@@ -29,3 +29,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-022 | 2026-09-19 | **Workspace**: a folder, used by a single catalogue, that receives all sidecars (of originals and of versions) and optionally exports. Auroraw writes nothing into source folders except at import and on explicit XMP export. Supersedes D-020. |
 | D-023 | 2026-09-19 | **Sidecar hierarchy**: the sidecar of an original holds only that original's metadata; the sidecar of a version copies those metadata and adds its own. |
 | D-024 | 2026-09-19 | **Exports and XMP compatibility**: exports may go into the workspace or elsewhere, and exporting into a source folder is discouraged with a warning. An option exports the originals' XMP files into the source folders, for compatibility with other software. |
+| D-025 | 2026-09-19 | **One workspace per catalogue**, exactly. |
+| D-026 | 2026-09-19 | **Catalogue database is local** (user data folder) and rebuildable from the workspace and the sources. Everything that would otherwise live only in the database is also written into the workspace. |
+| D-027 | 2026-09-19 | **Sidecar consistency**: when a photo's metadata changes, the copies in its version sidecars follow, except for the fields the version overrides. |
+| D-028 | 2026-09-19 | **XMP naming** for the export to source folders is the photographer's choice (`photo.xmp` or `photo.ARW.xmp`), `photo.xmp` by default. |
