@@ -1,14 +1,14 @@
 # Auroraw: architecture
 
-> **Status: first draft, for review.** This document describes *how Auroraw is built*: its
+> **Status: reviewed and adopted (D-079).** This document describes *how Auroraw is built*: its
 > modules, data, threads, image engine, plugins and interface. What the application does is in the
 > [functional specification](functional-specification.md); why choices were made is in the
 > [decision log](decisions.md); the measurements behind them are in the
 > [spike reports](spikes/). Each item carries a status:
 >
 > - **[decided]**: confirmed by Patrick, with its decision number.
-> - **[proposed]**: the architecture's own proposal, to be validated. Most of the structure is
->   in this category: the decisions fix the technology and the data model, not the module layout.
+> - **[proposed]**: adopted as the working design by D-079; it may be refined while building, and a
+>   change of substance goes through the decision log.
 > - **[open]**: unresolved, listed again in §14.
 >
 > Not covered here: the test strategy, continuous integration and governance (the next
