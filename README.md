@@ -9,6 +9,7 @@ negative scans, non-destructively), convert, edit metadata and deliver galleries
 - [Decision log](docs/decisions.md)
 - [Architecture](docs/architecture.md)
 - [Testing strategy](docs/testing-strategy.md)
+- [Continuous integration and releases](docs/continuous-integration.md)
 - [Technical spikes](docs/technical-spikes.md)
 
 ## License

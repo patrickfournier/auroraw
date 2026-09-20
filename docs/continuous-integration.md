@@ -1,0 +1,255 @@
+# Auroraw: continuous integration and releases
+
+> **Status: first draft, for review.** Where and when the tests of the
+> [testing strategy](testing-strategy.md) run, how a change reaches `dev` and `main`, how a
+> release is built, signed and published on three platforms, and how the supply chain is kept
+> safe. Items are tagged **[decided]**, **[proposed]** or **[open]**. Two items need a
+> decision from Patrick that involves money or accounts (§6.3, §6.4).
+
+## 1. Aims [proposed]
+
+1. **A change is known to work on Linux, Windows and macOS before it is merged**, not after a
+   user reports it. The spikes already found three platform-only failures (a DirectX compiler
+   rejection, a Linux-only system call, a Windows-only limit) that only a matrix would catch.
+2. **Fast feedback**: under ten minutes for the per-change run (testing strategy §10).
+3. **Releases are boring**: one tag produces every installer, signed, with checksums and notes, by
+   a script that has run many times before.
+4. **The pipeline is safe against its own inputs**: a contribution, a dependency or a plugin cannot
+   reach the signing keys.
+5. **Cheap to run**: hosted runners on a public repository, no servers to maintain.
+
+## 2. Branches and how a change flows [proposed, following D-006 and the standing git rules]
+
+| Branch | Role | Rules |
+| --- | --- | --- |
+| `main` | The last release. | Updated only by a merge at release time; every commit on it is a released state; tags `vX.Y.Z` point at it. Protected: no direct push, the release checks must pass. |
+| `dev` | Integration. | The default branch for work. Protected once outside contributors arrive: a pull request, the per-change checks green, one review. Until then, maintainers may push. |
+| `feature/...`, `fix/...` | One change each, from `dev`. | Short-lived; deleted after the merge. |
+
+A change: branch from `dev`, push, the **per-change workflow** runs, review, merge into `dev` by a
+squash or a merge commit as the reviewer prefers (history stays readable either way).
+A release: `dev` is merged into `main`, tagged, and the **release workflow** builds from the tag.
+A fix for a released version: a branch from the tag, released as a patch, merged back into `dev`
+[open: only needed once there are users to support].
+
+## 3. The workflows [proposed]
+
+### 3.1 Per change: `ci.yml`
+
+Runs on every push to `dev` and to a pull request. Jobs run in parallel; the slowest sets the time.
+
+| Job | What | Platforms |
+| --- | --- | --- |
+| **Lint** | `rustfmt --check`, `clippy` with warnings as errors, the repository's own checks (no tabs in docs, links between documents resolve) | Linux |
+| **Build and test** | `cargo build --locked`, `cargo nextest run` (unit, property with few cases, format, catalogue, engine scenarios, plugin host and hostile plugins, crash consistency short) | Linux x64, Windows x64, macOS arm64 |
+| **Plugins** | Build the plugins for `wasm32-wasip1` (the spike's step) and run the conformance tests against them | Linux, Windows, macOS |
+| **GPU reference** | The smoke test and the stage-against-reference tests on the **software adapter** of each runner: lavapipe, WARP, the runner's Metal adapter. **Blocking.** | All three |
+| **Dependencies** | `cargo deny check` (licences compatible with GPL-3.0, bans, sources), `cargo audit` | Linux |
+| **Translations** | Message ids present and unused, pseudo-locale run of every screen, the catalogue compiles | Linux |
+| **Accessibility** | The AT-SPI check that every control has a role and a name | Linux, under a virtual display |
+| **Docs** | The documents build; the spike and decision indexes are consistent | Linux |
+
+**Time control.** Cargo's registry and build cache are kept (`Swatinem/rust-cache` keyed on the lock
+file and the toolchain), tests run in parallel, and the smoke test uses a tiny image. The budget
+is ten minutes at the median; a job that grows past it is split or moved to the nightly run.
+
+**The runners.** GitHub-hosted `ubuntu-24.04`, `windows-2025` (or the current `windows-latest`),
+and `macos-15` on Apple silicon, pinned by name rather than `latest` so an image update does not
+change the result unannounced, and moved forward deliberately. Linux needs the packages the spikes
+found (`mesa-vulkan-drivers`, `libvulkan1`, fontconfig, xkbcommon, wayland and X libraries).
+Standard runners for a **public** repository are free; the repository's visibility is therefore
+part of this plan [open: confirm the repository is public before the code lands].
+
+### 3.2 Nightly: `nightly.yml`
+
+Runs once a night on `dev`, and on demand. Failures open an issue automatically.
+
+| Job | What |
+| --- | --- |
+| **Property, long** | The property tests with thousands of cases and a random seed that is printed, so a failure can be replayed |
+| **Fuzz** | Each fuzz target for a few minutes; new crashes are uploaded with their input |
+| **Large catalogue** | Generate the 100,000-photo dataset (about 3.5 GB, well within a runner's disk) and run the query, rebuild, and crash-consistency tests on it, on all three platforms (this is where the NTFS behaviour of spike 3 gets watched) |
+| **Sanitizers and races** | Address and thread sanitizers on the engine's concurrency tests, Linux only; `loom` on the small synchronisation pieces |
+| **Performance trend** | The harness on the runner, stored with the commit and drawn as a trend. **Never a gate** (testing strategy §7), because a shared runner's timings are noise |
+| **Latest toolchain** | Build with the newest stable and the beta compiler, to see breakage early |
+| **Dependency drift** | The freshest allowed versions of the dependencies build and pass |
+
+### 3.3 Release: `release.yml`
+
+Runs on a tag `vX.Y.Z` pushed to `main`. See §6.
+
+### 3.4 The spikes' workflow
+
+`spikes.yml` stays until the spike code is archived (§8), then is deleted. It is the ancestor of
+`ci.yml`, and its steps (build, adapter listing, blocking smoke test, sandbox tests) are already
+inside the jobs above.
+
+## 4. Running on real machines [proposed; the open item of the testing strategy]
+
+Hosted runners have no real GPU. Real Vulkan, DirectX 12 and Metal results, and honest timings,
+come from Patrick's machines. Three ways, in the order proposed:
+
+1. **A command anyone with the hardware runs**: `cargo xtask gpu-check` builds, lists the adapters,
+   runs the reference and smoke tests on each real adapter, and the performance harness, then
+   writes one JSON file with the machine, adapters, commit and results. A second command,
+   `cargo xtask compare <file>`, compares it with the stored baseline for that machine and prints
+   what changed. This replaces the ad hoc scripts of the spikes (`run-all.sh`) and works the same
+   on the three systems.
+2. **The result is posted, not run remotely.** The JSON goes as a comment on the pull request or
+   the release issue. Nothing on Patrick's machines is reachable from GitHub.
+3. **No self-hosted runner** on a personal machine for a public repository: a workflow triggered
+   by a pull request would run a stranger's code on it. If dedicated hardware appears (a small
+   test machine that is not used for anything else, run with ephemeral jobs and no access to
+   secrets), this can be revisited [open].
+
+The `xtask` crate is also the home for the other developer commands (`fetch-samples`, generate the
+test catalogue, update golden images, package), so that the same command works locally and in
+CI, and the workflow files stay short.
+
+## 5. Supply chain and secrets [proposed]
+
+- **Pin.** Third-party actions are pinned to a full commit hash, with the version in a comment;
+  a bot (Dependabot) proposes updates as pull requests. The Rust toolchain is pinned in
+  `rust-toolchain.toml`; `Cargo.lock` is committed and builds use `--locked`.
+- **Dependencies.** `cargo deny` blocks a dependency with an incompatible or unknown licence,
+  a known vulnerability, or a source other than crates.io without a reviewed exception.
+  New dependencies are justified in the change (testing strategy §9). Updates arrive weekly as
+  grouped pull requests and pass the same checks.
+- **Permissions.** Each workflow declares the least it needs (`contents: read` by default).
+  Pull requests from forks run **without secrets** and cannot publish anything.
+- **Secrets.** The signing keys and tokens live only in a protected **release environment** that
+  requires Patrick's approval for each release run and is available only to tags on `main`. They
+  are never available to `ci.yml` or to a pull request. No secret is ever printed, and logs are
+  reviewed once for leaks.
+- **Provenance.** Release artifacts get GitHub's build **attestations**, so a downloaded
+  installer can be verified to come from this repository's workflow, and a **software bill of
+  materials** (CycloneDX, from `cargo cyclonedx`) is published with each release.
+- **Reproducibility** is a goal, not a promise: the same commit built twice on the same runner
+  image should give the same binary, and the release notes say which toolchain was used.
+- **Plugins in the index** (D-054) get their own pipeline, described with the plugin index in M5.
+  This document covers the application only.
+
+## 6. Releases [proposed]
+
+### 6.1 Version numbers [proposed]
+
+`MAJOR.MINOR.PATCH`, with three separate version spaces that must not be confused:
+
+| What | Versioned how |
+| --- | --- |
+| The **application** | SemVer, `0.x` until the first stable release (after M4). A `0.x` minor may change anything but the promise below. |
+| **File formats** (sidecars, state files, catalogue schema) | Their own integers, written inside the files (architecture §5.5). A release can change none, one or several. **A new release always opens the workspaces of the older ones.** |
+| The **plugin API** | Its own number in every declaration (D-078), experimental until M5. |
+
+Each release notes which format versions and which API version it carries, and whether a
+migration runs on first start (with a backup made first).
+
+### 6.2 What a release contains
+
+| Platform | Deliverables |
+| --- | --- |
+| **Linux x64** | A **Flatpak** (the sandboxed, distribution-neutral route, published to Flathub), an **AppImage**, and a plain tarball. The Flatpak grants what the application needs (the photo folders the user picks through the portal, the GPU, the display) and no more, which suits the read-only-originals promise. |
+| **Windows x64** | A signed **installer** (per-user, no administrator rights needed) and a **portable** zip. |
+| **macOS arm64** | A signed and **notarised** `.dmg` with the application bundle. |
+| **All** | A checksum file, the SBOM, the release notes taken from the changelog, the attestations. |
+
+The plugins of the core (Prooftide export, official decoders) are **bundled as WebAssembly files**
+with the compiled-plugin cache made at first start, per machine, not shipped (a compiled plugin
+depends on the CPU).
+
+### 6.3 Signing: a decision for Patrick [open]
+
+Unsigned software triggers Windows SmartScreen and macOS Gatekeeper warnings that most
+photographers will not click past. What each platform needs:
+
+| | What is needed | Cost |
+| --- | --- | --- |
+| **macOS** | An Apple Developer Program membership, for the signing certificate and notarisation. **No way around it** for an application meant to be double-clicked. | About 99 USD a year |
+| **Windows** | A code-signing certificate. Options: **SignPath Foundation** signs open source projects for free after a review of the project; **Azure Trusted Signing** is a low monthly fee; a traditional certificate from an authority costs more and, since 2023, needs a hardware token. Unsigned builds work but show a warning. | Free to about 10 USD a month |
+| **Linux** | Flatpak and AppImage do not need a certificate; Flathub signs its repository. Optionally sign the tarball and checksums with a project key (a detached signature). | Free |
+
+Proposal: apply to SignPath for Windows, take the Apple membership when the first macOS build is
+ready to publish, and **ship the first 0.x pre-releases unsigned** with a clear note, so that
+signing is never on the critical path of the milestones. The keys and the account belong to
+the project's owner, not to me: I cannot and should not hold them.
+
+### 6.4 Updates [open]
+
+The application makes **no network request the user did not consent to** (D-061), so it cannot
+silently check for a new version. Proposal: a **"Check for updates"** command and an opt-in
+setting that fetches one small file listing the latest version, nothing else sent; Flatpak and
+package managers update themselves without any of this; no automatic download or install in
+v1. Windows and macOS users install the new release over the old one. Whether a proper updater
+(Sparkle on macOS, an equivalent on Windows) is worth its complexity is decided after the first
+release, from real use.
+
+### 6.5 Crash reports [open]
+
+A crash writes a **local** report (the application's log tail, the versions, the adapter), and a
+dialog offers to open the folder or copy the text into an issue. Nothing is sent automatically.
+An opt-in uploader is not planned.
+
+### 6.6 The release procedure
+
+1. On `dev`: the checks are green for the last week, the nightly runs are green, the performance
+   and manual checks of the testing strategy §11 are done and recorded.
+2. Update the changelog and the version; merge `dev` into `main`; tag `vX.Y.Z`.
+3. `release.yml` builds each platform, runs the test suite once more against the built
+   artifacts (a launch test: the binary starts, opens a sample workspace, renders a sample
+   image, exits), signs (after Patrick's approval), attaches checksums, SBOM and attestations,
+   and creates a **draft** release.
+4. Patrick installs each artifact on a clean machine or VM and runs the packaging checks.
+5. Patrick publishes the draft. Flathub and other channels follow.
+6. `main` is merged back into `dev` if anything changed on it.
+
+A **pre-release** channel is the same procedure with a tag such as `v0.3.0-rc.1` and the release
+marked as a pre-release. **Nightly builds** from `dev` are kept as CI artifacts for 14 days, unsigned,
+for testers; they are not linked from the front page.
+
+## 7. What it costs [proposed]
+
+For a public repository, hosted runners on all three platforms are free. If the repository were
+private the macOS and Windows minutes would multiply the bill: another reason to confirm it is
+public. Expected use: a per-change run of about 10 minutes on three platforms (roughly 30
+runner-minutes), a nightly run of an hour or so, a release of a few tens of minutes. Storage
+of artifacts is capped by retention (14 days for nightly builds, a few days for pull requests,
+releases permanent). The recurring costs that money buys are only the signing accounts of §6.3.
+
+## 8. From the spikes to the product [proposed]
+
+- The spike code has answered its questions. Before the first product commit, it is **archived**:
+  a tag (`spikes-final`) marks the last commit that has it, and the `spikes/` directory is
+  removed from `dev`. The reports in `docs/spikes/` and the raw results stay, as they are the
+  record.
+- The repository then looks like this:
+
+```
+Cargo.toml            workspace
+crates/               types, format, catalogue, workspace, sources, imaging, import,
+                      pipeline, develop, export, publish, plugin-api, plugin-host,
+                      engine, ui, cli, app   (architecture §3.1)
+plugins/              the core's own plugins (built for wasm32-wasip1)
+xtask/                developer commands (§4)
+packaging/            Flatpak manifest, installer scripts, bundle metadata
+fuzz/                 fuzz targets
+testdata/             fixtures per format version, golden images (small)
+docs/                 as today
+```
+
+- The harnesses of the spikes that the strategy keeps (the dataset generator, the benchmark JSON
+  output, the smoke test, the hostile plugins, the AT-SPI script) are **moved** into `xtask`, the
+  test trees and `plugins/`, not rewritten.
+
+## 9. Open points
+
+| # | Item | To settle |
+| --- | --- | --- |
+| 1 | The repository is public (free runners) | Patrick, before code lands |
+| 2 | Signing: SignPath and Apple membership, and who holds the accounts | Patrick, before the first release |
+| 3 | Flatpak details: permissions, the runtime, Vulkan and GPU access on the sandbox | M1 packaging spike, small |
+| 4 | Intel Macs (x86_64): supported, or Apple silicon only | Before the first macOS release |
+| 5 | Linux on arm64, Windows on arm64 | After the first release, on demand |
+| 6 | Updates: opt-in check only, or a real updater | After the first release |
+| 7 | Real-GPU runs: the `xtask` command is enough, or dedicated hardware later | After M2 |
+| 8 | Branch protection rules on `dev` | When the first outside contributor arrives |
+| 9 | Hosting for large test data (the sample RAW files) if the source goes away | With the first golden tests |
