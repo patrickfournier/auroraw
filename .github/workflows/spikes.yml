@@ -42,6 +42,12 @@ jobs:
         run: ./target/release/adapters${{ matrix.ext }}
         shell: bash
 
+      - name: Smoke test
+        # Every shader must compile on this platform's graphics API and agree with the CPU
+        # reference. This is a blocking step: a shader that one API rejects fails the build.
+        run: ./target/release/smoke${{ matrix.ext }} --adapter "${{ matrix.backend }}"
+        shell: bash
+
       - name: Benchmark (24 MP)
         # The hosted runners have no discrete GPU: this measures the software or virtual adapter
         # they offer, and checks that the shaders run and agree with the CPU reference.
@@ -58,6 +64,7 @@ jobs:
             spikes/target/release/bench${{ matrix.ext }}
             spikes/target/release/rawbench${{ matrix.ext }}
             spikes/target/release/heavy${{ matrix.ext }}
+            spikes/target/release/smoke${{ matrix.ext }}
             spikes/target/release/memtest${{ matrix.ext }}
             spikes/target/release/adapters${{ matrix.ext }}
             spikes/fetch-samples.sh

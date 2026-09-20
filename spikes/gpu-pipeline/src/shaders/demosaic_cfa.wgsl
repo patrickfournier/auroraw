@@ -29,6 +29,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     if (gid.x >= p.tile_w || gid.y >= p.tile_h) { return; }
     let x = i32(p.tile_x + gid.x);
     let y = i32(p.tile_y + gid.y);
+    // No dynamic indexing of vector components: DirectX's FXC compiler rejects it in a loop.
     var sum = vec3<f32>(0.0);
     var weight = vec3<f32>(0.0);
     for (var dy = -3; dy <= 3; dy = dy + 1) {
@@ -36,13 +37,16 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             let mx = mirror(x + dx, i32(p.width));
             let my = mirror(y + dy, i32(p.height));
             let c = colour_at(mx, my);
+            let mask = vec3<f32>(f32(c == 0u), f32(c == 1u), f32(c == 2u));
             let w = 1.0 / (1.0 + f32(dx * dx + dy * dy));
-            sum[c] = sum[c] + w * raw(mx, my);
-            weight[c] = weight[c] + w;
+            sum = sum + mask * (w * raw(mx, my));
+            weight = weight + mask * w;
         }
     }
     var rgb = sum / max(weight, vec3<f32>(1e-6));
-    rgb[colour_at(x, y)] = raw(x, y);
+    let own = colour_at(x, y);
+    let own_mask = vec3<f32>(f32(own == 0u), f32(own == 1u), f32(own == 2u));
+    rgb = mix(rgb, vec3<f32>(raw(x, y)), own_mask);
     rgb = max(rgb, vec3<f32>(0.0)) * p.wb.xyz;
     inter[gid.y * p.tile_w + gid.x] = vec4<f32>(rgb, 1.0);
 }
