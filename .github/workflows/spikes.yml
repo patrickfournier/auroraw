@@ -33,7 +33,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y mesa-vulkan-drivers libvulkan1 libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcb1-dev libgl1-mesa-dev
 
       - name: Toolchain
-        run: rustup update stable && rustc --version
+        run: rustup update stable && rustup target add wasm32-wasip1 && rustc --version
 
       - name: Build
         run: cargo build --release
@@ -46,6 +46,19 @@ jobs:
         # Every shader must compile on this platform's graphics API and agree with the CPU
         # reference. This is a blocking step: a shader that one API rejects fails the build.
         run: ./target/release/smoke${{ matrix.ext }} --adapter "${{ matrix.backend }}"
+        shell: bash
+
+      - name: Build the WebAssembly plugins
+        run: cargo build --release --target wasm32-wasip1
+        working-directory: spikes/plugins
+
+      - name: Plugin sandbox (spike 4)
+        # A plugin that crashes, loops, hoards memory or reaches for files and the network must
+        # not hurt the host, and must be refused, on every platform.
+        run: |
+          ./target/release/sandbox${{ matrix.ext }}
+          ./target/release/gpubench${{ matrix.ext }} --out results/${{ matrix.name }}-gpu-plugin.json
+          ./target/release/opbench${{ matrix.ext }} --out results/${{ matrix.name }}-ops-plugin.json
         shell: bash
 
       - name: Benchmark (24 MP)
@@ -75,6 +88,11 @@ jobs:
             spikes/target/release/exifcost${{ matrix.ext }}
             spikes/target/release/viewer-catalogue${{ matrix.ext }}
             spikes/run-spike3.sh
+            spikes/target/release/sandbox${{ matrix.ext }}
+            spikes/target/release/opbench${{ matrix.ext }}
+            spikes/target/release/importbench${{ matrix.ext }}
+            spikes/target/release/gpubench${{ matrix.ext }}
+            spikes/plugins/target/wasm32-wasip1/release/*.wasm
             spikes/target/release/memtest${{ matrix.ext }}
             spikes/target/release/adapters${{ matrix.ext }}
             spikes/fetch-samples.sh

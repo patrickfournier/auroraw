@@ -1,0 +1,80 @@
+{
+  "safety_nets_conv5_ms": {
+    "epoch interruption": 202.691747,
+    "fuel metering": 209.03290099999998,
+    "no protection": 191.27997599999998
+  },
+  "scaling_16_tiles": [
+    {
+      "native_ms": 377.194356,
+      "threads": 1,
+      "wasm_ms": 543.345266
+    },
+    {
+      "native_ms": 192.66935700000002,
+      "threads": 2,
+      "wasm_ms": 291.690551
+    },
+    {
+      "native_ms": 112.633105,
+      "threads": 4,
+      "wasm_ms": 173.733079
+    },
+    {
+      "native_ms": 87.31950099999999,
+      "threads": 8,
+      "wasm_ms": 120.213409
+    },
+    {
+      "native_ms": 79.456833,
+      "threads": 16,
+      "wasm_ms": 123.0793
+    }
+  ],
+  "wasm SIMD128": {
+    "call_overhead_us": 0.039,
+    "compile_ms": 6.5521720000000006,
+    "conv5": {
+      "in_ms": 5.589908,
+      "native_ms": 155.770984,
+      "out_ms": 6.586715,
+      "run_ms": 107.766339,
+      "run_ratio": 0.6918255006978706,
+      "total_ratio": 0.7699955339564395
+    },
+    "instantiate_ms": 0.078692,
+    "load_compiled_ms": 0.0838,
+    "tone": {
+      "in_ms": 5.589929000000001,
+      "max_diff": 0.0,
+      "native_ms": 86.117202,
+      "out_ms": 6.842404,
+      "run_ms": 119.200693,
+      "run_ratio": 1.3841682060222997,
+      "total_ratio": 1.5285334746477248
+    }
+  },
+  "wasm scalar": {
+    "call_overhead_us": 0.04,
+    "compile_ms": 7.609258,
+    "conv5": {
+      "in_ms": 5.480456,
+      "native_ms": 156.751705,
+      "out_ms": 5.964851,
+      "run_ms": 190.007966,
+      "run_ratio": 1.2121588470122224,
+      "total_ratio": 1.2851743654080192
+    },
+    "instantiate_ms": 0.073458,
+    "load_compiled_ms": 0.09269,
+    "tone": {
+      "in_ms": 5.603104999999999,
+      "max_diff": 0.0,
+      "native_ms": 86.42762499999999,
+      "out_ms": 7.1709190000000005,
+      "run_ms": 123.00467499999999,
+      "run_ratio": 1.423210171516341,
+      "total_ratio": 1.5710104147834676
+    }
+  }
+}

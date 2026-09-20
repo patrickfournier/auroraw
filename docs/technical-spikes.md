@@ -1,6 +1,6 @@
 # Technical spikes
 
-> **Status: spikes 1 and 2 done, 3 measured on Linux, 4 to do.** Phase 2 (development process) begins with the technology
+> **Status: spikes 1 and 2 done, 3 and 4 measured on Linux.** Phase 2 (development process) begins with the technology
 > stack. Four choices depend on facts we do not have yet, so we measure before we decide.
 > A spike is a small, throwaway prototype that answers one question with numbers. Its code is
 > not part of the product.
@@ -18,6 +18,7 @@ Decided so far for the stack (see [decisions.md](decisions.md), D-068 to D-071):
 - **Spike 1 done**: wgpu is confirmed (docs/spikes/01-gpu-pipeline.md).
 - **Spike 2 done**: the interface toolkit is **Slint**, D-072 (docs/spikes/02-image-view-and-toolkit.md).
 - **Spike 3 measured on Linux**: SQLite meets every budget; a Windows run is pending (docs/spikes/03-catalogue-and-grid.md).
+- **Spike 4 measured on Linux**: WebAssembly works as the plugin sandbox, 1.2 to 2 times native (docs/spikes/04-plugin-sandbox.md).
 
 Candidates carried into the spikes:
 

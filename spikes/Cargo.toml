@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
-members = ["gpu-pipeline", "viewer-slint", "viewer-iced", "catalogue", "viewer-catalogue"]
+members = ["gpu-pipeline", "viewer-slint", "viewer-iced", "catalogue", "viewer-catalogue", "plugin-host"]
+# The plugins are built for WebAssembly, in their own workspace.
+exclude = ["plugins"]
 
 [profile.release]
 debug = 1

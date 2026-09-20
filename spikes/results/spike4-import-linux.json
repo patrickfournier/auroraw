@@ -1,0 +1,90 @@
+{
+  "compile_ms": 434.695532,
+  "files": [
+    {
+      "file": "DSC00396.ARW",
+      "guest_memory_mb": 261.0,
+      "identical": true,
+      "instantiate_ms": 0.465085,
+      "mb": 58.9521484375,
+      "native_ms": 53.764883,
+      "ratio_decode": 7.019533512236974,
+      "ratio_total": 8.143203361941659,
+      "wasm_decode_ms": 377.40439799999996,
+      "wasm_in_ms": 19.376197,
+      "wasm_out_ms": 41.037781,
+      "wasm_total_ms": 437.81837599999994
+    },
+    {
+      "file": "DSCF0120.RAF",
+      "guest_memory_mb": 184.0,
+      "identical": true,
+      "instantiate_ms": 0.195627,
+      "mb": 28.277542114257812,
+      "native_ms": 242.66790699999999,
+      "ratio_decode": 8.46753043450447,
+      "ratio_total": 8.617425677965732,
+      "wasm_decode_ms": 2054.797888,
+      "wasm_in_ms": 9.561717000000002,
+      "wasm_out_ms": 26.813048,
+      "wasm_total_ms": 2091.172653
+    },
+    {
+      "file": "Nikon-D850-14bit-compressed.NEF",
+      "guest_memory_mb": 243.4375,
+      "identical": true,
+      "instantiate_ms": 0.15458599999999997,
+      "mb": 45.40380668640137,
+      "native_ms": 249.756652,
+      "ratio_decode": 1.368101915459693,
+      "ratio_total": 1.5471880684883619,
+      "wasm_decode_ms": 341.692554,
+      "wasm_in_ms": 15.205762,
+      "wasm_out_ms": 29.522196,
+      "wasm_total_ms": 386.420512
+    },
+    {
+      "file": "PB290154.ORF",
+      "guest_memory_mb": 114.9375,
+      "identical": true,
+      "instantiate_ms": 0.160802,
+      "mb": 16.9785099029541,
+      "native_ms": 251.043864,
+      "ratio_decode": 1.2949851624336055,
+      "ratio_total": 1.3693114921143819,
+      "wasm_decode_ms": 325.098079,
+      "wasm_in_ms": 5.620255,
+      "wasm_out_ms": 13.038914,
+      "wasm_total_ms": 343.75724799999995
+    },
+    {
+      "file": "canon-r5m2-CRAW.CR3",
+      "guest_memory_mb": 346.5625,
+      "identical": true,
+      "instantiate_ms": 0.157781,
+      "mb": 26.252593994140625,
+      "native_ms": 286.572303,
+      "ratio_decode": 4.9646446118695575,
+      "ratio_total": 5.104441314414115,
+      "wasm_decode_ms": 1422.72964,
+      "wasm_in_ms": 9.068106,
+      "wasm_out_ms": 30.993757,
+      "wasm_total_ms": 1462.791503
+    },
+    {
+      "file": "dc-s5_6k4k.RW2",
+      "guest_memory_mb": 175.375,
+      "identical": true,
+      "instantiate_ms": 0.156365,
+      "mb": 34.3310546875,
+      "native_ms": 23.194493,
+      "ratio_decode": 7.747286392507048,
+      "ratio_total": 8.92314999081894,
+      "wasm_decode_ms": 179.69438,
+      "wasm_in_ms": 11.699332,
+      "wasm_out_ms": 15.574228000000002,
+      "wasm_total_ms": 206.96794
+    }
+  ],
+  "load_compiled_ms": 3.5486
+}

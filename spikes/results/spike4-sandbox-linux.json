@@ -1,0 +1,147 @@
+{
+  "clock_readable": true,
+  "environment_variables_seen": 0,
+  "failures": [
+    {
+      "case": "panic",
+      "host_alive": true,
+      "ms": 0.979424,
+      "outcome": "trap: error while executing at wasm backtrace:"
+    },
+    {
+      "case": "infinite loop, stopped by a 10 ms timer",
+      "host_alive": true,
+      "ms": 10.165892,
+      "outcome": "interrupted: error while executing at wasm backtrace:"
+    },
+    {
+      "case": "infinite loop, stopped by a 100 ms timer",
+      "host_alive": true,
+      "ms": 100.14107299999999,
+      "outcome": "interrupted: error while executing at wasm backtrace:"
+    },
+    {
+      "case": "infinite loop, stopped by a 1000 ms timer",
+      "host_alive": true,
+      "ms": 1000.1630159999999,
+      "outcome": "interrupted: error while executing at wasm backtrace:"
+    },
+    {
+      "case": "infinite loop, 300 million steps of fuel",
+      "host_alive": true,
+      "ms": 20.165967,
+      "outcome": "stopped: error while executing at wasm backtrace:"
+    },
+    {
+      "case": "asks for 100 MB, limit 256 MB",
+      "host_alive": true,
+      "ms": 28.522389,
+      "outcome": "got 100 MB"
+    },
+    {
+      "case": "asks for 2000 MB, limit 256 MB",
+      "host_alive": true,
+      "ms": 69.021799,
+      "outcome": "refused: error while executing at wasm backtrace:"
+    },
+    {
+      "case": "endless recursion",
+      "host_alive": true,
+      "ms": 0.263287,
+      "outcome": "trap: error while executing at wasm backtrace:"
+    }
+  ],
+  "new_file_created": false,
+  "permissions": [
+    {
+      "action": "read the host's private file",
+      "as_intended": true,
+      "case": "nothing granted",
+      "result": "denied: ENOENT (-44)"
+    },
+    {
+      "action": "read /etc/passwd",
+      "as_intended": true,
+      "case": "nothing granted",
+      "result": "denied: ENOENT (-44)"
+    },
+    {
+      "action": "read the granted file",
+      "as_intended": true,
+      "case": "nothing granted",
+      "result": "denied: ENOENT (-44)"
+    },
+    {
+      "action": "read outside by ../",
+      "as_intended": true,
+      "case": "nothing granted",
+      "result": "denied: ENOENT (-44)"
+    },
+    {
+      "action": "list the granted folder",
+      "as_intended": true,
+      "case": "nothing granted",
+      "result": "denied: ENOENT (-44)"
+    },
+    {
+      "action": "write a file in the granted folder",
+      "as_intended": true,
+      "case": "nothing granted",
+      "result": "denied: ENOENT (-44)"
+    },
+    {
+      "action": "read the host's private file",
+      "as_intended": true,
+      "case": "one folder, read only",
+      "result": "denied: ENOENT (-44)"
+    },
+    {
+      "action": "read /etc/passwd",
+      "as_intended": true,
+      "case": "one folder, read only",
+      "result": "denied: ENOENT (-44)"
+    },
+    {
+      "action": "read the granted file",
+      "as_intended": true,
+      "case": "one folder, read only",
+      "result": "ok (2)"
+    },
+    {
+      "action": "read outside by ../",
+      "as_intended": true,
+      "case": "one folder, read only",
+      "result": "denied: EPERM (-63)"
+    },
+    {
+      "action": "list the granted folder",
+      "as_intended": true,
+      "case": "one folder, read only",
+      "result": "ok (1)"
+    },
+    {
+      "action": "write a file in the granted folder",
+      "as_intended": true,
+      "case": "one folder, read only",
+      "result": "denied: EPERM (-63)"
+    },
+    {
+      "action": "open a network connection",
+      "as_intended": true,
+      "case": "nothing granted",
+      "result": "denied: unsupported (-1001)"
+    },
+    {
+      "action": "start a program",
+      "as_intended": true,
+      "case": "nothing granted",
+      "result": "denied: unsupported (-1001)"
+    },
+    {
+      "action": "start a thread",
+      "as_intended": true,
+      "case": "nothing granted",
+      "result": "denied: ENOTSUP (-58)"
+    }
+  ]
+}

@@ -291,6 +291,62 @@ impl<'g> Renderer<'g> {
     }
 }
 
+
+/// An operation supplied by a plugin as WGSL, compiled and checked by the host.
+pub struct PluginOp {
+    pipeline: wgpu::ComputePipeline,
+}
+
+impl<'g> Renderer<'g> {
+    /// Compiles a plugin's WGSL. It is appended to the shared `Params` declaration and must define
+    /// `main` and the three bindings (uniform `p`, storage `src`, storage `dst`). A shader that is
+    /// invalid is refused with the reason; nothing panics.
+    pub fn compile_plugin_op(&self, body: &str) -> std::result::Result<PluginOp, String> {
+        let d = &self.g.device;
+        let scope = d.push_error_scope(wgpu::ErrorFilter::Validation);
+        let module = d.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("plugin"), source: wgpu::ShaderSource::Wgsl(Cow::Owned(format!("{COMMON}\n{body}"))) });
+        let pipeline = d.create_compute_pipeline(&wgpu::ComputePipelineDescriptor { label: Some("plugin"), layout: None, module: &module, entry_point: Some("main"), compilation_options: Default::default(), cache: None });
+        match pollster::block_on(scope.pop()) {
+            Some(e) => Err(e.to_string()),
+            None => Ok(PluginOp { pipeline }),
+        }
+    }
+
+    /// Develops a region of the mosaic into `buf` (camera RGB), the stage before a plugin.
+    pub fn demosaic_region(&self, buf: &wgpu::Buffer, x0: u32, y0: u32, w: u32, h: u32) -> Result<f64> {
+        let p = Params { tile_x: x0, tile_y: y0, tile_w: w, tile_h: h, ..self.scene_params };
+        let start = Instant::now();
+        let mut enc = self.encoder();
+        self.demosaic_pass(&mut enc, &p, buf);
+        self.submit_wait(enc)?;
+        Ok(ms(start.elapsed()))
+    }
+
+    /// Runs a plugin operation from `src` to `dst`, both camera RGB of `w` by `h`.
+    /// `params` reach the shader as `p.op0` to `p.op3`.
+    pub fn run_plugin_op(&self, op: &PluginOp, src: &wgpu::Buffer, dst: &wgpu::Buffer, w: u32, h: u32, params: &[f32; 16]) -> Result<f64> {
+        let mut ops = [[0f32; 4]; 4];
+        for (i, v) in params.iter().enumerate() {
+            ops[i / 4][i % 4] = *v;
+        }
+        let p = Params { tile_w: w, tile_h: h, op: ops, ..self.scene_params };
+        let start = Instant::now();
+        let mut enc = self.encoder();
+        self.pass(&mut enc, &op.pipeline, &p, &[src, dst]);
+        self.submit_wait(enc)?;
+        Ok(ms(start.elapsed()))
+    }
+
+    /// The tone and display stage on a camera RGB buffer: RGBA8 out.
+    pub fn tone_from(&self, inter: &wgpu::Buffer, out: &wgpu::Buffer, w: u32, h: u32) -> Result<f64> {
+        self.crop_tone_only(w, h, self.scene_params.exposure, inter, out)
+    }
+
+    pub fn read_f32(&self, buf: &wgpu::Buffer, n: u64) -> Result<Vec<f32>> {
+        Ok(self.read(buf, n)?.into_iter().map(f32::from_bits).collect())
+    }
+}
+
 /// Buffers for the 100% view path: develop a viewport, read it back to the CPU as RGBA8.
 pub struct ViewPath {
     inter: wgpu::Buffer,

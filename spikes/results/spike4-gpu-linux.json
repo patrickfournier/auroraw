@@ -1,0 +1,51 @@
+{
+  "placement_cases": [
+    {
+      "case": "after the output, before demosaic",
+      "result": "refused: no room: it must come after stage 5 and before stage 0"
+    },
+    {
+      "case": "a stage that does not exist",
+      "result": "refused: unknown stage `hologram`"
+    },
+    {
+      "case": "no constraints at all",
+      "result": "demosaic -> denoise -> sharpen -> local-contrast -> tone -> output -> test"
+    }
+  ],
+  "refused": [
+    {
+      "case": "a syntax error",
+      "verdict": "refused by the GPU driver's validation: Shader 'plugin' parsing error: expected operation (`=`), found \"==\""
+    },
+    {
+      "case": "a store into a read-only buffer",
+      "verdict": "refused by the GPU driver's validation: Shader validation error: Entry point main at Compute is invalid"
+    },
+    {
+      "case": "no entry point",
+      "verdict": "refused by the GPU driver's validation: Error matching shader requirements against the pipeline"
+    },
+    {
+      "case": "an unbounded loop",
+      "verdict": "refused by the host's check: `loop` is not allowed: a shader that never ends cannot be stopped on a GPU"
+    },
+    {
+      "case": "a workgroup of 1024 invocations",
+      "verdict": "refused by the host's check: workgroup of 1024 invocations, the limit is 256"
+    },
+    {
+      "case": "an undeclared variable",
+      "verdict": "refused by the GPU driver's validation: Shader 'plugin' parsing error: invalid field accessor `nonsense`"
+    }
+  ],
+  "run": {
+    "adapter": "NVIDIA GeForce GTX 1650 SUPER",
+    "compile_ms": 0.424047,
+    "cpu_twin_ms": 9.149236,
+    "fraction_changed": 0.7145939429012346,
+    "gpu_ms": 0.625305,
+    "worst_abs_diff": 1.4901161193847656e-8,
+    "worst_rel_diff": 7.450580142176477e-6
+  }
+}
