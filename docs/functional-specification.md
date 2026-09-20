@@ -663,17 +663,66 @@ optional and backward compatible.
 Four families [decided]: **import** (including RAW reading), **export** (images and galleries),
 **image-processing operations**, **image sources**.
 
-High-level requirements [proposed]:
+**What each family provides** [proposed]
 
-- Auroraw's internal modules (operations, base formats) use the same interface as external
-  plugins, so the interface is validated as early as milestone M2.
+| Family | What it provides |
+| --- | --- |
+| Import | Reads a file format: pixels (linear), metadata, embedded preview and thumbnail. RAW decoders belong here. |
+| Export | Writes a file format, with its options declared. Also gallery services: creating, updating and deleting items, the service's limits, whether it can update in place, and fetching client feedback (§5.9). |
+| Operation | Parameters, a shader or kernel, its stage and ordering constraints in the pipeline (§5.6), mask support, the panel it belongs in. |
+| Source | Lists, describes, reads and watches files; reports online or offline; read-only or writable; handles its own sign-in. |
+
+**Plugin manager and behaviour** [proposed]
+
+- A plugin manager built into the application lists installed plugins and lets the user enable,
+  disable and update them, see their permissions, licence and errors.
+- A failing plugin never crashes the application and never corrupts a catalogue or a workspace.
+- Each plugin declares an identifier, its version, the API version it targets, its family, its
+  permissions and the languages it provides. It ships its own translations.
+- A plugin's interface is **declarative** (forms, sliders, curves, pickers) and displayed by
+  Auroraw, so it stays consistent, translatable and accessible. Fully custom interfaces are not
+  planned for v1.
+- Versions record which plugins they need (§5.6), and a missing plugin never loses settings.
+
+**Distribution** [decided, D-054]
+
+- A **catalogue of plugins** built into the application, fed by a **public, open index** (a
+  repository describing plugins, versions and fingerprints), with **trust levels**: official,
+  verified, community.
+- **Manual installation** from a file or an address stays possible, for private plugins and for
+  development.
+- No hosted store: no accounts, moderation or payments to run.
+
+**Trust and permissions** [decided, D-055]
+
+- A plugin runs in a **sandbox** by default. It declares what it needs (network, files,
+  keychain) and the user sees those permissions **before installing**.
+- Plugins that need native code (fast RAW decoders) may request a **native** level. It is
+  clearly flagged and needs explicit confirmation.
+
+**Source plugins: first scenarios** [decided, D-056]
+
+- The interface must first allow: a **folder on a local disk** and a **card mounted in the file
+  system** (the core's own sources use the same interface, so it is exercised from the start
+  [proposed]); a **camera or phone connected** by USB (PTP or MTP); and **online storage** (S3,
+  WebDAV, Google Drive, Dropbox), with the online and offline states of §5.1.
+- **Scanner acquisition** is not among the first scenarios.
+- **Importing from other software** (Lightroom, digiKam, darktable catalogues) is kept for
+  later, together with the question of importing their settings (§10).
+
+**Timeline** [decided]
+
+- Internal modules use the same interface as external plugins from milestone M2, so the
+  interface is validated early. The public API is frozen in milestone M5, not before; until
+  then it is marked experimental [proposed].
 - Operation plugins must be able to run on the GPU and declare where they sit in the pipeline
   (§5.6).
-- A plugin declares its permissions (network, disk access); the user sees them before
-  installation.
-- The public API is frozen in milestone M5, not before.
 
-Language, ABI, isolation and distribution are handled in the "development process" phase (§10).
+**Licensing** [open, D-057]: the licence policy for plugins is settled together with the
+isolation model in the next phase (§10). Moving the core to the LGPL is an option kept open.
+
+Language, ABI, isolation technology and hosting of the index are handled in the "development
+process" phase (§10).
 
 ### 5.11 AI
 
@@ -758,7 +807,9 @@ to it.
    could be offered for the reliable subset, with a warning.
 10. **Prooftide API v1**: the exact scope of the documented API, its compatibility policy, and how
     a plugin identifies itself and is authorised (work in the Prooftide repository).
-11. **Plugin model**: language, isolation, distribution, compatibility with GPL-3.0.
+11. **Plugin technology**: the language and ABI, the isolation technology (what runs in the
+    sandbox and what "native" means), how GPU code is packaged, and how the index is hosted and
+    its entries signed.
 12. **Importing settings** from other software (Lightroom, darktable): useful, and how far?
 13. **Dependency licenses**: compatibility with GPL-3.0 (RAW libraries, Lensfun and its database,
     AI models).
@@ -805,6 +856,13 @@ to it.
     published photo is no longer in the catalogue.
 33. **Linking an existing gallery**: how ambiguities are resolved when several photos share a
     file name.
+34. **Plugin licensing (D-057)**: options are keeping GPL-3.0 with a plugin exception, licensing
+    the plugin API and SDK permissively, or moving the core to the LGPL. This is best decided
+    before accepting outside contributions, since relicensing later needs the consent of every
+    contributor. It is legal as well as technical, and depends on the isolation model.
+35. **Source plugin details**: how a source reports changes for monitoring (§5.1), how sign-in
+    and refreshed credentials are stored, and how a camera source presents its files to the
+    import (§5.2).
 
 ## 11. Next steps
 
