@@ -33,3 +33,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-026 | 2026-09-19 | **Catalogue database is local** (user data folder) and rebuildable from the workspace and the sources. Everything that would otherwise live only in the database is also written into the workspace. |
 | D-027 | 2026-09-19 | **Sidecar consistency**: when a photo's metadata changes, the copies in its version sidecars follow, except for the fields the version overrides. |
 | D-028 | 2026-09-19 | **XMP naming** for the export to source folders is the photographer's choice (`photo.xmp` or `photo.ARW.xmp`), `photo.xmp` by default. |
+| D-029 | 2026-09-19 | **Import profiles**: an import profile stores destination, naming, backup, metadata template and style; inserting a card offers a one-click import with a profile. Nothing starts automatically. |
+| D-030 | 2026-09-19 | **Import everything**: no pre-selection at import; culling happens afterwards in the catalogue. |
+| D-031 | 2026-09-19 | **The card is never modified**: Auroraw signals when the copies are verified and it is safe to erase, and deletes nothing. |
+| D-032 | 2026-09-19 | **RAW+JPEG**: a pair is one photo with two files; the RAW is developed, the JPEG is a companion. A profile setting can ignore either kind. |

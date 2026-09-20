@@ -179,11 +179,62 @@ original for detail-dependent operations (see §10).
 
 ### 5.2 Import
 
-- Import from a memory card with renaming, duplicate backup and metadata application
-  [decided, v1].
-- Import of geolocation from GPX tracks, and a map of photos [decided, v1].
+**Ways to bring photos in** [proposed]
+
+| Way | What happens |
+| --- | --- |
+| Copy from a card or a folder | Files are copied to a destination folder in the photographer's archive, then added to the catalogue. This is the only case, besides the explicit XMP export, where Auroraw writes into a source. |
+| Add in place | An existing folder becomes a source. Nothing is copied or written. |
+| Other | Cameras and phones connected directly, cloud services and so on, through source plugins (§5.10). |
+
+**Import profiles** [decided, D-029]
+
+- A profile stores everything an import needs: destination folder template, renaming template,
+  backup copy destinations, metadata template (creator, copyright, keywords), a style to apply,
+  and the RAW+JPEG rule below [proposed].
+- When a card is inserted, Auroraw offers "Import with profile X": **one click**. Nothing
+  starts on its own; the click is always the photographer's [proposed].
+- The full dialog is the profile editor (and can run a one-off import with unsaved settings).
+  Everyday imports do not go through it.
+
+**Everything is imported, culling comes after** [decided, D-030]
+
+- No pre-selection: every file on the card is copied.
+- Culling can begin as soon as the first photos are copied, while the copy continues; thumbnails
+  come from the previews embedded in the files [proposed].
+
+**Copy safety** [proposed]
+
+- Each copy is verified by checksum against the source.
+- An optional second copy (backup) goes to another location and is verified the same way.
+- An interrupted import resumes where it stopped.
+- Files already imported are recognised by content fingerprint and skipped, with a report.
+- A file is never overwritten; a name collision gets a unique suffix.
+
+**After the import** [decided, D-031]
+
+- Auroraw **deletes nothing on the card**. When every copy and backup is verified it shows "All
+  N files copied and verified to X and Y" and offers to eject the card. The photographer formats
+  the card in the camera.
+
+**RAW+JPEG pairs** [decided, D-032]
+
+- A pair is **one photo with two files**. The RAW is the file that is developed; the JPEG is a
+  companion (the camera's rendering, quick delivery). Both are copied.
+- A profile setting can ignore the JPEGs or the RAW files. A JPEG without a RAW is a photo like
+  any other.
+
+**Metadata and geolocation at import** [proposed]
+
+- The profile's metadata template is written to the photo sidecars in the workspace, never into
+  the copied files.
+- Geolocation from GPX tracks [decided, v1] applies at import or afterwards, with a correction
+  for the camera clock offset and time zone. Photos can be shown on a map.
+
+**Formats** [decided]
+
 - Import of all RAW formats (through import plugins; the core bundles the most common ones) and
-  of all image formats used in the photo and film industries [decided]. Video is excluded.
+  of all image formats used in the photo and film industries. Video is excluded.
 
 ### 5.3 Culling, series and duplicates
 
@@ -420,8 +471,9 @@ to it.
 12. **Importing settings** from other software (Lightroom, darktable): useful, and how far?
 13. **Dependency licenses**: compatibility with GPL-3.0 (RAW libraries, Lensfun and its database,
     AI models).
-14. **Import from a card**: destination folder templates, renaming tokens, duplicate backup,
-    checksum verification, and the "safe to erase the card" signal.
+14. **Import details**: default destination and renaming templates and their tokens, what happens
+    with cards from several cameras or with clashing file numbers, time zone handling for GPX,
+    and how card insertion is detected on each operating system.
 
 ## 11. Next steps
 
