@@ -911,8 +911,10 @@ to it.
 
 ## 11. Next steps
 
-1. Detail each domain of §5 with usage scenarios (in this order: sources and catalogue, culling,
-   development and versions, metadata, export and Prooftide, plugins, AI).
-2. Define the development process (architecture, technology stack, testing, continuous
-   integration, open source governance).
-3. Plan milestone M1.
+1. ~~Detail each domain of §5 with usage scenarios.~~ Done on 2026-09-19 for sources and
+   catalogues, culling, development and versions, metadata, export and Prooftide, plugins and AI.
+2. Review the whole specification for consistency, and sort the open questions of §10 into those
+   that need a decision now and those that belong to the technical phase.
+3. Define the development process (architecture, technology stack, testing, continuous
+   integration, open source governance, plugin licensing).
+4. Plan milestone M1.
