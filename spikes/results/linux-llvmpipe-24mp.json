@@ -1,0 +1,55 @@
+{
+  "accuracy_small_vs_cpu": {
+    "fraction_over_one_level": 0.0,
+    "max_level": 1,
+    "mean_level": 0.000013987223307291666
+  },
+  "adapter": {
+    "backend": "Vulkan",
+    "driver": "Mesa 25.2.8-0ubuntu0.24.04.2 (LLVM 20.1.2)",
+    "name": "llvmpipe (LLVM 20.1.2, 256 bits)",
+    "type": "Cpu"
+  },
+  "band_rows": 1398,
+  "cpu_reference": {
+    "full_ms": 400.785334,
+    "gpu_vs_cpu_full": {
+      "fraction_over_one_level": 0.0,
+      "max_level": 1,
+      "mean_level": 0.000015027777777777778
+    },
+    "threads": 16
+  },
+  "export_compute_ms": 234.73809500000002,
+  "export_readback_ms": 33.336484999999996,
+  "image": {
+    "height": 4000,
+    "megapixels": 24.0,
+    "width": 6000
+  },
+  "view_100": {
+    "patch_vs_cpu": {
+      "fraction_over_one_level": 0.0,
+      "max_level": 1,
+      "mean_level": 0.000011444091796875
+    },
+    "recompute_median_ms": 23.870556,
+    "recompute_p95_ms": 26.611908,
+    "tone_only_median_ms": 14.741374,
+    "tone_only_p95_ms": 17.495326,
+    "viewport": [
+      2560,
+      1440
+    ]
+  },
+  "view_fit": {
+    "cold_ms": 154.425993,
+    "factor": 3,
+    "size": [
+      2000,
+      1334
+    ],
+    "slider_median_ms": 11.8999,
+    "slider_p95_ms": 13.164395
+  }
+}

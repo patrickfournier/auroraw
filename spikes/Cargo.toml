@@ -1,0 +1,6 @@
+[workspace]
+resolver = "3"
+members = ["gpu-pipeline"]
+
+[profile.release]
+debug = 1

@@ -1,0 +1,60 @@
+name: spikes
+
+# Builds and runs the throwaway technical spikes on the three target platforms, so that results
+# from Windows and macOS can be collected without a local machine. See docs/technical-spikes.md.
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "spikes/**"
+      - ".github/workflows/spikes.yml"
+  workflow_dispatch:
+
+jobs:
+  gpu-pipeline:
+    name: gpu-pipeline (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x64, os: ubuntu-24.04, ext: "", backend: "vulkan llvmpipe" }
+          - { name: windows-x64, os: windows-latest, ext: ".exe", backend: "dx12" }
+          - { name: macos-arm64, os: macos-latest, ext: "", backend: "metal" }
+    defaults:
+      run:
+        working-directory: spikes
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install a software Vulkan driver (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+
+      - name: Toolchain
+        run: rustup update stable && rustc --version
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Adapters
+        run: ./target/release/adapters${{ matrix.ext }}
+        shell: bash
+
+      - name: Benchmark (24 MP)
+        # The hosted runners have no discrete GPU: this measures the software or virtual adapter
+        # they offer, and checks that the shaders run and agree with the CPU reference.
+        continue-on-error: true
+        run: |
+          mkdir -p results
+          ./target/release/bench${{ matrix.ext }} --adapter "${{ matrix.backend }}" --mp 24 --out results/${{ matrix.name }}-ci-24mp.json
+        shell: bash
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gpu-pipeline-${{ matrix.name }}
+          path: |
+            spikes/target/release/bench${{ matrix.ext }}
+            spikes/target/release/adapters${{ matrix.ext }}
+            spikes/results/*.json
