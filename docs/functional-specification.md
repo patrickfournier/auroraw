@@ -577,6 +577,9 @@ model:
 - A photo published and then edited shows a **"modified since publication"** badge.
 - **Republishing is manual**: a "republish changes" action sends the modified items. Nothing is
   ever sent on its own, so an unfinished edit never reaches a client.
+- What "republish" does depends on the destination [proposed]: one that can **update items in
+  place** (a delivery folder) receives only the modified items; one that cannot (a service that
+  only creates galleries, Prooftide included) receives a **new revision** (§5.9).
 
 ### 5.9 Galleries and Prooftide
 
@@ -602,6 +605,25 @@ optional and backward compatible.
    copies the original files. Delivered versions are rendered from the catalogue.
 5. **Licence key**: it is kept in the operating system's keychain, not in clear text
    [proposed].
+
+**Revisions of a gallery** [proposed, from an idea of Patrick's]
+
+- "Republish changes" on a gallery publishes the **whole collection again as a new gallery**, a
+  revision (v2, v3...), named after the first one ("Marie wedding (v2)") and with a new link for
+  the client.
+- Nothing changes on the Prooftide side: no need to replace or remove single photos. It works
+  for any service that can only create galleries; a plugin declares whether it can update in
+  place.
+- A publication is the **series of its revisions**. Each revision has its own record (§5.8) and
+  its own client-selection collection; a cumulative view of the selections across revisions is
+  offered.
+- At republish time the photographer chooses the scope: the **whole collection** (default) or
+  only the modified and new photos.
+- Each revision uses a gallery slot and its photos count towards the plan's limits. The plugin
+  says so before publishing and offers to delete earlier revisions once they are no longer
+  needed. On a plan with a single gallery, that means deleting before publishing.
+- The client's earlier selection does not carry over by itself. Pre-selecting it in the new
+  revision would need an optional API extension [open].
 
 **Client feedback** [decided, D-050]
 
@@ -773,10 +795,9 @@ to it.
     detection of external changes, and how quickly a change is reported.
 29. **Geocoding database**: size, attribution required by its licence, update mechanism, and the
     levels of detail offered.
-30. **Republishing to Prooftide**: uploads are idempotent per file name and only a whole gallery
-    can be deleted, so a modified photo cannot be replaced or removed. What does "republish
-    changes" do: an optional, backward-compatible API extension (replace and remove a photo), or
-    publish the changed photos as new ones?
+30. **Gallery revisions**: the default scope (whole collection or only changes), carrying the
+    client's previous selection over to a new revision (an optional Prooftide API extension), and
+    how revisions are named and presented to the client.
 31. **Modified since publication**: what enters the settings fingerprint (pipeline settings,
     recipe, original fingerprint, metadata) and what it costs to compute.
 32. **Client feedback**: refresh rhythm, notifications, and what happens to a selection when a
