@@ -37,16 +37,21 @@ galleries, all in a simple, fast and professional workflow.
 | **Original** | An image file as it exists on a source. Never modified by Auroraw. |
 | **Photo** | What the photographer thinks of as "one shot": one original, or a RAW+JPEG group treated as a unit. It has a stable identity in the catalogue, independent of file name and location. |
 | **Series** | Several related photos (burst, bracketing, near-duplicates) grouped for culling. Distinct from versions. |
-| **Version** | One development of a photo: its chain of operations, its history, its name. Creating a version copies no pixels. A photo always has a default version, which exists only in the catalogue until the first edit [proposed]. |
-| **Workspace** | A folder, owned by exactly one catalogue (one workspace per catalogue), that receives everything Auroraw writes about photos: sidecars and, optionally, exports. Originals' folders are never written to. |
+| **Version** | One development of a photo: its chain of operations, its history, its name. Creating a version copies no pixels. A photo always has a default version, which exists only in the catalogue until the first edit and is displayed with the base look (§5.6) [proposed]. |
+| **Workspace** | A folder, owned by exactly one catalogue (one workspace per catalogue), that receives everything Auroraw writes about photos: sidecars and, optionally, exports. Originals' folders are written to only in the cases of §5.1. |
 | **Photo sidecar** | An XMP file in the workspace holding the metadata of an original (rating, keywords, captions, IPTC...). |
 | **Version sidecar** | A file in the workspace holding one version: a copy of its photo's metadata, the version's own metadata, and its development chain, history and snapshots. |
 | **Snapshot** | A named state of a version's history, which can be returned to or turned into a new version. |
 | **Operation** | A non-destructive development step (exposure, curve, mask, etc.), parameterised and ordered in the chain. |
-| **Style / preset** | A reusable set of operations and parameters, applicable to one or more versions. |
+| **Style** | A named set of settings on one or several tools, reusable and applicable to one or more versions. A tool preset is a style with a single tool (D-040). |
 | **Collection** | A grouping chosen by the photographer (manual) or defined by a query (smart). |
-| **Catalogue** | The local database indexing photos, their versions, their metadata and their previews. |
+| **Catalogue** | What the photographer opens and works in: a local database that indexes photos, versions, metadata and previews, paired with its workspace. The database can be rebuilt; the workspace holds what must not be lost (D-025, D-026). |
 | **Export recipe** | A named, reusable setting for producing files (format, size, profile, metadata, naming, watermark, etc.). |
+| **Main version** | The version of a photo that supplies its grid thumbnail and is the default for export and publication (D-038). |
+| **Base look** | The style applied to a RAW before any edit: neutral by default (D-042). |
+| **Local adjustment** | A mask together with the settings it carries, a first-class object of a version (D-043). |
+| **Publication** | The record of what was sent to a destination (a gallery, a folder, a site): photos, versions, published names, dates (D-049). |
+| **Revision** | A later publication of the same gallery, published as a new gallery (v2, v3...) (D-053). |
 
 ## 3. Guiding principles
 
@@ -58,8 +63,9 @@ galleries, all in a simple, fast and professional workflow.
 3. **Workflows, not panels** [proposed]. The interface is organised around tasks (Import, Cull,
    Develop, Publish), not a stack of tools.
 4. **Keyboard first** [proposed]. All routine culling and navigation works without a mouse.
-5. **Local AI by default** [proposed]. No image or metadata leaves the machine for an external
-   service without explicit consent, feature by feature.
+5. **Local AI by default** [decided, D-061]. The core calls no external AI service. A plugin that
+   does is off by default, needs consent per plugin and shows what leaves the machine.
+   Publishing to a gallery service is a different matter: an explicit action of the photographer.
 6. **Openness and interoperability** [decided for Prooftide, proposed elsewhere]. No feature may
    require a particular service or piece of software; integrations go through open formats and
    plugins.
@@ -103,10 +109,11 @@ The milestone of each feature (M1 to M5) is described in §8.
   rebuildable from the workspace and the sources [decided, D-026]. Previews live in a separate
   cache that can be deleted without losing anything [proposed].
 
-**Sources are never written to** [decided, D-018, refined by D-022]
+**Writing into sources** [decided, D-018, refined by D-022 and D-024]
 
-- Auroraw writes into a source in only two cases: copying files at import, and an explicit
-  request from the photographer to export XMP files into source folders (see below). It never
+- Auroraw writes into a source in only three cases: copying files at import; an explicit request
+  from the photographer to export XMP files into source folders (see below); and an export that
+  the photographer chooses to place in a source folder, which triggers a warning. It never
   modifies, moves, renames or deletes an original.
 - Consequences [proposed]: the Rejected flag deletes nothing. A "Rejected" view offers *Show in
   file manager* and an exportable list of rejected files, so tidying happens outside Auroraw.
@@ -156,6 +163,9 @@ Each source shows its state as a badge. **Developing on an offline source is not
 v1** [decided, D-021]: a reduced-resolution proxy would not give results identical to the
 original for detail-dependent operations (see §10).
 
+Viewing an offline photo relies on the preview cache: if the cache is deleted while a source is
+offline, those photos cannot be displayed until the source returns [proposed].
+
 **Detecting new, changed and moved files** [decided, D-019]
 
 - Online sources are **monitored**. New files are reported ("42 new photos in this folder") and
@@ -183,7 +193,7 @@ original for detail-dependent operations (see §10).
 
 | Way | What happens |
 | --- | --- |
-| Copy from a card or a folder | Files are copied to a destination folder in the photographer's archive, then added to the catalogue. This is the only case, besides the explicit XMP export, where Auroraw writes into a source. |
+| Copy from a card or a folder | Files are copied to a destination folder in the photographer's archive, then added to the catalogue. Besides this, Auroraw writes into a source only for the explicit XMP export and for exports the photographer places there (§5.1). |
 | Add in place | An existing folder becomes a source. Nothing is copied or written. |
 | Other | Cameras and phones connected directly, cloud services and so on, through source plugins (§5.10). |
 
@@ -191,7 +201,8 @@ original for detail-dependent operations (see §10).
 
 - A profile stores everything an import needs: destination folder template, renaming template,
   backup copy destinations, metadata template (creator, copyright, keywords), a style to apply,
-  and the RAW+JPEG rule below [proposed].
+  and the RAW+JPEG rule below. Applying a style at import creates the photo's first version, on
+  top of the base look [proposed].
 - When a card is inserted, Auroraw offers "Import with profile X": **one click**. Nothing
   starts on its own; the click is always the photographer's [proposed].
 - The full dialog is the profile editor (and can run a one-off import with unsaved settings).
@@ -349,12 +360,13 @@ A dedicated, full-screen mode for culling. The grid stays the navigation view.
 | Catalogue | Index, previews, queries, anything that speeds things up | Local database, rebuildable |
 | Photo sidecar (workspace) | The original's metadata: keywords, ratings, captions, IPTC, rights | Standard XMP, readable by other software |
 | Version sidecar (workspace) | A copy of the photo's metadata, the version's own metadata, its chain, history and snapshots | Open, documented format built on XMP if practical, with a schema version in each file |
+| State files (workspace) | What would otherwise live only in the database: collections, series, keyword vocabulary, sources, publications | Open, documented format (§10, question 3) |
 
 The workspace lets the catalogue be rebuilt from the sidecars and the sources. Development
 settings from other software are not portable as-is; a partial import of common settings
 (Lightroom, darktable) is conceivable later [open].
 
-### 5.5 Metadata: photo and version [decided]
+### 5.5 Metadata: photo and version [decided for ratings and keywords; other fields proposed]
 
 Some metadata can be **overridden at the version level**. Example given: rate the photo for its
 composition, then rate each version for its rendering.
@@ -408,7 +420,8 @@ where the displayed value comes from.
 **Base look** [decided, D-042]
 
 - When a version is created, Auroraw applies a **base look**, which is a style (D-040): a
-  faithful, pleasant, tone-mapped image with no artistic treatment.
+  faithful, pleasant, tone-mapped image with no artistic treatment. An unedited photo is shown
+  with the base look, and no version is written until its first edit.
 - The photographer can choose another base look by default, in the preferences or in an import
   profile. The base looks shipped include the neutral one and a **flat linear** one.
 - A base look that imitates the camera's embedded JPEG is a **planned evolution** [decided]. The
@@ -619,7 +632,6 @@ optional and backward compatible.
   offered.
 - At republish time the photographer chooses the scope: the **whole collection** (default) or
   only the modified and new photos.
-- The revision is named after the first gallery with a suffix: "Marie wedding (v2)".
 - Each revision uses a gallery slot and its photos count towards the plan's limits. The plugin
   says so before publishing and offers to delete earlier revisions once they are no longer
   needed. On a plan with a single gallery, that means deleting before publishing.
@@ -712,8 +724,8 @@ Four families [decided]: **import** (including RAW reading), **export** (images 
 
 **Timeline** [decided]
 
-- Internal modules use the same interface as external plugins from milestone M2, so the
-  interface is validated early. The public API is frozen in milestone M5, not before; until
+- Internal modules use the same interface as external plugins: the core's own sources from
+  milestone M1, operations and the other families from M2, so the interface is validated early. The public API is frozen in milestone M5, not before; until
   then it is marked experimental [proposed].
 - Operation plugins must be able to run on the GPU and declare where they sit in the pipeline
   (§5.6).
@@ -800,7 +812,7 @@ must not rule them out (notably soft proofing, which depends on colour managemen
 
 | Milestone | Content | What it gives the user |
 | --- | --- | --- |
-| **M1** | Catalogue, sources, import (card and folders), previews, culling, series and duplicates, tags, ratings, IPTC/XMP, search and filters, GPS | A complete culling and organising tool |
+| **M1** | Catalogues and workspaces (photo sidecars, keyword vocabulary, state files), sources, import (card and folders, import profiles), previews, culling, series and duplicates, keywords, ratings, IPTC/XMP, XMP export to source folders [proposed], search and filters, GPS | A complete culling and organising tool |
 | **M2** | Non-destructive pipeline (basic operations), versions and snapshots, presets and styles, colour management, GPU acceleration, internal modules written as plugins | Basic RAW development |
 | **M3** | Masks and local retouching, lens corrections, negative scan module, advanced operations | Professional-level development |
 | **M4** | Batch export with recipes, Prooftide plugin, selection feedback, catalogue backup and sync | The full loop: from the card to the client |
@@ -821,10 +833,21 @@ to it.
 
 ## 10. Open questions
 
+Sorted on 2026-09-19 by when they need an answer:
+
+| When | Questions |
+| --- | --- |
+| **Decide now**, before the technical phase | 1, 5, 8, 19, 39, 40 |
+| **Technical phase** | 2, 3, 4, 6, 10, 11, 13, 17, 20, 21, 22, 25, 28, 29, 31, 34, 35, 36, 38 |
+| **Milestone planning**, when the milestone is reached | 7, 9, 12, 14, 15, 16, 18, 23, 24, 26, 27, 30, 32, 33, 37 |
+
 1. **Catalogue backup and sync**: the workspace is plain files, so a file-sync tool can carry it
    between machines. How does the second machine's local database notice and absorb changes
    (rescan by modification time and fingerprint)? Is built-in sync wanted, or only documented
-   compatibility with such tools?
+   compatibility with such tools? D-007 lists "catalogue backup and sync" in v1, but the workspace
+   design already covers backup (copying a folder) and rebuilding. Proposed: v1 offers a backup
+   helper and rebuild from the workspace, plus documented compatibility with file-sync tools;
+   built-in sync is not in v1.
 2. **Workspace layout and default location**: mirror of the source folder tree, or one folder per
    photo? Human-readable names plus a short identifier, or identifiers only? Where does a new
    workspace go by default?
@@ -835,7 +858,10 @@ to it.
 5. **Automatic XMP mirroring** into the source folders, in addition to the on-demand export
    (D-024): wanted or not?
 6. **Content fingerprint**: what is hashed (whole file or head, tail and size) so relinking and
-   sidecar association stay fast on network shares without false matches.
+   sidecar association stay fast on network shares without false matches. A fingerprint alone
+   cannot follow a file edited elsewhere, since its content changes: a photo needs a stable
+   identifier stored in its sidecar, with the fingerprint, the last known path and capture data
+   as hints for relinking.
 7. **Workspace unavailable** (for example on a network share that is down): read-only mode, or
    queue the edits?
 8. **Moving photos between catalogues** with their versions and metadata: copying sidecars
@@ -866,7 +892,7 @@ to it.
 18. **Auto-sync**: how it behaves with photos that already have different settings for the same
     tool (overwrite, or only relative changes such as an exposure delta)?
 19. **Main version and metadata**: the grid shows the main version's effective rating; confirm
-    this is what the photographer expects when sorting a catalogue by rating.
+    this is what the photographer expects when sorting a catalogue by rating. See also 40.
 20. **History size**: brush strokes and masks can make histories large; what does "compact"
     keep, and at what point is it proposed automatically?
 21. **Working space**: fixed in the Rec.2020 class, or selectable? How are OCIO and ACES handled
@@ -886,9 +912,8 @@ to it.
     detection of external changes, and how quickly a change is reported.
 29. **Geocoding database**: size, attribution required by its licence, update mechanism, and the
     levels of detail offered.
-30. **Gallery revisions**: the default scope (whole collection or only changes), carrying the
-    client's previous selection over to a new revision (an optional Prooftide API extension), and
-    how revisions are named and presented to the client.
+30. **Gallery revisions**: carrying the client's previous selection over to a new revision (an
+    optional Prooftide API extension), and how revisions are presented to the client.
 31. **Modified since publication**: what enters the settings fingerprint (pipeline settings,
     recipe, original fingerprint, metadata) and what it costs to compute.
 32. **Client feedback**: refresh rhythm, notifications, and what happens to a selection when a
@@ -908,13 +933,21 @@ to it.
     for weights released under non-commercial or research-only terms.
 38. **AI noise reduction in the pipeline**: where it sits (before or after demosaicing), and how
     to keep results stable across CPU and GPU (see 22).
+39. **Export before M4**: milestone M2 ("basic RAW development") has no way out without export,
+    which arrives in M4, so M2 would not be usable on its own. Proposed: a minimal export (JPEG,
+    TIFF and PNG; size, profile, metadata setting) ships in M2, while recipes, the queue, the
+    watermark and publication stay in M4.
+40. **Rating level while culling**: the grid shows the main version's effective rating (§5.4), and
+    a version may override it. Proposed: Cull mode works on the photo's values (the composition),
+    Develop works on the version's values (the rendering), and the grid shows the effective value
+    and marks a photo whose value is overridden.
 
 ## 11. Next steps
 
 1. ~~Detail each domain of §5 with usage scenarios.~~ Done on 2026-09-19 for sources and
    catalogues, culling, development and versions, metadata, export and Prooftide, plugins and AI.
-2. Review the whole specification for consistency, and sort the open questions of §10 into those
-   that need a decision now and those that belong to the technical phase.
+2. ~~Review the whole specification for consistency, and sort the open questions of §10.~~ Done
+   on 2026-09-19. The six questions marked "decide now" remain.
 3. Define the development process (architecture, technology stack, testing, continuous
    integration, open source governance, plugin licensing).
 4. Plan milestone M1.
