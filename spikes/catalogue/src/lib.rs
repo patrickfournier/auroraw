@@ -27,7 +27,9 @@ pub fn pct(v: &[f64], q: f64) -> f64 {
 }
 
 /// Asks the kernel to drop a file's pages from the cache, so the next read comes from disk.
-#[cfg(unix)]
+/// Linux only: macOS has no `posix_fadvise`, and Windows no equivalent used here. Elsewhere it
+/// does nothing, so cold-cache figures are only meaningful on Linux.
+#[cfg(target_os = "linux")]
 pub fn evict(path: &std::path::Path) {
     use std::os::unix::io::AsRawFd;
     if let Ok(f) = std::fs::File::open(path) {
@@ -36,5 +38,5 @@ pub fn evict(path: &std::path::Path) {
         }
     }
 }
-#[cfg(not(unix))]
+#[cfg(not(target_os = "linux"))]
 pub fn evict(_path: &std::path::Path) {}
