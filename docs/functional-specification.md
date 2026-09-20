@@ -238,12 +238,56 @@ original for detail-dependent operations (see §10).
 
 ### 5.3 Culling, series and duplicates
 
-- Fast keyboard culling: ratings, flags (picked, rejected), colour labels, side-by-side
-  comparison, 100% loupe with sharpness aids [decided, v1].
-- Duplicate detection and grouping into series (bursts, bracketing, RAW+JPEG) [decided, v1].
-- A series collapses into one thumbnail; it is "resolved" by keeping one or several photos
-  [proposed].
-- Optional AI assistance: sharpness, closed eyes, best frame of a series [proposed].
+**Vocabulary** [decided in principle, details proposed]
+
+- Rating from 0 to 5 stars, flags (Picked, Rejected) and colour labels. While culling they apply
+  to the photo; a version may override them later (§5.5).
+- Every action is one key and can be undone, several steps back [proposed].
+- Rejected photos are hidden by default, with a toggle to show them. **Nothing is ever deleted**
+  (D-018): the Rejected view offers *Show in file manager* and an exportable list (§5.1).
+
+**Cull mode** [decided, D-033]
+
+A dedicated, full-screen mode for culling. The grid stays the navigation view.
+
+- The image fills the screen, with a discreet filmstrip [proposed].
+- One key per rating, flag and label; optional auto-advance after each action [proposed].
+- Side-by-side comparison of 2 to 4 images, with zoom and pan synchronised [proposed].
+- A series expands in place [proposed].
+- Culling can start on the last import, even while the copy is still running (§5.2) [proposed].
+- Quality aids that need no AI, in M1 [proposed]: focus peaking, clipping warnings, blur score,
+  optional histogram.
+- AI aids (closed eyes, best frame of a series) come in M5 and only **suggest**; they never rate
+  or reject on their own [proposed].
+
+**Series** [decided, D-034 and D-035]
+
+- **Objective series form automatically**, at import and whenever photos are added: bursts and
+  bracketing recognised from metadata (sequence, gaps between capture times, exposure
+  parameters). The time gap is adjustable. RAW+JPEG pairs are already one photo (§5.2).
+- **Visually similar photos are suggested**, not grouped: "5 similar photos", and the
+  photographer confirms. Similarity is computed locally from the previews [proposed].
+- A series collapses into one thumbnail with a count and expands in place. Members can be added,
+  removed, merged or split by hand [proposed].
+- **Resolving a series**: the photographer designates the photos to keep, and **the others get
+  the Rejected flag**. The series stays expandable. It is one gesture and can be undone.
+- A series shows whether it is resolved, and can be filtered on that [proposed].
+- Series membership and resolution are catalogue state, so they are also written into the
+  workspace (D-026) [proposed].
+- A series is not a version: a series groups several photos, a version is one photo developed
+  several ways.
+
+**Duplicates** [decided, D-036]
+
+- **Exact duplicates** (the same content fingerprint at several locations, for example the
+  working disk and its backup) are **one photo with several locations**. The catalogue uses
+  whichever location is available, and sidecars and versions are not duplicated. The photo's
+  information shows all its locations.
+- An optional **duplicates report** lists the photos that exist at several locations (which
+  sources, which sizes) so the photographer can tidy up in the file manager. Auroraw never
+  deletes files. The list can be exported. Milestone: M1 or shortly after [proposed].
+- **Near duplicates** are handled as series suggestions, not as duplicates.
+- Import already skips files it has imported before (§5.2).
 
 ### 5.4 Development versions
 
@@ -474,6 +518,12 @@ to it.
 14. **Import details**: default destination and renaming templates and their tokens, what happens
     with cards from several cameras or with clashing file numbers, time zone handling for GPX,
     and how card insertion is detected on each operating system.
+15. **Culling details**: how an objective series is detected (metadata rules, default time gap),
+    how visual similarity is computed (perceptual hashes or learned embeddings, and the cost on
+    100,000 photos), which key bindings, how a series' cover is chosen, and which location a
+    multi-location photo prefers (online first, then fastest).
+16. **Duplicates with different metadata**: when two copies of the same file carry different XMP
+    (ratings, keywords) found at import, how are they merged?
 
 ## 11. Next steps
 

@@ -37,3 +37,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-030 | 2026-09-19 | **Import everything**: no pre-selection at import; culling happens afterwards in the catalogue. |
 | D-031 | 2026-09-19 | **The card is never modified**: Auroraw signals when the copies are verified and it is safe to erase, and deletes nothing. |
 | D-032 | 2026-09-19 | **RAW+JPEG**: a pair is one photo with two files; the RAW is developed, the JPEG is a companion. A profile setting can ignore either kind. |
+| D-033 | 2026-09-19 | **Cull mode**: a dedicated full-screen mode for culling, with the grid as the navigation view. |
+| D-034 | 2026-09-19 | **Series formation**: objective series (bursts, bracketing) form automatically; visually similar photos are only suggested and the photographer confirms. |
+| D-035 | 2026-09-19 | **Resolving a series** keeps the designated photos and gives the others the Rejected flag. The series stays expandable. Nothing is deleted. |
+| D-036 | 2026-09-19 | **Exact duplicates** are one photo with several locations. An optional duplicates report helps the photographer tidy up; Auroraw itself deletes nothing. |
