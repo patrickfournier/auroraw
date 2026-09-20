@@ -106,8 +106,10 @@ The milestone of each feature (M1 to M5) is described in §8.
 - Each catalogue has **exactly one workspace** [decided, D-025]. To the photographer the two can
   present as a single thing: "my catalogue and its folder" [proposed].
 - The catalogue database stays on the **local disk**, in the user's data folder, and is
-  rebuildable from the workspace and the sources [decided, D-026]. Previews live in a separate
-  cache that can be deleted without losing anything [proposed].
+  rebuildable from the workspace and the sources [decided, D-026]. The database is **SQLite**
+  [decided, D-073]. Thumbnails and previews live in a separate cache, a SQLite database with
+  32 KB pages that can be deleted without losing anything [decided, D-075, provisional pending a
+  Windows measurement].
 
 **Writing into sources** [decided, D-018, refined by D-022 and D-024]
 
@@ -125,7 +127,10 @@ The milestone of each feature (M1 to M5) is described in §8.
 - A workspace is a **folder** that receives the sidecars of the originals and of their
   versions, and optionally exports. Each catalogue has exactly one, and a workspace is never
   shared between catalogues.
-- The **photo sidecar** contains only the metadata of the original. It is standard XMP.
+- The **photo sidecar** contains only the metadata of the original. It is standard XMP. It also
+  caches what was read from the original file (capture time, camera, lens, exposure, size, GPS),
+  so the catalogue can be rebuilt without reopening the originals, which may be offline
+  [decided, D-074].
 - The **version sidecar** copies the photo's metadata and adds the version's own: overrides,
   development chain, history and snapshots. A version sidecar is therefore self-contained.
 - Sidecars are not next to the originals, so a sidecar is tied to its original by **content
@@ -380,7 +385,7 @@ A dedicated, full-screen mode for culling. The grid stays the navigation view.
 | Layer | Contains | Format |
 | --- | --- | --- |
 | Catalogue | Index, previews, queries, anything that speeds things up | Local database, rebuildable |
-| Photo sidecar (workspace) | The original's metadata: keywords, ratings, captions, IPTC, rights | Standard XMP, readable by other software |
+| Photo sidecar (workspace) | The original's metadata: keywords, ratings, captions, IPTC, rights, and a cache of its capture data (D-074) | Standard XMP, readable by other software |
 | Version sidecar (workspace) | A copy of the photo's metadata, the version's own metadata, its chain, history and snapshots | Open, documented format built on XMP if practical, with a schema version in each file |
 | State files (workspace) | What would otherwise live only in the database: collections, series, keyword vocabulary, sources, publications | Open, documented format (§10, question 3) |
 
