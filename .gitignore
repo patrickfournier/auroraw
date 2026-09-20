@@ -1,3 +1,6 @@
 # Rust build output
 target/
 spikes/samples/
+
+# Screenshots written by the spikes are large and reproducible
+spikes/results/**/*.png

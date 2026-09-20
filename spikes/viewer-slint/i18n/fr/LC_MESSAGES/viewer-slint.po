@@ -1,0 +1,16 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: fr\n"
+
+msgid "Auroraw spike 2"
+msgstr "Auroraw prototype 2"
+
+msgid "Keywords"
+msgstr "Mots-clés"
+
+msgid "Search"
+msgstr "Rechercher"
+
+msgid "Switch language"
+msgstr "Changer de langue"

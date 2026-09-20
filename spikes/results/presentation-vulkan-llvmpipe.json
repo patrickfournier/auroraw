@@ -1,0 +1,28 @@
+{
+  "adapter": "llvmpipe (LLVM 20.1.2, 256 bits)",
+  "backend": "Vulkan",
+  "scene": "Nikon D850 (RGGB, 8256x5504, black 400, white 15520, matrix camera)",
+  "views": {
+    "1200x800": {
+      "gpu_ms": 7.898954,
+      "readback_ms": 0.26919299999999996,
+      "total_median_ms": 8.216156,
+      "total_p95_ms": 9.935073000000001,
+      "total_p99_ms": 12.915113999999999
+    },
+    "1872x1064": {
+      "gpu_ms": 15.658617,
+      "readback_ms": 0.943904,
+      "total_median_ms": 16.635478,
+      "total_p95_ms": 18.676313,
+      "total_p99_ms": 21.195631000000002
+    },
+    "2560x1440": {
+      "gpu_ms": 28.599012,
+      "readback_ms": 1.481041,
+      "total_median_ms": 30.107467,
+      "total_p95_ms": 33.492904,
+      "total_p99_ms": 36.905937
+    }
+  }
+}

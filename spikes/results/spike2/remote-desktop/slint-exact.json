@@ -1,0 +1,43 @@
+{
+  "first_frame_ms": 453.400855,
+  "fps": 270.8218599121358,
+  "frame_interval_ms": {
+    "max": 7.856745,
+    "mean": 3.6924641176470594,
+    "median": 3.0824540000000002,
+    "p95": 7.856745,
+    "p99": 7.856745
+  },
+  "frames_measured": 17,
+  "frames_over_20ms": 0,
+  "i18n_ok": true,
+  "mode": "Exact",
+  "pixel_exact": {
+    "different_pixels": 0,
+    "total_pixels": 452000,
+    "worst_channel_difference": 0
+  },
+  "prepare_frames_ms": 816.653484,
+  "render_ms": {
+    "max": 1.8149920000000002,
+    "median": 0.7827230000000001,
+    "p95": 1.8149920000000002,
+    "p99": 1.8149920000000002
+  },
+  "rss_mb": 508.28125,
+  "toolkit": "slint 1.18 (femtovg, winit)",
+  "tree_toggle_ms_median": 0.0,
+  "tree_toggles": 0,
+  "update_ms": {
+    "median": 0.000147,
+    "p95": 0.000511
+  },
+  "view": [
+    800,
+    600
+  ],
+  "window": [
+    1060,
+    636
+  ]
+}

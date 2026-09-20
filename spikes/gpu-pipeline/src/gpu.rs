@@ -270,6 +270,56 @@ impl<'g> Renderer<'g> {
     }
 }
 
+/// Buffers for the 100% view path: develop a viewport, read it back to the CPU as RGBA8.
+pub struct ViewPath {
+    inter: wgpu::Buffer,
+    out: wgpu::Buffer,
+    readback: wgpu::Buffer,
+    pub w: u32,
+    pub h: u32,
+}
+
+impl<'g> Renderer<'g> {
+    pub fn view_path(&self, w: u32, h: u32) -> ViewPath {
+        ViewPath {
+            inter: self.storage(w as u64 * h as u64 * 16),
+            out: self.storage(w as u64 * h as u64 * 4),
+            readback: Self::make(self.g, w as u64 * h as u64 * 4, wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST),
+            w,
+            h,
+        }
+    }
+
+    /// Develops the viewport at (x0, y0) and copies the RGBA8 pixels into `dst` (w * h * 4 bytes).
+    /// Returns (GPU milliseconds, readback milliseconds).
+    pub fn render_view(&self, vp: &ViewPath, x0: u32, y0: u32, dst: &mut [u8]) -> Result<(f64, f64)> {
+        let p0 = self.scene_params;
+        let p = Params { tile_x: x0, tile_y: y0, tile_w: vp.w, tile_h: vp.h, in_x0: 0, in_y0: 0, in_stride: vp.w, out_x0: 0, out_y0: 0, out_stride: vp.w, ..p0 };
+        let t0 = Instant::now();
+        let mut enc = self.encoder();
+        self.demosaic_pass(&mut enc, &p, &vp.inter);
+        self.pass(&mut enc, &self.tone, &p, &[&vp.inter, &self.lut, &vp.out]);
+        enc.copy_buffer_to_buffer(&vp.out, 0, &vp.readback, 0, Some(vp.w as u64 * vp.h as u64 * 4));
+        self.g.queue.submit([enc.finish()]);
+        self.g.wait()?;
+        let gpu_ms = ms(t0.elapsed());
+        let t1 = Instant::now();
+        let slice = vp.readback.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |r| {
+            let _ = tx.send(r);
+        });
+        self.g.wait()?;
+        rx.recv()?.map_err(|e| anyhow!("map: {e:?}"))?;
+        {
+            let data = slice.get_mapped_range().map_err(|e| anyhow!("range: {e:?}"))?;
+            dst.copy_from_slice(&data);
+        }
+        vp.readback.unmap();
+        Ok((gpu_ms, ms(t1.elapsed())))
+    }
+}
+
 /// The stages of the full chain, in order. Changing a setting reruns its stage and every later one.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, serde::Serialize)]
 pub enum Stage {

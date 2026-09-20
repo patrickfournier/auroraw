@@ -1,0 +1,85 @@
+import { ListView, LineEdit, Button } from "std-widgets.slint";
+
+export struct Cell { ax: int, ay: int, rating: int, thumb: image }
+export struct GridRow { cells: [Cell] }
+export struct TreeRow { depth: int, label: string, expanded: bool, has-children: bool }
+
+export component MainWindow inherits Window {
+    in property <int> win-w: 1600;
+    in property <int> win-h: 1000;
+    width: win-w * 1px;
+    height: win-h * 1px;
+    background: #1e1e1e;
+    title: @tr("Auroraw spike 2");
+
+    in property <image> frame;
+    in property <int> view-w;
+    in property <int> view-h;
+    in property <image> atlas;
+    in property <[GridRow]> rows;
+    in property <[TreeRow]> tree;
+    in property <string> stats;
+    in property <bool> show-view: true;
+    in property <bool> show-grid: true;
+    in property <bool> cell-images: true;
+    in property <bool> use-atlas: false;
+    in property <bool> cell-text: true;
+    in-out property <string> query;
+    in-out property <length> grid-scroll: 0px;
+    public function caption() -> string { return @tr("Keywords"); }
+    callback toggle-language();
+    callback toggle-node(int);
+
+    property <length> grid-y: 36px + (show-view ? view-h * 1px : 0px);
+
+    // Sidebar: a tree of keywords, flattened to a list.
+    Rectangle {
+        x: 0; y: 0; width: 260px; height: root.height; background: #262626;
+        Text { x: 8px; y: 6px; text: @tr("Keywords"); color: #dddddd; font-weight: 700; }
+        ListView {
+            x: 0; y: 30px; width: 260px; height: root.height - 30px;
+            for row[i] in root.tree : Rectangle {
+                height: 22px;
+                TouchArea { clicked => { root.toggle-node(i); } }
+                Text {
+                    x: 8px + row.depth * 14px;
+                    text: (row.has-children ? (row.expanded ? "▾ " : "▸ ") : "   ") + row.label;
+                    color: #cccccc; vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // Top bar.
+    Rectangle {
+        x: 260px; y: 0; width: root.width - 260px; height: 36px; background: #2b2b2b;
+        LineEdit { x: 6px; y: 4px; width: 320px; height: 28px; placeholder-text: @tr("Search"); text <=> root.query; }
+        Button { x: 340px; y: 4px; height: 28px; text: @tr("Switch language"); clicked => { root.toggle-language(); } }
+        Text { x: 540px; y: 0; height: 36px; text: root.stats; color: #99cc99; vertical-alignment: center; }
+    }
+
+    // The image view: frames arrive as RGBA8 bytes and are shown 1:1.
+    if root.show-view : Image {
+        x: 260px; y: 36px; width: root.view-w * 1px; height: root.view-h * 1px;
+        source: root.frame; image-rendering: pixelated;
+    }
+
+    // The grid of thumbnails: rows of cells cut out of one atlas.
+    if root.show-grid : ListView {
+        x: 260px; y: root.grid-y; width: root.width - 260px; height: root.height - root.grid-y;
+        content-y <=> root.grid-scroll;
+        for row in root.rows : HorizontalLayout {
+            height: 124px; spacing: 4px; alignment: start;
+            for c in row.cells : Rectangle {
+                width: 160px; height: 120px;
+                if root.cell-images && !root.use-atlas : Image { source: c.thumb; width: 160px; height: 120px; }
+                if root.cell-images && root.use-atlas : Image {
+                    source: root.atlas; width: 160px; height: 120px;
+                    source-clip-x: c.ax; source-clip-y: c.ay; source-clip-width: 160; source-clip-height: 120;
+                }
+                if !root.cell-images : Rectangle { background: #446688; }
+                if root.cell-text : Text { x: 6px; y: 4px; text: c.rating > 0 ? "\{c.rating}★" : ""; color: #ffd24a; }
+            }
+        }
+    }
+}
