@@ -4,3 +4,7 @@ spikes/samples/
 
 # Screenshots written by the spikes are large and reproducible
 spikes/results/**/*.png
+
+# Qt build directory and captured frame files
+spikes/viewer-qt/build/
+spikes/viewer-qt/i18n/*.qm

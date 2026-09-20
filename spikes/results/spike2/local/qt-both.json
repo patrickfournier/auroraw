@@ -1,0 +1,32 @@
+{
+    "first_frame_ms": 533.619588,
+    "fps": 59.950955165227164,
+    "frame_interval_ms": {
+        "max": 17.996075,
+        "mean": 16.680301377083335,
+        "median": 16.679601,
+        "p95": 16.753546,
+        "p99": 16.858933
+    },
+    "frames_measured": 480,
+    "frames_over_20ms": 0,
+    "graphics_api": "3",
+    "i18n_ok": true,
+    "mode": "both",
+    "render_loop": "default (threaded)",
+    "render_ms": {
+        "median": 1.720142,
+        "p95": 2.446957,
+        "p99": 2.774894
+    },
+    "rss_mb": 337.6875,
+    "toolkit": "Qt Quick 6.4.2",
+    "update_ms": {
+        "median": 0.176024,
+        "p95": 0.848675
+    },
+    "view": [
+        1340,
+        480
+    ]
+}
