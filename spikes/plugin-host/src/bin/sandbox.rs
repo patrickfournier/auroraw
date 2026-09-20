@@ -38,6 +38,10 @@ fn peak_rss_mb() -> f64 {
     std::fs::read_to_string("/proc/self/status").unwrap_or_default().lines().find(|l| l.starts_with("VmHWM:")).and_then(|l| l.split_whitespace().nth(1)?.parse::<f64>().ok()).map(|k| k / 1024.0).unwrap_or(0.0)
 }
 
+macro_rules! step {
+    ($($a:tt)*) => { eprintln!("[step] {}", format!($($a)*)); };
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let out = args.iter().position(|a| a == "--out").and_then(|i| args.get(i + 1)).cloned();
@@ -50,8 +54,11 @@ fn main() -> Result<()> {
     let _ = std::fs::remove_file(granted.join("new.txt"));
 
     println!("== a plugin that fails or misbehaves: what happens to the host\n");
+    step!("engine with epochs and fuel");
     let eng = engine(true, true)?;
+    step!("load hostile.wasm from {}", plugin_path("hostile.wasm").display());
     let module = load(&eng, &plugin_path("hostile.wasm"))?;
+    step!("loaded");
     let mut failures = Vec::new();
     let mut record = |name: &str, outcome: String, took: f64, alive: bool| {
         println!("{name:<44} {outcome:<62} {took:>8.1} ms   host alive: {}", if alive { "yes" } else { "NO" });
@@ -60,7 +67,9 @@ fn main() -> Result<()> {
 
     // A panic.
     {
+        step!("instantiate for the panic case");
         let mut p = instantiate(&eng, &module, &Grants::default())?;
+        step!("instantiated; calling do_panic");
         p.store.set_epoch_deadline(u64::MAX / 2); p.store.set_fuel(u64::MAX / 2)?;
         let f = p.func::<(), u32>("do_panic")?;
         let t = Instant::now();

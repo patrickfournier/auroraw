@@ -69,6 +69,11 @@ pub fn instantiate(engine: &Engine, module: &Module, grants: &Grants) -> Result<
     let limits = StoreLimitsBuilder::new().memory_size(grants.memory_limit.unwrap_or(1 << 30)).trap_on_grow_failure(true).build();
     let mut store = Store::new(engine, Ctx { wasi: wasi.build_p1(), limits });
     store.limiter(|c| &mut c.limits);
+    // A new store has no fuel and an epoch deadline of zero. Give it a large budget before anything
+    // runs, so that instantiating never fails for want of fuel; callers then set their own limits.
+    // (Both calls are harmless when the engine was not configured for them.)
+    let _ = store.set_fuel(u64::MAX / 2);
+    store.set_epoch_deadline(u64::MAX / 2);
     let mut linker: Linker<Ctx> = Linker::new(engine);
     add_to_linker_sync(&mut linker, |c: &mut Ctx| &mut c.wasi)?;
     let instance = linker.instantiate(&mut store, module)?;
