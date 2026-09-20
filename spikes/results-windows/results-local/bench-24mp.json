@@ -1,0 +1,55 @@
+{
+  "accuracy_small_vs_cpu": {
+    "fraction_over_one_level": 0.0,
+    "max_level": 1,
+    "mean_level": 0.000012291802300347223
+  },
+  "adapter": {
+    "backend": "Vulkan",
+    "driver": "566.24",
+    "name": "NVIDIA GeForce GTX 1650 SUPER",
+    "type": "DiscreteGpu"
+  },
+  "band_rows": 1747,
+  "cpu_reference": {
+    "full_ms": 350.7137,
+    "gpu_vs_cpu_full": {
+      "fraction_over_one_level": 0.0,
+      "max_level": 1,
+      "mean_level": 0.000013125
+    },
+    "threads": 16
+  },
+  "export_compute_ms": 24.5013,
+  "export_readback_ms": 18.5947,
+  "image": {
+    "height": 4000,
+    "megapixels": 24.0,
+    "width": 6000
+  },
+  "view_100": {
+    "patch_vs_cpu": {
+      "fraction_over_one_level": 0.0,
+      "max_level": 1,
+      "mean_level": 0.000020345052083333332
+    },
+    "recompute_median_ms": 1.1615,
+    "recompute_p95_ms": 1.3555,
+    "tone_only_median_ms": 0.6758,
+    "tone_only_p95_ms": 1.0092,
+    "viewport": [
+      2560,
+      1440
+    ]
+  },
+  "view_fit": {
+    "cold_ms": 9.316,
+    "factor": 3,
+    "size": [
+      2000,
+      1334
+    ],
+    "slider_median_ms": 0.44260000000000005,
+    "slider_p95_ms": 0.7015
+  }
+}

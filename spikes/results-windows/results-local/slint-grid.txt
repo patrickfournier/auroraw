@@ -1,0 +1,42 @@
+grid model of 100000 items built in 17 ms
+select fr: Ok(()), select en: Ok(())
+language switch after the event loop: 'Keywords' -> 'Mots-clés' (ok)
+{
+  "first_frame_ms": 746.0122,
+  "fps": 60.06431927065286,
+  "frame_interval_ms": {
+    "max": 19.827,
+    "mean": 16.648819334719327,
+    "median": 16.6536,
+    "p95": 17.2166,
+    "p99": 17.423299999999998
+  },
+  "frames_measured": 481,
+  "frames_over_20ms": 0,
+  "i18n_ok": true,
+  "mode": "Grid",
+  "pixel_exact": null,
+  "prepare_frames_ms": 0.00009999999999999999,
+  "render_ms": {
+    "max": 17.176099999999998,
+    "median": 16.3526,
+    "p95": 16.9643,
+    "p99": 17.110899999999997
+  },
+  "rss_mb": 0.0,
+  "toolkit": "slint 1.18 (femtovg, winit)",
+  "tree_toggle_ms_median": 0.0,
+  "tree_toggles": 0,
+  "update_ms": {
+    "median": 0.009300000000000001,
+    "p95": 0.012
+  },
+  "view": [
+    1340,
+    964
+  ],
+  "window": [
+    1600,
+    1000
+  ]
+}

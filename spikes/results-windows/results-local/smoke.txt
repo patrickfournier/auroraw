@@ -1,0 +1,7 @@
+adapter: NVIDIA GeForce GTX 1650 SUPER [Vulkan, DiscreteGpu]
+Bayer: demosaic + tone                       max 1 level(s), 0.0000% over one level  ok
+fit-to-screen (downscale pass)               ran  ok
+X-Trans: generic demosaic                    max 1 level(s), 0.0000% over one level  ok
+Bayer tiled: generic demosaic                max 1 level(s), 0.0000% over one level  ok
+Chain: denoise, blurs, combine, tone         max 1 level(s), 0.0000% over one level  ok
+smoke test passed

@@ -1,8 +1,8 @@
 # Spike 2: the image view and the interface toolkit (interim report)
 
 > **Status: interim.** Slint, iced and Qt Quick measured on Linux, on a real display, with real
-> RAW frames. Windows and macOS behaviour, Qt's accessibility, and a decision are still to come
-> (see "What remains"). Nothing here is a final decision.
+> RAW frames; Slint and iced also on Windows. macOS, Qt on Windows and macOS, and a decision are
+> still to come (see "What remains"). Nothing here is a final decision.
 
 ## Question
 
@@ -137,6 +137,34 @@ on Linux is generally reported to work; this test cannot confirm it. **Patrick t
 bridge works on the real desktop and the empty tree above is an artefact of the sandbox shell.
 The prototype itself has not been checked with Orca.
 
+## Windows, on the same PC
+
+Slint and iced were also run under Windows, on the same GTX 1650 SUPER and a real display at
+60 Hz (issue #1, `spikes/results-windows/`). Qt was not built for Windows. Windows had many
+updates pending and a busy disk during the run.
+
+| Mode | Toolkit | Median | p99 | Worst | Frames over 20 ms |
+| --- | --- | --- | --- | --- | --- |
+| View 1340x964 | Slint | 16.6 ms | 18.7 ms | 19 ms | 0 of 480 |
+| | iced | 16.7 ms | 20.8 ms | 23 ms | 8 of 479 |
+| Grid | Slint | 16.7 ms | 17.4 ms | 20 ms | 0 of 481 |
+| | iced | 16.7 ms | 19.4 ms | 28 ms | 4 of 479 |
+| View above the grid | Slint | 16.7 ms | 18.3 ms | 22 ms | 1 of 481 |
+| | iced | 18.0 ms | **33.1 ms** | 36 ms | **195 of 479** |
+
+- **Slint holds 60 frames per second in every mode on Windows**, more evenly than on Linux, and
+  displays the pixels exactly (0 differing pixels out of 480,000, as on Linux). The French and
+  English switch works. Once warm, its first frame appears in 135 to 142 ms.
+- **iced was uneven in one mode**: 195 of 479 frames late in the view-above-grid mode, where the
+  other two modes were fine. It may be the disturbance from Windows (the run was done under
+  load), or a real behaviour of iced on DirectX; it was not repeated.
+- **The first run of each viewer took 16 and 26 seconds to show its first frame** (iced view,
+  Slint view), against about 0.14 to 1.6 s for the others. These were the first launches of
+  freshly downloaded programs on a busy disk, so an antivirus scan and the updates are the
+  likely cause. It is a reminder that a first launch can be slow on Windows, not a toolkit
+  measure.
+- The memory figure is not measured on Windows (the benchmark reads it from a Linux-only file).
+
 ## Things met on the way
 
 - **Slint**: an image atlas cut with `source-clip` made the memory reach 1.7 GB and the frame
@@ -170,8 +198,8 @@ The prototype itself has not been checked with Orca.
   Linguist). Left: checking the prototype itself with Orca.
 - [ ] **Qt through Rust.** These measures used C++ and QML. The Rust-side cost of driving Qt
   (cxx-qt) is unmeasured.
-- [ ] **Windows and macOS.** The viewers are built by continuous integration and can be run on
-  Patrick's machines; the Qt build is not in continuous integration yet.
+- [x] **Windows** (Slint and iced): done, Slint holds 60 frames per second in every mode.
+- [ ] **macOS**, and **Qt on Windows and macOS** (not built there).
 - [ ] **Colour on a wide-gamut display**, and the display profile from the operating system.
 - [ ] **iced pixel fidelity** (not measured).
 - [ ] **Slint on Wayland and with high-DPI scaling**, not measured on a real display.

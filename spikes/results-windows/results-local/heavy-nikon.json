@@ -1,0 +1,76 @@
+{
+  "accuracy_chain_vs_cpu": {
+    "fraction_over_one_level": 0.0,
+    "max_level": 0,
+    "mean_level": 0.0
+  },
+  "adapter": {
+    "backend": "Vulkan",
+    "name": "NVIDIA GeForce GTX 1650 SUPER",
+    "type": "DiscreteGpu"
+  },
+  "change_ms_100_view": {
+    "denoise_strength": 104.92830000000001,
+    "exposure_tone_only": 0.6007,
+    "local_contrast": 2.1014,
+    "sharpen_radius": 9.4482,
+    "white_balance_after_denoise": 0.6162,
+    "white_balance_before_denoise": 106.2903
+  },
+  "denoise_search_radius_sweep_ms": {
+    "search_radius_2": 28.0169,
+    "search_radius_3": 46.957699999999996,
+    "search_radius_5": 105.53490000000001,
+    "search_radius_7": 209.2401,
+    "search_radius_9": 386.63439999999997
+  },
+  "export_chain_ms": 1786.1145000000001,
+  "fit_view": {
+    "cold_prepare_ms": 25.741300000000003,
+    "denoise_change_ms": 17.000500000000002,
+    "factor": 4,
+    "local_contrast_change_ms": 1.5495999999999999,
+    "size": [
+      2064,
+      1376
+    ]
+  },
+  "megapixels": 45.441024,
+  "operations": {
+    "denoise": "non-local means, search radius 5 (11x11), patch 3x3",
+    "local_contrast": "box blur radius 24",
+    "mask": "radial exposure",
+    "sharpen": "unsharp mask, box radius 2"
+  },
+  "scene": "Nikon D850 (RGGB, 8256x5504, black 400, white 15520, matrix camera)",
+  "stage_ms_100_view": {
+    "Blur": 7.6476,
+    "Combine": 1.5636,
+    "Demosaic": 0.5860000000000001,
+    "Denoise": 96.1498,
+    "Tone": 0.5636
+  },
+  "upload_ms": 140.9723,
+  "viewport_sizes": {
+    "1280x720": {
+      "denoise_change_ms": 28.5871,
+      "megapixels": 0.9216,
+      "upstream_change_ms": 28.227
+    },
+    "1920x1080": {
+      "denoise_change_ms": 61.7458,
+      "megapixels": 2.0736,
+      "upstream_change_ms": 62.159
+    },
+    "2560x1440": {
+      "denoise_change_ms": 105.7777,
+      "megapixels": 3.6864,
+      "upstream_change_ms": 106.25179999999999
+    },
+    "3840x2160": {
+      "denoise_change_ms": 231.5043,
+      "megapixels": 8.2944,
+      "upstream_change_ms": 232.5384
+    }
+  }
+}

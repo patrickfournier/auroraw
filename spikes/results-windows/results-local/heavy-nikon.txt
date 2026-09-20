@@ -1,0 +1,11 @@
+adapter: NVIDIA GeForce GTX 1650 SUPER [Vulkan]
+scene: Nikon D850 (RGGB, 8256x5504, black 400, white 15520, matrix camera) (45.4 MP)
+upload of the mosaic and LUT: 141.0 ms
+chain, 256x256 region, GPU vs CPU reference: Diff { max_level: 0, fraction_over_one_level: 0.0, mean_level: 0.0 }; mean level 106.9, 42648 distinct colours
+100% view size used: 2560x1440 (+ 40 px halo)
+stage times at 100% view, 2560x1440 + halo: {"Blur":7.6476,"Combine":1.5636,"Demosaic":0.5860000000000001,"Denoise":96.1498,"Tone":0.5636}
+setting changes at 100% view: exposure 0.6 ms | local contrast 2.1 | sharpen radius 9.4 | denoise strength 104.9 | white balance before denoise 106.3 | white balance after denoise 0.6
+denoise-strength change vs search radius: {"search_radius_2":28.0169,"search_radius_3":46.957699999999996,"search_radius_5":105.53490000000001,"search_radius_7":209.2401,"search_radius_9":386.63439999999997}
+viewport sizes: {"1280x720":{"denoise_change_ms":28.5871,"megapixels":0.9216,"upstream_change_ms":28.227},"1920x1080":{"denoise_change_ms":61.7458,"megapixels":2.0736,"upstream_change_ms":62.159},"2560x1440":{"denoise_change_ms":105.7777,"megapixels":3.6864,"upstream_change_ms":106.25179999999999},"3840x2160":{"denoise_change_ms":231.5043,"megapixels":8.2944,"upstream_change_ms":232.5384}}
+fit view 1/4 (2064x1376): cold prepare 26 ms; denoise change 17.0 ms; local contrast change 1.5 ms
+full export through the chain: 1786 ms (bands of 158 rows + halo)

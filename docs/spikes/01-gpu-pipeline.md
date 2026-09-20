@@ -3,7 +3,8 @@
 > **Status: interim.** Measured on Linux with a real GPU, on real RAW files from six cameras,
 > and on Linux, Windows and macOS through continuous integration (no discrete GPU there, and
 > synthetic data), and with a heavier pipeline (denoising, sharpening, local contrast, a mask).
-> Real Windows and macOS GPUs and the sRAW entry point are still to come (see "What remains").
+> A real Windows GPU (Vulkan) has been measured on the same machine. DirectX 12 on a real GPU,
+> a Mac, and the sRAW entry point are still to come (see "What remains").
 > Nothing here is a final decision.
 
 ## Question
@@ -191,6 +192,35 @@ Shaders shipped by operation plugins (specification §5.6 and §5.10) will need 
 a portable subset of WGSL that they must stay within, and a check on every back end before a
 plugin is accepted into the index, because the author will usually have tried only one.
 
+## The same machine under Windows
+
+Patrick booted the same PC into Windows and ran `run-all.sh` (issue #1 of the repository, results
+in `spikes/results-windows/`). Same GTX 1650 SUPER, driver 566.24, wgpu on **Vulkan**. Windows had
+many updates pending and a busy disk during the run, which could disturb timings; the figures
+below are close to Linux's, so the effect on the GPU work was small.
+
+| Measure | Linux | Windows |
+| --- | --- | --- |
+| Full render 24 MP, synthetic | 27 ms | 25 ms |
+| 100% view, upstream / tone only | 1.2 ms / 0.6 ms | 1.2 ms / 0.7 ms |
+| Real files, full render (Sony 60 MP / Nikon 45 MP) | 63 / 51 ms | 56 / 73 ms |
+| Real files, decode (Sony / Nikon / Canon R5 II) | 115 / 301 / 378 ms | 103 / 285 / 514 ms |
+| Heavy chain: denoise stage alone, 2560x1440 | 108 ms | 96 ms |
+| Heavy chain: denoise strength change / WB after denoise | 118 / 0.7 ms | 105 / 0.6 ms |
+| Heavy chain: full export, 45 MP | 2.0 s | 1.8 s |
+| Heavy chain, a 3840x2160 view | did not fit in GPU memory | 232 ms |
+| Worst difference from the CPU reference | 1 level | 1 level |
+| Smoke test (all shaders against the CPU reference) | passes | **passes** |
+| Readback of a 2 MP view | 0.9 ms | 0.75 ms |
+
+The 4K view fitted this time because the Windows desktop leaves more GPU memory free. Nothing in
+these numbers changes the conclusions above.
+
+The Windows machine reports six adapters: the GTX 1650 SUPER on Vulkan, DirectX 12 and OpenGL,
+the **Intel UHD 630 on Vulkan and DirectX 12** (it was invisible under Linux), and WARP.
+The benchmarks ran on the NVIDIA card through Vulkan. **DirectX 12 on a real GPU, and the Intel
+iGPU, are not measured yet**; DirectX 12 is what wgpu picks by default on Windows.
+
 ## What it means
 
 1. **The architecture holds.** Caching the camera RGB at the stage boundary makes a downstream
@@ -229,8 +259,8 @@ plugin is accepted into the index, because the author will usually have tried on
 
 ## What remains
 
-- [ ] **Real GPUs on Windows and macOS.** The workflow's binaries can be run on Patrick's
-  machines to get real numbers. Correctness on both is already shown.
+- [x] **A real GPU on Windows** (Vulkan, same PC): matches Linux.
+- [ ] **DirectX 12 on a real GPU and the Intel iGPU**, then **a Mac** with a real display.
 - [x] **Real RAW files** from six cameras (done). Still open: the linear entry point (sRAW).
 - [ ] **Better inputs.** The automatic exposure of the benchmark is crude and over-exposes
   bright scenes (the Canon R5 II preview clips its highlights). Black levels are averaged over

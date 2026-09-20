@@ -1,0 +1,4 @@
+adapter: NVIDIA GeForce GTX 1650 SUPER [Vulkan] | Nikon D850 (RGGB, 8256x5504, black 400, white 15520, matrix camera) (8256x5504)
+1200x800 (1.0 MP, 3.8 MB): GPU 0.82 ms, readback 0.39 ms, total median 1.22 ms, p95 1.49, p99 1.59
+1872x1064 (2.0 MP, 8.0 MB): GPU 1.44 ms, readback 0.75 ms, total median 2.19 ms, p95 6.62, p99 7.20
+2560x1440 (3.7 MP, 14.7 MB): GPU 2.45 ms, readback 1.44 ms, total median 3.90 ms, p95 4.09, p99 4.36

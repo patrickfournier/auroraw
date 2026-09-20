@@ -1,0 +1,28 @@
+{
+  "adapter": "NVIDIA GeForce GTX 1650 SUPER",
+  "backend": "Vulkan",
+  "scene": "Nikon D850 (RGGB, 8256x5504, black 400, white 15520, matrix camera)",
+  "views": {
+    "1200x800": {
+      "gpu_ms": 0.8209,
+      "readback_ms": 0.3893,
+      "total_median_ms": 1.217,
+      "total_p95_ms": 1.4885000000000002,
+      "total_p99_ms": 1.5925
+    },
+    "1872x1064": {
+      "gpu_ms": 1.4388,
+      "readback_ms": 0.7461,
+      "total_median_ms": 2.1919,
+      "total_p95_ms": 6.6207,
+      "total_p99_ms": 7.1967
+    },
+    "2560x1440": {
+      "gpu_ms": 2.4497999999999998,
+      "readback_ms": 1.4443,
+      "total_median_ms": 3.8964,
+      "total_p95_ms": 4.089,
+      "total_p99_ms": 4.3563
+    }
+  }
+}

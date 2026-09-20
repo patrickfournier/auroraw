@@ -1,0 +1,37 @@
+6 adapter(s)
+
+NVIDIA GeForce GTX 1650 SUPER [Vulkan, DiscreteGpu]
+  driver: NVIDIA 566.24
+  max buffer: 4094 MiB, max storage binding: 2047 MiB
+  max 2D texture: 32768, workgroup storage: 48 KiB, invocations/workgroup: 1024
+  f16 in shaders: true
+
+Intel(R) UHD Graphics 630 [Vulkan, IntegratedGpu]
+  driver: Intel Corporation Intel driver
+  max buffer: 4095 MiB, max storage binding: 1023 MiB
+  max 2D texture: 16384, workgroup storage: 32 KiB, invocations/workgroup: 1024
+  f16 in shaders: true
+
+NVIDIA GeForce GTX 1650 SUPER [Dx12, DiscreteGpu]
+  driver: 32.0.15.6624 
+  max buffer: 2047 MiB, max storage binding: 2047 MiB
+  max 2D texture: 16384, workgroup storage: 32 KiB, invocations/workgroup: 1024
+  f16 in shaders: false
+
+Intel(R) UHD Graphics 630 [Dx12, IntegratedGpu]
+  driver: 31.0.101.2130 
+  max buffer: 2047 MiB, max storage binding: 2047 MiB
+  max 2D texture: 16384, workgroup storage: 32 KiB, invocations/workgroup: 1024
+  f16 in shaders: false
+
+Microsoft Basic Render Driver [Dx12, Cpu]
+  driver: 10.0.26100.3624 
+  max buffer: 2047 MiB, max storage binding: 2047 MiB
+  max 2D texture: 16384, workgroup storage: 32 KiB, invocations/workgroup: 1024
+  f16 in shaders: false
+
+NVIDIA GeForce GTX 1650 SUPER/PCIe/SSE2 [Gl, Other]
+  driver:  4.6.0 NVIDIA 566.24
+  max buffer: 2047 MiB, max storage binding: 2047 MiB
+  max 2D texture: 32768, workgroup storage: 48 KiB, invocations/workgroup: 1024
+  f16 in shaders: false
