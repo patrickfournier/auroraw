@@ -1,0 +1,72 @@
+{
+  "accuracy_chain_vs_cpu": {
+    "fraction_over_one_level": 0.0,
+    "max_level": 1,
+    "mean_level": 0.0000152587890625
+  },
+  "adapter": {
+    "backend": "Vulkan",
+    "name": "llvmpipe (LLVM 20.1.2, 256 bits)",
+    "type": "Cpu"
+  },
+  "change_ms_100_view": {
+    "denoise_strength": 3233.10682,
+    "exposure_tone_only": 16.531976,
+    "local_contrast": 31.547838000000002,
+    "sharpen_radius": 181.216717,
+    "white_balance_after_denoise": 17.625784,
+    "white_balance_before_denoise": 3252.4073059999996
+  },
+  "denoise_search_radius_sweep_ms": {
+    "search_radius_2": 866.8658350000001,
+    "search_radius_3": 1455.140769,
+    "search_radius_5": 3244.614612,
+    "search_radius_7": 5803.287380000001,
+    "search_radius_9": 9116.18974
+  },
+  "export_chain_ms": 55666.074986,
+  "fit_view": {
+    "cold_prepare_ms": 222.651433,
+    "denoise_change_ms": 541.8183720000001,
+    "factor": 4,
+    "local_contrast_change_ms": 25.887667999999998,
+    "size": [
+      2064,
+      1376
+    ]
+  },
+  "megapixels": 45.441024,
+  "operations": {
+    "denoise": "non-local means, search radius 5 (11x11), patch 3x3",
+    "local_contrast": "box blur radius 24",
+    "mask": "radial exposure",
+    "sharpen": "unsharp mask, box radius 2"
+  },
+  "scene": "Nikon D850 (RGGB, 8256x5504, black 400, white 15520, matrix camera)",
+  "stage_ms_100_view": {
+    "Blur": 146.285645,
+    "Combine": 18.362878,
+    "Demosaic": 9.196060000000001,
+    "Denoise": 2936.0776140000003,
+    "Tone": 14.190322
+  },
+  "upload_ms": 123.826265,
+  "viewport_sizes": {
+    "1280x720": {
+      "denoise_change_ms": 905.7982089999999,
+      "megapixels": 0.9216,
+      "upstream_change_ms": 905.253757
+    },
+    "1920x1080": {
+      "denoise_change_ms": 1894.708884,
+      "megapixels": 2.0736,
+      "upstream_change_ms": 1880.423239
+    },
+    "2560x1440": {
+      "denoise_change_ms": 3228.081295,
+      "megapixels": 3.6864,
+      "upstream_change_ms": 3224.7662419999997
+    },
+    "3840x2160": "does not fit (GPU memory or binding size limit)"
+  }
+}

@@ -27,4 +27,9 @@ struct Params {
     src_h: u32,
     factor: u32,
     cfa_flip: u32,    // demosaic: bit 0 flips the column parity, bit 1 the row parity
+    op0: vec4<f32>,   // denoise: h, unused, search radius, patch radius
+    op1: vec4<f32>,   // sharpen: amount, blur radius
+    op2: vec4<f32>,   // local contrast: gain, blur radius
+    op3: vec4<f32>,   // mask: centre x, centre y, radius, exposure change (EV)
+    blur: vec4<u32>,  // blur pass: radius, direction (0 horizontal, 1 vertical)
 };

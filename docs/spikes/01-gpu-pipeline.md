@@ -2,8 +2,9 @@
 
 > **Status: interim.** Measured on Linux with a real GPU, on real RAW files from six cameras,
 > and on Linux, Windows and macOS through continuous integration (no discrete GPU there, and
-> synthetic data). Real Windows and macOS GPUs, a heavier pipeline and the sRAW entry point are
-> still to come (see "What remains"). Nothing here is a final decision.
+> synthetic data), and with a heavier pipeline (denoising, sharpening, local contrast, a mask).
+> Real Windows and macOS GPUs and the sRAW entry point are still to come (see "What remains").
+> Nothing here is a final decision.
 
 ## Question
 
@@ -89,6 +90,92 @@ Other facts:
 - **wgpu's GL back end** lost the device on this workload. It is not a target platform.
 - **Intel UHD 630** is not visible to wgpu from this sandbox, so it could not be tested.
 
+## Second round: a heavier pipeline
+
+The minimal pipeline left a lot of headroom, so the question was where it runs out. Four
+operations were added after demosaicing, in this order, on the camera RGB:
+
+1. **Non-local means denoising**, search window 11x11, 3x3 patches. The most expensive
+   operation in most RAW developers, and the one that scales worst.
+2. **Unsharp mask** (box blur radius 2).
+3. **Local contrast** (box blur radius 24).
+4. **A radial exposure mask.**
+
+Each stage has its own buffer, so a change reruns its stage and every later one, and the earlier
+results stay cached. The work is done on a region with a **40 px halo** so the edges of the view
+are right. A CPU version of the whole chain checks the shaders: on the GTX 1650 SUPER the two
+agree exactly on the 256x256 test region, on llvmpipe within one level.
+
+Nikon D850 file, 45 MP, GTX 1650 SUPER, a **2560x1440 view at 100%** (3.7 MP). The Sony 60 MP file
+gives the same numbers within 2%.
+
+| Stage alone | Time |
+| --- | --- |
+| Demosaic | 1.0 ms |
+| **Denoise (non-local means)** | **108 ms** |
+| Blurs (four passes) | 9.6 ms |
+| Sharpen, local contrast and mask | 2.1 ms |
+| Tone and display | 1.0 ms |
+
+| What the photographer changes (target: under 50 ms) | Time | Stages rerun |
+| --- | --- | --- |
+| Exposure, tone curve | **0.7 ms** | tone |
+| Local contrast amount, sharpening amount, mask | **2.6 ms** | combine, tone |
+| Sharpening radius | 11 ms | blurs and later |
+| **Denoise strength** | **118 ms** | denoise and later |
+| **White balance, applied before denoising** | **120 ms** | everything |
+| **White balance, applied after denoising** | **0.6 ms** | tone |
+
+How the denoise cost grows, on the same view (a search window of (2R+1)^2 pixels):
+
+| Search radius | 2 | 3 | 5 | 7 | 9 |
+| --- | --- | --- | --- | --- | --- |
+| Denoise change on 2560x1440 | 32 ms | 52 ms | 120 ms | 237 ms | 419 ms |
+
+And how it grows with the view, at radius 5: 1280x720 (0.9 MP) 31 ms, 1920x1080 (2.1 MP) 69 ms,
+2560x1440 (3.7 MP) 120 ms. A 3840x2160 view did not fit in the free GPU memory.
+
+| Other paths | GTX 1650 SUPER | llvmpipe (16 threads) |
+| --- | --- | --- |
+| Fit-to-screen, denoise change (radii scaled by 1/4) | 19 ms | 542 ms |
+| Fit-to-screen, local contrast change | 1.7 ms | 26 ms |
+| Full export through the chain, 45 MP | **2.0 s** | 55.7 s |
+| Full export through the chain, 60 MP | 2.9 s | not run |
+| The 100% view, denoise change | 118 ms | 3,233 ms |
+
+The export used small bands (150 MB of buffers), so the halo was redundant work for about half
+of each band. It would be faster with bigger bands.
+
+### What it means
+
+1. **Everything but the denoiser fits the budget by a wide margin.** Sharpening, local contrast,
+   masks, exposure and tone cost under 12 ms together. The denoiser alone is 108 ms.
+2. **The order of operations decides how interactive the application feels.** The same white
+   balance change costs 120 ms before the denoiser and 0.6 ms after it, 200 times less, and the
+   result is the same, since the multipliers fold into the camera matrix. This is also how real
+   RAW developers do it, and the pipeline definition (specification §5.6) must be able to say it:
+   heavy operations that are rarely changed go early, operations dragged often go late.
+3. **A draft quality would keep dragging under 50 ms.** Denoising with a search radius of 2
+   costs 32 ms on a 2560x1440 view, against 120 ms at radius 5. Drawing the draft while a slider
+   moves and the full quality when it stops would meet the budget on this card. On a faster GPU,
+   and that is a mid-range one, the full quality alone might.
+4. **The fit-to-screen view is not the problem**: 19 ms with the radii scaled to the reduced
+   image.
+5. **The export target holds**: about 1 s per 24 MP through the whole chain, against a target of
+   2 s, even with wasteful bands.
+6. **The software fallback struggles with heavy operations.** llvmpipe is 27 times slower than
+   the GPU on the denoiser (target: under 20 times), and a 45 MP export takes 56 s. The fallback
+   is acceptable for the light pipeline and painful for the heavy one; it would need a cheaper
+   denoising algorithm, or a warning.
+7. **The application must adapt to the GPU memory it can get.** During this round the memory a
+   process could allocate on this 4 GB card went from 1.3 GB to 64 MB and back, as the desktop
+   and a virtual machine used it. One chain at 2560x1440 needs five 60 MB buffers, so the
+   view size, the band size and the halo have to follow the available memory, and running out
+   must be handled and not fatal. Half-precision intermediates would halve the memory.
+8. **Non-local means is a placeholder for the choice of denoiser**, which is a product decision:
+   its cost grows with the square of the search radius, and the AI denoiser planned for
+   milestone M5 has a different profile.
+
 ## What it means
 
 1. **The architecture holds.** Caching the camera RGB at the stage boundary makes a downstream
@@ -134,9 +221,10 @@ Other facts:
   bright scenes (the Canon R5 II preview clips its highlights). Black levels are averaged over
   the four channels. Highlight reconstruction, lens and chromatic-aberration corrections are
   absent. None of this affects the timings, but it limits what the previews say about quality.
-- [ ] **Upload time.** Sending the mosaic to the GPU (120 MB at 60 MP) is not timed yet.
-- [ ] **A heavier pipeline** (noise reduction, local contrast, a mask) to see where the budget
-  starts to bind.
+- [x] **Upload time**: 70 to 160 ms for a 45 MP mosaic (91 MB) and the LUT, varying with the
+  state of the GPU.
+- [x] **A heavier pipeline** (done, see above). Still open: a faster GPU to see whether the
+  full-quality denoiser fits on its own, and half-precision intermediates.
 - [ ] **Presentation.** These numbers stop at the buffer: no window, no swap chain, no vertical
   sync. That belongs to spike 2.
 - [ ] **A second GPU**, such as the Intel UHD 630, or an AMD card.
@@ -152,6 +240,7 @@ cargo build --release
 ./target/release/bench --adapter "vulkan nvidia" --mp 24    # synthetic; or 61; "dx12", "metal"
 ./fetch-samples.sh                                         # the seven CC0 RAW files, 225 MB
 ./target/release/rawbench --adapter "vulkan nvidia"        # real files; --generic forces the generic pass
+./target/release/heavy --adapter "vulkan nvidia" --file samples/DSC00396.ARW   # the heavy chain
 ```
 
 On Windows, run the shell script from Git Bash. `rawbench` writes previews to

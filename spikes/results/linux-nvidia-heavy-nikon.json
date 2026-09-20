@@ -1,0 +1,72 @@
+{
+  "accuracy_chain_vs_cpu": {
+    "fraction_over_one_level": 0.0,
+    "max_level": 0,
+    "mean_level": 0.0
+  },
+  "adapter": {
+    "backend": "Vulkan",
+    "name": "NVIDIA GeForce GTX 1650 SUPER",
+    "type": "DiscreteGpu"
+  },
+  "change_ms_100_view": {
+    "denoise_strength": 118.059909,
+    "exposure_tone_only": 0.713784,
+    "local_contrast": 2.649876,
+    "sharpen_radius": 11.449647,
+    "white_balance_after_denoise": 0.631994,
+    "white_balance_before_denoise": 119.637835
+  },
+  "denoise_search_radius_sweep_ms": {
+    "search_radius_2": 31.99382,
+    "search_radius_3": 52.353432999999995,
+    "search_radius_5": 120.36187199999999,
+    "search_radius_7": 237.025987,
+    "search_radius_9": 418.501109
+  },
+  "export_chain_ms": 2007.8167329999999,
+  "fit_view": {
+    "cold_prepare_ms": 27.417625,
+    "denoise_change_ms": 19.154014,
+    "factor": 4,
+    "local_contrast_change_ms": 1.7260579999999999,
+    "size": [
+      2064,
+      1376
+    ]
+  },
+  "megapixels": 45.441024,
+  "operations": {
+    "denoise": "non-local means, search radius 5 (11x11), patch 3x3",
+    "local_contrast": "box blur radius 24",
+    "mask": "radial exposure",
+    "sharpen": "unsharp mask, box radius 2"
+  },
+  "scene": "Nikon D850 (RGGB, 8256x5504, black 400, white 15520, matrix camera)",
+  "stage_ms_100_view": {
+    "Blur": 9.633809,
+    "Combine": 2.071041,
+    "Demosaic": 0.974897,
+    "Denoise": 108.05007499999999,
+    "Tone": 1.025869
+  },
+  "upload_ms": 67.761201,
+  "viewport_sizes": {
+    "1280x720": {
+      "denoise_change_ms": 31.170878,
+      "megapixels": 0.9216,
+      "upstream_change_ms": 32.568912999999995
+    },
+    "1920x1080": {
+      "denoise_change_ms": 68.81022,
+      "megapixels": 2.0736,
+      "upstream_change_ms": 69.838762
+    },
+    "2560x1440": {
+      "denoise_change_ms": 120.144684,
+      "megapixels": 3.6864,
+      "upstream_change_ms": 121.928566
+    },
+    "3840x2160": "does not fit (GPU memory or binding size limit)"
+  }
+}

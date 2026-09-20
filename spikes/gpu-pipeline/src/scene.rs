@@ -83,6 +83,8 @@ pub fn synthetic(width: u32, height: u32) -> Scene {
         src_h: height,
         factor: 1,
         cfa_flip: 0,
+        op: crate::DEFAULT_OPS,
+        blur: [0; 4],
     };
     Scene { width, height, mosaic, params, lut: make_lut(LUT_SIZE), label: "synthetic".into(), cfa6: None }
 }

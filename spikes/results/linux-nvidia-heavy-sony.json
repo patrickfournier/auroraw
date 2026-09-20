@@ -1,0 +1,72 @@
+{
+  "accuracy_chain_vs_cpu": {
+    "fraction_over_one_level": 0.0,
+    "max_level": 1,
+    "mean_level": 0.0000152587890625
+  },
+  "adapter": {
+    "backend": "Vulkan",
+    "name": "NVIDIA GeForce GTX 1650 SUPER",
+    "type": "DiscreteGpu"
+  },
+  "change_ms_100_view": {
+    "denoise_strength": 119.134478,
+    "exposure_tone_only": 0.669502,
+    "local_contrast": 2.213628,
+    "sharpen_radius": 11.114221,
+    "white_balance_after_denoise": 0.683856,
+    "white_balance_before_denoise": 120.146092
+  },
+  "denoise_search_radius_sweep_ms": {
+    "search_radius_2": 31.562716999999996,
+    "search_radius_3": 51.233932,
+    "search_radius_5": 118.301907,
+    "search_radius_7": 234.99204500000002,
+    "search_radius_9": 420.178102
+  },
+  "export_chain_ms": 2900.420573,
+  "fit_view": {
+    "cold_prepare_ms": 35.10611,
+    "denoise_change_ms": 25.797701,
+    "factor": 4,
+    "local_contrast_change_ms": 2.426273,
+    "size": [
+      2376,
+      1584
+    ]
+  },
+  "megapixels": 60.217344,
+  "operations": {
+    "denoise": "non-local means, search radius 5 (11x11), patch 3x3",
+    "local_contrast": "box blur radius 24",
+    "mask": "radial exposure",
+    "sharpen": "unsharp mask, box radius 2"
+  },
+  "scene": "Sony ILCE-7RM4 (RGGB, 9504x6336, black 512, white 15360, matrix camera)",
+  "stage_ms_100_view": {
+    "Blur": 8.649804000000001,
+    "Combine": 1.781091,
+    "Demosaic": 1.048607,
+    "Denoise": 109.391378,
+    "Tone": 0.6970890000000001
+  },
+  "upload_ms": 90.483367,
+  "viewport_sizes": {
+    "1280x720": {
+      "denoise_change_ms": 32.329334,
+      "megapixels": 0.9216,
+      "upstream_change_ms": 32.80088
+    },
+    "1920x1080": {
+      "denoise_change_ms": 69.423431,
+      "megapixels": 2.0736,
+      "upstream_change_ms": 69.617176
+    },
+    "2560x1440": {
+      "denoise_change_ms": 118.911367,
+      "megapixels": 3.6864,
+      "upstream_change_ms": 120.427318
+    },
+    "3840x2160": "does not fit (GPU memory or binding size limit)"
+  }
+}

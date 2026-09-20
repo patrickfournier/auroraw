@@ -115,3 +115,95 @@ pub fn render_region(scene: &Scene, x0: u32, y0: u32, w: u32, h: u32) -> Vec<u32
     });
     out
 }
+
+// ---- the heavy chain: non-local means, blurs, unsharp / local contrast / mask, then tone ----
+
+fn box_blur(src: &[[f32; 3]], rw: usize, rh: usize, radius: i32, vertical: bool) -> Vec<[f32; 3]> {
+    let mut out = vec![[0.0f32; 3]; rw * rh];
+    out.par_chunks_mut(rw).enumerate().for_each(|(y, line)| {
+        for (x, px) in line.iter_mut().enumerate() {
+            let mut acc = [0.0f32; 3];
+            for i in -radius..=radius {
+                let (sx, sy) = if vertical {
+                    (x, (y as i32 + i).clamp(0, rh as i32 - 1) as usize)
+                } else {
+                    ((x as i32 + i).clamp(0, rw as i32 - 1) as usize, y)
+                };
+                let v = src[sy * rw + sx];
+                acc = [acc[0] + v[0], acc[1] + v[1], acc[2] + v[2]];
+            }
+            let n = (2 * radius + 1) as f32;
+            *px = [acc[0] / n, acc[1] / n, acc[2] / n];
+        }
+    });
+    out
+}
+
+fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
+    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Renders the kept region (x0, y0, w, h), developed with a halo around it, through the whole
+/// heavy chain. The same maths as the shaders.
+pub fn chain_region(scene: &Scene, x0: u32, y0: u32, w: u32, h: u32, halo: u32) -> Vec<u32> {
+    let p = &scene.params;
+    let (rx, ry) = ((x0 - halo) as i32, (y0 - halo) as i32);
+    let (rw, rh) = ((w + 2 * halo) as usize, (h + 2 * halo) as usize);
+    let a: Vec<[f32; 3]> = (0..rw * rh).into_par_iter().map(|i| demosaic(scene, p, rx + (i % rw) as i32, ry + (i / rw) as i32)).collect();
+
+    let (radius, patch) = (p.op[0][2] as i32, p.op[0][3] as i32);
+    let h2 = (p.op[0][0] * p.op[0][0]).max(1e-8);
+    let norm = 1.0 / (((2 * patch + 1) * (2 * patch + 1) * 3) as f32);
+    let at = |x: i32, y: i32| a[(y.clamp(0, rh as i32 - 1) as usize) * rw + x.clamp(0, rw as i32 - 1) as usize];
+    let den: Vec<[f32; 3]> = (0..rw * rh)
+        .into_par_iter()
+        .map(|i| {
+            let (x, y) = ((i % rw) as i32, (i / rw) as i32);
+            let (mut acc, mut wsum) = ([0.0f32; 3], 0.0f32);
+            for sy in -radius..=radius {
+                for sx in -radius..=radius {
+                    let mut d = 0.0f32;
+                    for py in -patch..=patch {
+                        for px in -patch..=patch {
+                            let (u, v) = (at(x + px, y + py), at(x + sx + px, y + sy + py));
+                            d += (u[0] - v[0]).powi(2) + (u[1] - v[1]).powi(2) + (u[2] - v[2]).powi(2);
+                        }
+                    }
+                    let wgt = (-(d * norm) / h2).exp();
+                    let s = at(x + sx, y + sy);
+                    acc = [acc[0] + wgt * s[0], acc[1] + wgt * s[1], acc[2] + wgt * s[2]];
+                    wsum += wgt;
+                }
+            }
+            [acc[0] / wsum, acc[1] / wsum, acc[2] / wsum]
+        })
+        .collect();
+
+    let small = box_blur(&box_blur(&den, rw, rh, p.op[1][1] as i32, false), rw, rh, p.op[1][1] as i32, true);
+    let large = box_blur(&box_blur(&den, rw, rh, p.op[2][1] as i32, false), rw, rh, p.op[2][1] as i32, true);
+    let comb: Vec<[f32; 3]> = (0..rw * rh)
+        .into_par_iter()
+        .map(|i| {
+            let (x, y) = ((i % rw) as f32, (i / rw) as f32);
+            let (uvx, uvy) = (x / rw as f32, y / rh as f32);
+            let dist = ((uvx - p.op[3][0]).powi(2) + (uvy - p.op[3][1]).powi(2)).sqrt();
+            let m = 1.0 - smoothstep(0.5, 1.0, dist / p.op[3][2].max(1e-4));
+            let gain = (p.op[3][3] * m).exp2();
+            let mut out = [0.0f32; 3];
+            for c in 0..3 {
+                let v = den[i][c] + p.op[1][0] * (den[i][c] - small[i][c]) + p.op[2][0] * (den[i][c] - large[i][c]);
+                out[c] = v.max(0.0) * gain;
+            }
+            out
+        })
+        .collect();
+
+    let mut out = vec![0u32; (w * h) as usize];
+    out.par_chunks_mut(w as usize).enumerate().for_each(|(row, line)| {
+        for (col, px) in line.iter_mut().enumerate() {
+            *px = tone(scene, p, comb[(row + halo as usize) * rw + col + halo as usize]);
+        }
+    });
+    out
+}

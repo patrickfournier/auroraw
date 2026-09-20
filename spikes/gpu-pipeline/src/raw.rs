@@ -151,6 +151,8 @@ pub fn load(path: &Path, force_generic: bool) -> Result<Scene> {
         src_h: h as u32,
         factor: 1,
         cfa_flip: flip,
+        op: crate::DEFAULT_OPS,
+        blur: [0; 4],
     };
     let label = format!("{} {} ({}, {}x{}, black {:.0}, white {:.0}, matrix {})", raw.clean_make, raw.clean_model, cfg.cfa.name, w, h, black, white, if usable { "camera" } else { "MISSING" });
     Ok(Scene { width: w as u32, height: h as u32, mosaic, params, lut: make_lut(LUT_SIZE), label, cfa6 })

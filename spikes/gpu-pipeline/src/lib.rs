@@ -36,7 +36,15 @@ pub struct Params {
     pub factor: u32,
     /// Bit 0 flips the column parity, bit 1 the row parity of the RGGB pattern.
     pub cfa_flip: u32,
+    /// Operation parameters. op[0] denoise: strength h, unused, search radius, patch radius.
+    /// op[1] sharpen: amount, blur radius. op[2] local contrast: gain, blur radius.
+    /// op[3] mask: centre x, centre y, radius (fractions of the region), exposure change in EV.
+    pub op: [[f32; 4]; 4],
+    /// Blur pass: radius, direction (0 horizontal, 1 vertical).
+    pub blur: [u32; 4],
 }
+
+pub const DEFAULT_OPS: [[f32; 4]; 4] = [[0.03, 0.0, 5.0, 1.0], [0.6, 2.0, 0.0, 0.0], [0.4, 24.0, 0.0, 0.0], [0.5, 0.5, 0.35, 0.5]];
 
 pub const LUT_SIZE: u32 = 33;
 
