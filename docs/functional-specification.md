@@ -726,6 +726,21 @@ Four families [decided]: **import** (including RAW reading), **export** (images 
   planned for v1.
 - Versions record which plugins they need (§5.6), and a missing plugin never loses settings.
 
+**Declaration** [decided, D-078]
+
+- Every plugin carries a declaration: identifier, version, API version, family, panel, the
+  pipeline stage and ordering constraints (§5.6), parameters with limits and defaults, and
+  permissions. The host refuses a declaration it cannot satisfy, with the reason.
+
+**GPU operations** [decided, D-077]
+
+- An operation plugin may ship its shader as **data**, with a **CPU twin** in WebAssembly that
+  must give the same result. The host validates the shader, places the operation from its
+  declaration, and refuses it if it is invalid.
+- A GPU shader cannot be interrupted the way a WebAssembly loop can, so a **safety and portability
+  check** is mandatory before a plugin is admitted to the index: every loop proven bounded, and
+  the shader compiled on every graphics API (Vulkan, Metal, DirectX 12).
+
 **Distribution** [decided, D-054]
 
 - A **catalogue of plugins** built into the application, fed by a **public, open index** (a
@@ -739,6 +754,10 @@ Four families [decided]: **import** (including RAW reading), **export** (images 
 
 - A plugin runs in a **sandbox** by default. It declares what it needs (network, files,
   keychain) and the user sees those permissions **before installing**.
+- The sandbox is **WebAssembly, run by wasmtime** [decided, D-076]. A plugin has no access to
+  files, the network, the environment or other processes unless the host grants it; each has
+  limits on memory and running time and is stopped if it exceeds them, without harm to the host.
+  Plugins are compiled once at installation and the compiled copy is kept.
 - Plugins that need native code (fast RAW decoders) may request a **native** level. It is
   clearly flagged and needs explicit confirmation.
 
@@ -897,9 +916,11 @@ Sorted by when they need an answer. No question is left to decide before the tec
    could be offered for the reliable subset, with a warning.
 10. **Prooftide API v1**: the exact scope of the documented API, its compatibility policy, and how
     a plugin identifies itself and is authorised (work in the Prooftide repository).
-11. **Plugin technology**: the language and ABI, the isolation technology (what runs in the
-    sandbox and what "native" means), how GPU code is packaged, and how the index is hosted and
-    its entries signed.
+11. **Plugin technology**: the sandbox is settled (D-076) and so are the declaration and GPU
+    shaders as data (D-077, D-078). Left open: the interface between host and plugin (a hand-made C
+    interface was used; the WebAssembly component model would give typed interfaces), what
+    "native" means for decoders, WebAssembly threads, and how the index is hosted and its
+    entries signed.
 12. **Importing settings** from other software (Lightroom, darktable): useful, and how far?
 13. **Dependency licenses**: compatibility with GPL-3.0 (RAW libraries, Lensfun and its database,
     AI models).
