@@ -1,9 +1,9 @@
 # Spike 1: the GPU pipeline (interim report)
 
-> **Status: interim.** Measured on Linux with a real GPU, and on Linux, Windows and macOS
-> through continuous integration (no discrete GPU there), all with synthetic data. Real RAW
-> files and real Windows and macOS GPUs are still to come (see "What remains"). Nothing here is a
-> final decision.
+> **Status: interim.** Measured on Linux with a real GPU, on real RAW files from six cameras,
+> and on Linux, Windows and macOS through continuous integration (no discrete GPU there, and
+> synthetic data). Real Windows and macOS GPUs, a heavier pipeline and the sRAW entry point are
+> still to come (see "What remains"). Nothing here is a final decision.
 
 ## Question
 
@@ -24,9 +24,11 @@ result on Vulkan, Metal and DirectX 12, and with a CPU fallback? (docs/technical
   stage boundary so that a downstream change reruns only the tone pass.
 - A benchmark that prints every measure as JSON.
 
-The input is a synthetic Bayer mosaic (smooth colour field, texture, noise) because no RAW file
-is available yet. The pipeline has no data-dependent branching, so the timings should transfer;
-the accuracy result should be repeated on real files.
+The first input was a synthetic Bayer mosaic (smooth colour field, texture, noise). The second
+round, below, uses **real RAW files**, decoded with `rawler` (Rust, LGPL-2.1): black and white
+levels, white balance, the camera's colour matrix and the recommended crop come from the file.
+A generic demosaicing pass (a weighted average over a 7x7 window, for any 6x6 colour filter
+pattern) was added to show that the demosaicing stage can be swapped, using Fujifilm's X-Trans.
 
 ## Results
 
@@ -58,6 +60,25 @@ the shaders run and agree, not that a real GPU is fast. All four have 3 to 4 CPU
 
 In every case the fraction of pixels differing by more than one level is 0%.
 
+### Real RAW files
+
+Seven CC0 samples from raw.pixls.us. Same GTX 1650 SUPER, Vulkan. "Decode" is the CPU time
+`rawler` needs to read the file; the other columns are GPU. "Worst diff" is the largest
+difference from the CPU reference, over the whole image; no pixel differs by more than 1 level.
+
+| File | Sensor | Size | Decode | Full render | 100% view, upstream | 100% view, tone only | Worst diff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Sony A7R IV (ARW) | Bayer | 60 MP | 115 ms | 63 ms | 1.1 ms | 0.6 ms | 1 level |
+| Nikon D850 (NEF) | Bayer | 45 MP | 301 ms | 51 ms | 1.4 ms | 0.9 ms | 1 level |
+| Canon R5 Mark II (CR3, compressed) | Bayer | 45 MP | 378 ms | 45 ms | 1.5 ms | 0.8 ms | 1 level |
+| Fujifilm X-T50 (RAF) | **X-Trans** | 40 MP | 304 ms | 90 ms | 6.0 ms | 1.3 ms | 1 level |
+| Panasonic S5 (RW2) | Bayer | 24 MP | 54 ms | 25 ms | 1.2 ms | 0.7 ms | 1 level |
+| Olympus E-M5 III (ORF) | Bayer | 20 MP | 291 ms | 24 ms | 1.4 ms | 0.9 ms | 1 level |
+| Canon 5D Mark IV (CR2) | **sRAW**, 3 channels | 7.5 MP | not run | not run | not run | not run | not run |
+
+The previews written by the benchmark were checked by eye: correct orientation, plausible
+colours, no visible pattern from the demosaicing, on Sony, Nikon, Canon and Fujifilm.
+
 Other facts:
 
 - **Memory.** The 61 MP run used about 700 MB of GPU memory in the process. The desktop was
@@ -77,6 +98,18 @@ Other facts:
    reduction, sharpening, local contrast, masks, lens correction and more, and heavy operations
    will eat into the headroom. The budget is safe for now, not proven for M3.
 3. **Banding works** and is what makes 61 MP images fit small GPUs.
+   **Real files behave like the synthetic one**: same timings, same accuracy.
+3b. **Decoding is now the slow part.** Reading a RAW takes 55 to 380 ms on the CPU, against 25
+   to 90 ms for the whole GPU render. Opening a photo for development therefore costs about
+   0.4 s before the first pixel, whatever the GPU. Ways to hide it: show the embedded JPEG
+   preview at once, decode in the background while browsing, and decode on several threads.
+   `rawler` was measured here on its own; LibRaw, and LibRaw as WebAssembly, come in spike 4.
+3c. **The pipeline needs several entry points.** A Bayer mosaic (fast gradient-corrected
+   demosaicing), another colour filter such as X-Trans (the generic pass, 90 ms for 40 MP instead
+   of about 50 ms), and **already-interpolated linear data**, which is what Canon's sRAW and
+   many scanner files are. The Canon 5D Mark IV sample is the latter: three channels per pixel,
+   no demosaicing to do. Only the first stage changes; the rest of the pipeline is untouched,
+   which supports the pipeline definition of the specification (§5.6).
 4. **The CPU fallback depends on the platform.** On Linux, the same shaders on llvmpipe were
    about 9 times slower than the GPU (target: under 20 times), gave the same result within one
    level, and were **faster** than a hand-written Rust CPU implementation (235 ms against 354 ms
@@ -96,14 +129,19 @@ Other facts:
 
 - [ ] **Real GPUs on Windows and macOS.** The workflow's binaries can be run on Patrick's
   machines to get real numbers. Correctness on both is already shown.
-- [ ] **Real RAW files**, from several makers, decoded with a real decoder.
+- [x] **Real RAW files** from six cameras (done). Still open: the linear entry point (sRAW).
+- [ ] **Better inputs.** The automatic exposure of the benchmark is crude and over-exposes
+  bright scenes (the Canon R5 II preview clips its highlights). Black levels are averaged over
+  the four channels. Highlight reconstruction, lens and chromatic-aberration corrections are
+  absent. None of this affects the timings, but it limits what the previews say about quality.
+- [ ] **Upload time.** Sending the mosaic to the GPU (120 MB at 60 MP) is not timed yet.
 - [ ] **A heavier pipeline** (noise reduction, local contrast, a mask) to see where the budget
   starts to bind.
 - [ ] **Presentation.** These numbers stop at the buffer: no window, no swap chain, no vertical
   sync. That belongs to spike 2.
 - [ ] **A second GPU**, such as the Intel UHD 630, or an AMD card.
-- [ ] **Sensors that are not Bayer.** The spike demosaics an RGGB mosaic only. Fujifilm's
-  X-Trans and other patterns need their own demosaicing, which the pipeline must accommodate.
+- [x] **Sensors that are not Bayer.** X-Trans works through the generic pass, at a modest
+  quality. A proper X-Trans algorithm (for example Markesteijn) is a product task, not a spike.
 
 ## Running it
 
@@ -111,7 +149,12 @@ Other facts:
 cd spikes
 cargo build --release
 ./target/release/adapters                                  # lists what wgpu sees
-./target/release/bench --adapter "vulkan nvidia" --mp 24    # or 61; "dx12", "metal", ...
+./target/release/bench --adapter "vulkan nvidia" --mp 24    # synthetic; or 61; "dx12", "metal"
+./fetch-samples.sh                                         # the seven CC0 RAW files, 225 MB
+./target/release/rawbench --adapter "vulkan nvidia"        # real files; --generic forces the generic pass
 ```
+
+On Windows, run the shell script from Git Bash. `rawbench` writes previews to
+`samples/previews/`.
 
 Raw results are in `spikes/results/`.

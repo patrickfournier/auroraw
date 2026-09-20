@@ -56,5 +56,7 @@ jobs:
           name: gpu-pipeline-${{ matrix.name }}
           path: |
             spikes/target/release/bench${{ matrix.ext }}
+            spikes/target/release/rawbench${{ matrix.ext }}
             spikes/target/release/adapters${{ matrix.ext }}
+            spikes/fetch-samples.sh
             spikes/results/*.json

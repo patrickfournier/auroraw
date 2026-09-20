@@ -26,5 +26,5 @@ struct Params {
     src_w: u32,       // downscale pass: source size and box factor
     src_h: u32,
     factor: u32,
-    pad: u32,
+    cfa_flip: u32,    // demosaic: bit 0 flips the column parity, bit 1 the row parity
 };

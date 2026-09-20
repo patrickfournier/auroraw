@@ -11,6 +11,10 @@ pub struct Scene {
     pub mosaic: Vec<u16>,
     pub params: Params,
     pub lut: Vec<[f32; 4]>,
+    /// Where the data came from, for reports.
+    pub label: String,
+    /// A 6x6 colour table (0 red, 1 green, 2 blue) selecting the generic demosaicing pass.
+    pub cfa6: Option<Vec<u32>>,
 }
 
 fn hash(x: u32, y: u32) -> f32 {
@@ -78,9 +82,9 @@ pub fn synthetic(width: u32, height: u32) -> Scene {
         src_w: width,
         src_h: height,
         factor: 1,
-        pad: 0,
+        cfa_flip: 0,
     };
-    Scene { width, height, mosaic, params, lut: make_lut(LUT_SIZE) }
+    Scene { width, height, mosaic, params, lut: make_lut(LUT_SIZE), label: "synthetic".into(), cfa6: None }
 }
 
 /// A 3D LUT that stands in for an ICC display profile: near identity with a little cross-talk.

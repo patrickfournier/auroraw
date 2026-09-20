@@ -72,6 +72,8 @@ pub struct Renderer<'g> {
     demosaic: wgpu::ComputePipeline,
     tone: wgpu::ComputePipeline,
     downscale: wgpu::ComputePipeline,
+    demosaic_cfa: wgpu::ComputePipeline,
+    cfa: Option<wgpu::Buffer>,
     mosaic: wgpu::Buffer,
     lut: wgpu::Buffer,
     pub scene_params: Params,
@@ -83,6 +85,7 @@ impl<'g> Renderer<'g> {
         let demosaic = pipeline(d, "demosaic", include_str!("shaders/demosaic.wgsl"));
         let tone = pipeline(d, "tone", include_str!("shaders/tone.wgsl"));
         let downscale = pipeline(d, "downscale", include_str!("shaders/downscale.wgsl"));
+        let demosaic_cfa = pipeline(d, "demosaic_cfa", include_str!("shaders/demosaic_cfa.wgsl"));
         let words: Vec<u32> = scene
             .mosaic
             .chunks(2)
@@ -92,8 +95,13 @@ impl<'g> Renderer<'g> {
         g.queue.write_buffer(&mosaic, 0, bytemuck::cast_slice(&words));
         let lut = Self::make(g, (scene.lut.len() * 16) as u64, wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST);
         g.queue.write_buffer(&lut, 0, bytemuck::cast_slice(&scene.lut));
+        let cfa = scene.cfa6.as_ref().map(|t| {
+            let b = Self::make(g, (t.len() * 4) as u64, wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST);
+            g.queue.write_buffer(&b, 0, bytemuck::cast_slice(t));
+            b
+        });
         g.queue.submit([]);
-        Ok(Self { g, demosaic, tone, downscale, mosaic, lut, scene_params: scene.params })
+        Ok(Self { g, demosaic, tone, downscale, demosaic_cfa, cfa, mosaic, lut, scene_params: scene.params })
     }
 
     fn make(g: &Gpu, size: u64, usage: wgpu::BufferUsages) -> wgpu::Buffer {
@@ -121,6 +129,14 @@ impl<'g> Renderer<'g> {
         pass.set_pipeline(pl);
         pass.set_bind_group(0, &bg, &[]);
         pass.dispatch_workgroups(p.tile_w.div_ceil(16), p.tile_h.div_ceil(16), 1);
+    }
+
+    /// The demosaicing pass: the Bayer shader, or the generic one when the scene has a CFA table.
+    fn demosaic_pass(&self, enc: &mut wgpu::CommandEncoder, p: &Params, inter: &wgpu::Buffer) {
+        match &self.cfa {
+            Some(table) => self.pass(enc, &self.demosaic_cfa, p, &[&self.mosaic, inter, table]),
+            None => self.pass(enc, &self.demosaic, p, &[&self.mosaic, inter]),
+        }
     }
 
     fn submit_wait(&self, enc: wgpu::CommandEncoder) -> Result<()> {
@@ -152,7 +168,7 @@ impl<'g> Renderer<'g> {
             let th = rows_per_band.min(h - y0);
             let p = Params { tile_x: 0, tile_y: y0, tile_w: w, tile_h: th, in_x0: 0, in_y0: 0, in_stride: w, out_x0: 0, out_y0: 0, out_stride: w, ..p0 };
             let mut enc = self.encoder();
-            self.pass(&mut enc, &self.demosaic, &p, &[&self.mosaic, &inter]);
+            self.demosaic_pass(&mut enc, &p, &inter);
             self.pass(&mut enc, &self.tone, &p, &[&inter, &self.lut, &out]);
             enc.copy_buffer_to_buffer(&out, 0, &readback, y0 as u64 * w as u64 * 4, Some(th as u64 * w as u64 * 4));
             self.g.queue.submit([enc.finish()]);
@@ -171,7 +187,7 @@ impl<'g> Renderer<'g> {
         let p = Params { tile_x: x0, tile_y: y0, tile_w: w, tile_h: h, in_x0: 0, in_y0: 0, in_stride: w, out_x0: 0, out_y0: 0, out_stride: w, ..p0 };
         let start = Instant::now();
         let mut enc = self.encoder();
-        self.pass(&mut enc, &self.demosaic, &p, &[&self.mosaic, inter]);
+        self.demosaic_pass(&mut enc, &p, inter);
         self.pass(&mut enc, &self.tone, &p, &[inter, &self.lut, out]);
         self.submit_wait(enc)?;
         Ok(ms(start.elapsed()))
@@ -206,7 +222,7 @@ impl<'g> Renderer<'g> {
             let demosaic = Params { tile_x: 0, tile_y: y0, tile_w: w, tile_h: th, ..p0 };
             let down = Params { tile_w: dw, tile_h: th.div_ceil(f), src_w: w, src_h: th, factor: f, out_y0: y0 / f, ..p0 };
             let mut enc = self.encoder();
-            self.pass(&mut enc, &self.demosaic, &demosaic, &[&self.mosaic, &inter]);
+            self.demosaic_pass(&mut enc, &demosaic, &inter);
             self.pass(&mut enc, &self.downscale, &down, &[&inter, &small_buf]);
             self.g.queue.submit([enc.finish()]);
             y0 += th;

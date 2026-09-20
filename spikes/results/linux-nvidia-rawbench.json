@@ -1,0 +1,127 @@
+{
+  "adapter": {
+    "backend": "Vulkan",
+    "name": "NVIDIA GeForce GTX 1650 SUPER",
+    "type": "DiscreteGpu"
+  },
+  "files": [
+    {
+      "file": "B13A0732.CR2",
+      "status": "unsupported: not a CFA image"
+    },
+    {
+      "cpu": {
+        "diff": {
+          "fraction_over_one_level": 0.0,
+          "max_level": 1,
+          "mean_level": 6.930450690972576e-6
+        },
+        "ms": 969.106056
+      },
+      "decode_ms": 114.61655900000001,
+      "export_ms": 62.662591000000006,
+      "file": "DSC00396.ARW",
+      "fit_cold_ms": 35.075919999999996,
+      "label": "Sony ILCE-7RM4 (RGGB, 9504x6336, black 512, white 15360, matrix camera)",
+      "megapixels": 60.217344,
+      "status": "ok",
+      "view_100_recompute_ms": 1.130213,
+      "view_100_tone_only_ms": 0.599209
+    },
+    {
+      "cpu": {
+        "diff": {
+          "fraction_over_one_level": 0.0,
+          "max_level": 1,
+          "mean_level": 8.89957038265842e-6
+        },
+        "ms": 1726.177188
+      },
+      "decode_ms": 303.693225,
+      "export_ms": 89.58063700000001,
+      "file": "DSCF0120.RAF",
+      "fit_cold_ms": 65.102162,
+      "label": "Fujifilm X-T50 (GGRGGBGGBGGRBRGRBGGGBGGRGGRGGBRBGBRG, 7728x5152, black 1020, white 16383, matrix camera)",
+      "megapixels": 39.814656,
+      "status": "ok",
+      "view_100_recompute_ms": 5.970487,
+      "view_100_tone_only_ms": 1.259328
+    },
+    {
+      "cpu": {
+        "diff": {
+          "fraction_over_one_level": 0.0,
+          "max_level": 1,
+          "mean_level": 9.389459768042786e-6
+        },
+        "ms": 767.749727
+      },
+      "decode_ms": 301.06032799999997,
+      "export_ms": 51.070098,
+      "file": "Nikon-D850-14bit-compressed.NEF",
+      "fit_cold_ms": 25.546466,
+      "label": "Nikon D850 (RGGB, 8256x5504, black 400, white 15520, matrix camera)",
+      "megapixels": 45.441024,
+      "status": "ok",
+      "view_100_recompute_ms": 1.416484,
+      "view_100_tone_only_ms": 0.861487
+    },
+    {
+      "cpu": {
+        "diff": {
+          "fraction_over_one_level": 0.0,
+          "max_level": 1,
+          "mean_level": 0.000011130189545970296
+        },
+        "ms": 316.35765100000003
+      },
+      "decode_ms": 291.26728299999996,
+      "export_ms": 23.816019,
+      "file": "PB290154.ORF",
+      "fit_cold_ms": 8.473875000000001,
+      "label": "Olympus E-M5 Mark III (RGGB, 5184x3888, black 253, white 4000, matrix camera)",
+      "megapixels": 20.155392,
+      "status": "ok",
+      "view_100_recompute_ms": 1.3732970000000002,
+      "view_100_tone_only_ms": 0.857788
+    },
+    {
+      "cpu": {
+        "diff": {
+          "fraction_over_one_level": 0.0,
+          "max_level": 1,
+          "mean_level": 0.000011967239640525867
+        },
+        "ms": 799.377633
+      },
+      "decode_ms": 377.902491,
+      "export_ms": 45.090354999999995,
+      "file": "canon-r5m2-CRAW.CR3",
+      "fit_cold_ms": 25.213399000000003,
+      "label": "Canon EOS R5 Mark II (RGGB, 8192x5464, black 512, white 14888, matrix camera)",
+      "megapixels": 44.761088,
+      "status": "ok",
+      "view_100_recompute_ms": 1.453109,
+      "view_100_tone_only_ms": 0.785372
+    },
+    {
+      "cpu": {
+        "diff": {
+          "fraction_over_one_level": 0.0,
+          "max_level": 1,
+          "mean_level": 0.000013138888888888888
+        },
+        "ms": 384.896157
+      },
+      "decode_ms": 54.154652999999996,
+      "export_ms": 24.996618,
+      "file": "dc-s5_6k4k.RW2",
+      "fit_cold_ms": 11.159809,
+      "label": "Panasonic DC-S5 (RGGB, 6000x4000, black 510, white 16380, matrix camera)",
+      "megapixels": 24.0,
+      "status": "ok",
+      "view_100_recompute_ms": 1.2223819999999999,
+      "view_100_tone_only_ms": 0.6538499999999999
+    }
+  ]
+}

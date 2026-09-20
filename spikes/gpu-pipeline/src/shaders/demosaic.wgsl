@@ -33,8 +33,8 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let nw = raw(x - 1, y - 1); let ne = raw(x + 1, y - 1);
     let sw = raw(x - 1, y + 1); let se = raw(x + 1, y + 1);
 
-    let px = u32(x) & 1u;
-    let py = u32(y) & 1u;
+    let px = (u32(x) ^ p.cfa_flip) & 1u;
+    let py = (u32(y) ^ (p.cfa_flip >> 1u)) & 1u;
     var rgb = vec3<f32>(0.0);
     // Green interpolated at a red or blue site.
     let g_at_rb = (4.0 * c + 2.0 * (n + s + e + w) - (nn + ss + ee + ww)) / 8.0;

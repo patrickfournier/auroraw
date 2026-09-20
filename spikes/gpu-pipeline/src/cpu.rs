@@ -22,14 +22,36 @@ fn raw(scene: &Scene, p: &Params, x: i32, y: i32) -> f32 {
     (scene.mosaic[iy * scene.width as usize + ix] as f32 - p.black) / (p.white - p.black)
 }
 
+fn demosaic_generic(scene: &Scene, p: &Params, table: &[u32], x: i32, y: i32) -> [f32; 3] {
+    let colour = |ix: i32, iy: i32| table[((iy % 6) * 6 + ix % 6) as usize] as usize;
+    let (mut sum, mut weight) = ([0.0f32; 3], [0.0f32; 3]);
+    for dy in -3..=3i32 {
+        for dx in -3..=3i32 {
+            let mx = mirror(x + dx, scene.width as i32);
+            let my = mirror(y + dy, scene.height as i32);
+            let c = colour(mx, my);
+            let w = 1.0 / (1.0 + (dx * dx + dy * dy) as f32);
+            sum[c] += w * raw(scene, p, mx, my);
+            weight[c] += w;
+        }
+    }
+    let mut rgb = [sum[0] / weight[0].max(1e-6), sum[1] / weight[1].max(1e-6), sum[2] / weight[2].max(1e-6)];
+    rgb[colour(x, y)] = raw(scene, p, x, y);
+    [rgb[0].max(0.0) * p.wb[0], rgb[1].max(0.0) * p.wb[1], rgb[2].max(0.0) * p.wb[2]]
+}
+
 fn demosaic(scene: &Scene, p: &Params, x: i32, y: i32) -> [f32; 3] {
+    if let Some(table) = &scene.cfa6 {
+        return demosaic_generic(scene, p, table, x, y);
+    }
     let c = raw(scene, p, x, y);
     let (n, s, w, e) = (raw(scene, p, x, y - 1), raw(scene, p, x, y + 1), raw(scene, p, x - 1, y), raw(scene, p, x + 1, y));
     let (nn, ss, ww, ee) = (raw(scene, p, x, y - 2), raw(scene, p, x, y + 2), raw(scene, p, x - 2, y), raw(scene, p, x + 2, y));
     let (nw, ne, sw, se) = (raw(scene, p, x - 1, y - 1), raw(scene, p, x + 1, y - 1), raw(scene, p, x - 1, y + 1), raw(scene, p, x + 1, y + 1));
     let g_at_rb = (4.0 * c + 2.0 * (n + s + e + w) - (nn + ss + ee + ww)) / 8.0;
     let diag = nw + ne + sw + se;
-    let rgb = match (x & 1, y & 1) {
+    let (px, py) = ((x as u32 ^ p.cfa_flip) & 1, (y as u32 ^ (p.cfa_flip >> 1)) & 1);
+    let rgb = match (px, py) {
         (0, 0) => [c, g_at_rb, (6.0 * c + 2.0 * diag - 1.5 * (nn + ss + ee + ww)) / 8.0],
         (1, 1) => [(6.0 * c + 2.0 * diag - 1.5 * (nn + ss + ee + ww)) / 8.0, g_at_rb, c],
         (1, 0) => [

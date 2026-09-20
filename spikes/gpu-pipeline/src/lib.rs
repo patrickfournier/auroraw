@@ -34,7 +34,8 @@ pub struct Params {
     pub src_w: u32,
     pub src_h: u32,
     pub factor: u32,
-    pub pad: u32,
+    /// Bit 0 flips the column parity, bit 1 the row parity of the RGGB pattern.
+    pub cfa_flip: u32,
 }
 
 pub const LUT_SIZE: u32 = 33;
@@ -65,3 +66,5 @@ pub fn diff(a: &[u32], b: &[u32]) -> Diff {
     let channels = (a.len() * 3) as f64;
     Diff { max_level: max, fraction_over_one_level: over as f64 / channels, mean_level: sum as f64 / channels }
 }
+
+pub mod raw;
