@@ -37,7 +37,10 @@ galleries, all in a simple, fast and professional workflow.
 | **Original** | An image file as it exists on a source. Never modified by Auroraw. |
 | **Photo** | What the photographer thinks of as "one shot": one original, or a RAW+JPEG group treated as a unit. It has a stable identity in the catalogue, independent of file name and location. |
 | **Series** | Several related photos (burst, bracketing, near-duplicates) grouped for culling. Distinct from versions. |
-| **Version** | One development of a photo: its chain of operations, its history, its name. A photo has at least one version. Creating a version copies no pixels. |
+| **Version** | One development of a photo: its chain of operations, its history, its name. Creating a version copies no pixels. A photo always has a default version, which exists only in the catalogue until the first edit [proposed]. |
+| **Workspace** | A folder, used by a single catalogue, that receives everything Auroraw writes about photos: sidecars and, optionally, exports. Originals' folders are never written to. |
+| **Photo sidecar** | An XMP file in the workspace holding the metadata of an original (rating, keywords, captions, IPTC...). |
+| **Version sidecar** | A file in the workspace holding one version: a copy of its photo's metadata, the version's own metadata, and its development chain, history and snapshots. |
 | **Snapshot** | A named state of a version's history, which can be returned to or turned into a new version. |
 | **Operation** | A non-destructive development step (exposure, curve, mask, etc.), parameterised and ordered in the chain. |
 | **Style / preset** | A reusable set of operations and parameters, applicable to one or more versions. |
@@ -50,8 +53,8 @@ galleries, all in a simple, fast and professional workflow.
 1. **Originals are never modified** [decided]. After import Auroraw does not move, rename or
    delete them either (D-018).
 2. **Nothing is trapped in the catalogue** [proposed]. The catalogue is an index and a working
-   area that can be rebuilt. Metadata and versions are also written to open files next to the
-   originals (see §5.4).
+   area that can be rebuilt. Metadata and versions are also written to open files in the
+   workspace (see §5.1 and §5.4).
 3. **Workflows, not panels** [proposed]. The interface is organised around tasks (Import, Cull,
    Develop, Publish), not a stack of tools.
 4. **Keyboard first** [proposed]. All routine culling and navigation works without a mouse.
@@ -78,7 +81,7 @@ dialog in between.
 
 The milestone of each feature (M1 to M5) is described in §8.
 
-### 5.1 Sources and catalogues
+### 5.1 Sources, catalogues and workspaces
 
 **Catalogues** [decided, D-017]
 
@@ -90,32 +93,61 @@ The milestone of each feature (M1 to M5) is described in §8.
   [proposed].
 - Catalogues are isolated: search, collections, keyword lists and duplicate detection work within
   the open catalogue [proposed].
+- Auroraw writes nothing into sources (see below), so catalogues do not need to claim source
+  folders exclusively: two catalogues may reference the same folder, each with its own workspace
+  and its own metadata. A notice tells the photographer when a folder is already in another
+  catalogue [proposed].
 - Location [proposed]: by default in the user's data folder, movable (for example to an external
   drive). Previews live in a separate cache, per catalogue, that can be deleted without losing
   anything.
-- A source folder belongs to **one catalogue at a time** [proposed, to confirm], since two
-  catalogues writing versions next to the same original would diverge (see §10).
 
-**Originals are read-only** [decided, D-018]
+**Sources are never written to** [decided, D-018, refined by D-022]
 
-- After import, Auroraw never modifies, moves, renames or deletes an original. It writes to a
-  source in exactly two cases: copying files at import, and writing sidecar and XMP files, which
-  are *new* files next to the originals [proposed reading, to confirm].
+- Auroraw writes into a source in only two cases: copying files at import, and an explicit
+  request from the photographer to export XMP files into source folders (see below). It never
+  modifies, moves, renames or deletes an original.
 - Consequences [proposed]: the Rejected flag deletes nothing. A "Rejected" view offers *Show in
   file manager* and an exportable list of rejected files, so tidying happens outside Auroraw.
-  Adding a folder "in place" copies and touches nothing.
+  Adding a folder "in place" copies and touches nothing. Read-only media and archives need no
+  special handling.
+
+**Workspaces** [decided, D-022 and D-023]
+
+- A workspace is a **folder** that receives the sidecars of the originals and of their
+  versions, and optionally exports. It is used in the context of a **single catalogue** and is
+  never shared between catalogues.
+- The **photo sidecar** contains only the metadata of the original. It is standard XMP.
+- The **version sidecar** copies the photo's metadata and adds the version's own: overrides,
+  development chain, history and snapshots. A version sidecar is therefore self-contained.
+- Sidecars are not next to the originals, so a sidecar is tied to its original by **content
+  fingerprint**, with the last known path and file name as hints [proposed].
+- **Exports** (JPEG and others) may go into the workspace or anywhere else. Exporting into a
+  source folder is discouraged and triggers a warning, not a ban [decided, D-024].
+- **XMP export to the source folders** [decided, D-024]: an option for compatibility with other
+  software. It writes the photo sidecars of the RAW files next to the originals, on explicit
+  request only (for a selection, a folder or a whole source). It is one-way and covers
+  photo-level metadata; which naming convention to use is open (§10).
+- **Existing XMP** files found next to originals at import (from Lightroom or others) are read,
+  never modified, and their ratings and keywords are copied into the photo sidecar [proposed].
+- Because sidecars live in the workspace, metadata edits are written immediately, whatever the
+  state of the source: read-only card, unplugged drive, network share down [proposed].
+- The catalogue can be rebuilt from the workspace and the sources [proposed]. Backing up the
+  work is copying a folder.
+
+The exact layout of a workspace, how much of the catalogue's state also lives in it (collections,
+gallery publications), and how photo and version sidecars stay consistent are open (§10).
 
 **Source states** [proposed]
 
 | State | Meaning | What works |
 | --- | --- | --- |
-| Online | Reachable and writable | Everything |
-| Read-only | Reachable, not writable | Everything, except sidecar files (see below) |
-| Offline | Not reachable (unplugged drive, network down) | Browse, search, sort, rate, tag, view previews. Metadata is kept in the catalogue and synced to the sidecar when the source returns. Operations that need the original are shown as unavailable, not hidden. |
+| Online | Reachable | Everything |
+| Offline | Not reachable (unplugged drive, network down) | Browse, search, sort, rate, tag, view previews. Metadata edits are written to the workspace as usual. Anything that needs the original (development, export, publication) is shown as unavailable, not hidden. |
 | Missing | The expected location no longer exists | Same as offline, plus a prompt to relocate the source |
 
-Each source shows its state as a badge. Whether development can continue on an offline source is
-open (§10).
+Each source shows its state as a badge. **Developing on an offline source is not supported in
+v1** [decided, D-021]: a reduced-resolution proxy would not give results identical to the
+original for detail-dependent operations (see §10).
 
 **Detecting new, changed and moved files** [decided, D-019]
 
@@ -130,13 +162,6 @@ open (§10).
   "Remove missing photos" action exists [proposed].
 - Network shares do not deliver reliable change notifications, so those sources are rescanned on
   demand and at intervals [proposed].
-
-**Sidecars on sources that cannot be written to** [decided, D-020]
-
-- The sidecar is written next to the original when possible.
-- Otherwise the versions live in the catalogue only, and a discreet warning says that rebuilding
-  from the disks will not cover those photos.
-- Sidecars can be exported elsewhere at any time.
 
 **Search, filters and sorting**
 
@@ -181,10 +206,11 @@ This is a central point [decided: versions, virtual copies and snapshots in v1].
 | Layer | Contains | Format |
 | --- | --- | --- |
 | Catalogue | Index, previews, queries, anything that speeds things up | Local database, rebuildable |
-| Auroraw sidecar (next to the original) | All versions, histories and snapshots | Open, documented format, schema version in each file |
-| Standard XMP | Portable metadata: keywords, ratings, captions, IPTC, rights | XMP, readable by other software |
+| Photo sidecar (workspace) | The original's metadata: keywords, ratings, captions, IPTC, rights | Standard XMP, readable by other software |
+| Version sidecar (workspace) | A copy of the photo's metadata, the version's own metadata, its chain, history and snapshots | Open, documented format built on XMP if practical, with a schema version in each file |
 
-The sidecar lets the catalogue be rebuilt from the disks. Development settings from other
+The workspace lets the catalogue be rebuilt from the sidecars and the sources. Development
+settings from other
 software are not portable as-is; a partial import of common settings (Lightroom, darktable) is
 conceivable later [open].
 
@@ -212,7 +238,8 @@ where the displayed value comes from.
   the photo alone.
 - Export and publication write the **effective** metadata of the exported version into the
   produced file.
-- In XMP the photo's value is written as-is; overrides live in the Auroraw sidecar.
+- The photo sidecar carries the photo's values as-is. A version sidecar carries the effective
+  values and records which fields it overrides, so inheritance survives a rebuild [proposed].
 
 ### 5.6 Development (RAW, scans, images)
 
@@ -244,6 +271,8 @@ where the displayed value comes from.
 - Export to all image formats used in the photo and film industries [decided].
 - Batch export with reusable recipes [decided, v1]: format, size, output sharpening, profile,
   metadata, naming, watermark, destination.
+- Destination: the workspace or any folder. Exporting into a source folder shows a warning
+  [decided, D-024].
 - Export of one or several versions per photo; deterministic naming (a `{version}` token, for
   example) [proposed].
 - Gallery export through plugins (§5.9) [decided].
@@ -356,25 +385,41 @@ to it.
 ## 10. Open questions
 
 1. **Catalogue backup and sync**: what is synced, between what (several machines of the same
-   person?), through which mechanism?
-2. **Auroraw sidecar**: one file per photo or one folder per source? Exact format.
-3. **Prooftide API for third-party clients**: status, stability and terms of use; do plugins need
-   an access key?
-4. **Plugin model**: language, isolation, distribution, compatibility with GPL-3.0.
-5. **Importing settings** from other software (Lightroom, darktable): useful, and how far?
-6. **Dependency licenses**: compatibility with GPL-3.0 (RAW libraries, Lensfun and its database,
-   AI models).
-7. **Development on offline sources**: can a photographer keep developing when the original is
-   unreachable, using a reduced-resolution editable proxy kept in the catalogue (export would
-   then wait for the original)? Or is development simply unavailable?
-8. **Several catalogues**: may one folder belong to two catalogues? How are photos moved from one
-   catalogue to another with their versions and metadata? How does a catalogue detect that a
-   folder is already claimed by another one (a marker in the sidecars)?
-9. **Sidecar files under "read-only originals"**: confirm that writing new sidecar and XMP files
-   next to originals is compatible with D-018 (originals themselves are never touched).
-10. **Content fingerprint**: what is hashed (whole file or head, tail and size) so relinking stays
-    fast on network shares without false matches.
-11. **Import from a card**: destination folder templates, renaming tokens, duplicate backup,
+   person?), through which mechanism? Syncing a workspace with a file-sync tool is natural, but a
+   database inside a synced folder gets corrupted, so the catalogue database probably stays
+   local and rebuildable.
+2. **Workspace and catalogue**: exactly one workspace per catalogue, or several? Recommended:
+   exactly one.
+3. **Workspace layout**: mirror of the source folder tree, or one folder per photo? Human
+   readable names plus a short identifier, versus identifiers only.
+4. **Catalogue-only state**: collections, smart collection definitions, source list and gallery
+   publications must also be written into the workspace for a rebuild to be complete. Which
+   format?
+5. **Photo and version sidecar consistency**: when a photo's metadata changes, do the copies in
+   its version sidecars follow (unless overridden), or are they frozen at version creation?
+   Recommended: they follow, because they are a denormalised copy of the effective values.
+6. **XMP naming convention** for the export to source folders (`photo.xmp` as Lightroom does,
+   `photo.ARW.xmp` as darktable does, or a choice), and whether an optional automatic mirroring is
+   wanted in addition to the on-demand export.
+7. **Auroraw version sidecar format**: pure XMP with an Auroraw namespace, or XMP plus a
+   companion file for the history.
+8. **Content fingerprint**: what is hashed (whole file or head, tail and size) so relinking and
+   sidecar association stay fast on network shares without false matches.
+9. **Workspace unavailable** (for example on a network share that is down): read-only mode, or
+   queue the edits?
+10. **Moving photos between catalogues** with their versions and metadata: copying sidecars
+    between workspaces is probably enough. Confirm the wish for it, and its milestone.
+11. **Offline development**: reconsider after the pipeline exists (M2 or later). A proxy
+    would be reliable for colour, tone and geometry, but not for operations that depend on pixel
+    scale: sharpening, noise reduction, local contrast, retouching, lens corrections at the
+    edges. It could be offered for the reliable subset, with a warning.
+12. **Prooftide API for third-party clients**: status, stability and terms of use; do plugins need
+    an access key?
+13. **Plugin model**: language, isolation, distribution, compatibility with GPL-3.0.
+14. **Importing settings** from other software (Lightroom, darktable): useful, and how far?
+15. **Dependency licenses**: compatibility with GPL-3.0 (RAW libraries, Lensfun and its database,
+    AI models).
+16. **Import from a card**: destination folder templates, renaming tokens, duplicate backup,
     checksum verification, and the "safe to erase the card" signal.
 
 ## 11. Next steps

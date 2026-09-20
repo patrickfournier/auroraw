@@ -22,6 +22,10 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-015 | 2026-09-19 | **Project language**: English for all repository documentation and code. Conversation with Patrick stays in French. |
 | D-016 | 2026-09-19 | **Git workflow**: same rules as Prooftide. Work on `dev`, merge into `main` only at release. Claude Code commits as `Claude Code <claude-code@straycat.ca>`. |
 | D-017 | 2026-09-19 | **Catalogues**: several catalogues, all equal, chosen at opening (typically separate areas of activity, such as family and professional). The application must be fully functional with a single catalogue. |
-| D-018 | 2026-09-19 | **Originals are read-only** except at import: Auroraw does not modify, move, rename or delete them afterwards. |
+| D-018 | 2026-09-19 | **Originals are read-only** except at import: Auroraw does not modify, move, rename or delete them afterwards. Refined by D-022. |
 | D-019 | 2026-09-19 | **Change detection**: online sources are monitored; new files are reported and added with one click after confirmation; moved files are relinked by content fingerprint. |
-| D-020 | 2026-09-19 | **Non-writable sources**: sidecars are written next to the original when possible, otherwise versions live in the catalogue only, with a warning; sidecars can be exported on demand. |
+| D-020 | 2026-09-19 | **Non-writable sources**: sidecars are written next to the original when possible, otherwise versions live in the catalogue only, with a warning; sidecars can be exported on demand. *Superseded by D-022.* |
+| D-021 | 2026-09-19 | **No development on offline sources in v1.** A reduced-resolution proxy is not trusted to give the same result as the original. To be reconsidered once the pipeline exists. |
+| D-022 | 2026-09-19 | **Workspace**: a folder, used by a single catalogue, that receives all sidecars (of originals and of versions) and optionally exports. Auroraw writes nothing into source folders except at import and on explicit XMP export. Supersedes D-020. |
+| D-023 | 2026-09-19 | **Sidecar hierarchy**: the sidecar of an original holds only that original's metadata; the sidecar of a version copies those metadata and adds its own. |
+| D-024 | 2026-09-19 | **Exports and XMP compatibility**: exports may go into the workspace or elsewhere, and exporting into a source folder is discouraged with a warning. An option exports the originals' XMP files into the source folders, for compatibility with other software. |
