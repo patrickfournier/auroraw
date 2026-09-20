@@ -116,11 +116,11 @@ for every candidate, and a toolkit must simply not alter pixels, which all pass.
 | Text field, typing | works | works | works |
 | Accents, dead keys, input method | works (checked by Patrick) | works (checked by Patrick) | not yet checked |
 | Translations | gettext, built in, switch at run time | none built in | Qt Linguist, switch at run time |
-| **Accessibility** | **works**: a tree of window, labels and list, read through AT-SPI | **none**: no accessibility code in the toolkit, and no application visible to a screen reader | **not verifiable here**: Qt's layer is active, its bridge publishes nothing (see below) |
+| **Accessibility** | **works**: a tree of window, labels and list, read through AT-SPI | **none**: no accessibility code in the toolkit, and no application visible to a screen reader | **works in a stock Qt application**: Orca reads Qt Linguist's menus (checked by Patrick); the prototype itself not checked by hand; not visible from the test sandbox (see below) |
 | Language of the code | Rust | Rust | C++ and QML |
 | Licence | GPL-3.0, or royalty-free, or commercial | MIT | LGPL and GPL |
 
-### Accessibility of Qt: not verifiable in this session
+### Accessibility of Qt: works on the real session, invisible to the test script
 
 With the script that shows a complete tree for Slint, Qt Quick shows only an empty application
 node, and so does Qt Linguist, a standard Qt 6 application of the same system. This was retried
@@ -133,8 +133,9 @@ described correctly on Qt's side. What is not: its AT-SPI bridge does not publis
 bus here. The empty node comes from GTK, which the session loads into every process through
 `GTK_MODULES=gail:atk-bridge` (its toolkit is reported as `gtk`). The same happens with a stock Qt
 application, so this points at the session or packaging, not at the prototype. Qt's accessibility
-on Linux is generally reported to work; this test cannot confirm it. A manual check with Orca
-and Linguist, outside this sandbox, would settle it.
+on Linux is generally reported to work; this test cannot confirm it. **Patrick then checked by hand: Orca reads the menus of Qt Linguist on his session**, so Qt's
+bridge works on the real desktop and the empty tree above is an artefact of the sandbox shell.
+The prototype itself has not been checked with Orca.
 
 ## Things met on the way
 
@@ -165,7 +166,8 @@ and Linguist, outside this sandbox, would settle it.
 
 ## What remains
 
-- [x] **Qt accessibility**, retested with Orca running: still not verifiable in this session (see above). A manual check outside the sandbox remains possible.
+- [x] **Qt accessibility**: works in a stock Qt application on the real session (Orca reads Qt
+  Linguist). Left: checking the prototype itself with Orca.
 - [ ] **Qt through Rust.** These measures used C++ and QML. The Rust-side cost of driving Qt
   (cxx-qt) is unmeasured.
 - [ ] **Windows and macOS.** The viewers are built by continuous integration and can be run on
