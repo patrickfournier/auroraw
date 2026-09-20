@@ -340,6 +340,7 @@ A dedicated, full-screen mode for culling. The grid stays the navigation view.
   the selection, for a series or a whole shoot.
 - A style can be applied at import (import profile, §5.2) and can be applied selectively
   (which tools) [proposed].
+- Styles live at user level, shared by all catalogues (D-052, §5.8).
 
 **Persistence of versions** [proposed]:
 
@@ -542,14 +543,40 @@ model:
 
 ### 5.8 Export
 
-- Export to all image formats used in the photo and film industries [decided].
-- Batch export with reusable recipes [decided, v1]: format, size, output sharpening, profile,
-  metadata, naming, watermark, destination.
+**Recipes** [decided, v1]
+
+- Export to all image formats used in the photo and film industries [decided], including
+  converting a RAW to DNG.
+- A recipe holds [proposed]: format and its options, size (long edge, resolution), output
+  sharpening, colour profile and bit depth, the metadata setting (§5.7, D-046), the naming
+  template (with a `{version}` token), the watermark, the destination and its sub-folders.
+- There are three kinds of recipe [proposed]: **image export**, **copy of the original files**
+  (to hand over RAW or JPEG files unchanged) and **gallery publication** (through a plugin,
+  §5.9).
+- The **watermark** is a general export operation, available to every recipe, not reserved to a
+  gallery plugin. It offers text or a logo, corner or centre placement, and a placement that
+  avoids faces. The logic comes from Prooftide, ideally as a shared module [proposed].
+- Recipes, styles and import profiles live at **user level**, shared by all the catalogues, in
+  the user's configuration folder, and can be imported and exported as files [decided, D-052].
+  A publication keeps a **copy of the recipe it used**, so it can be republished identically.
+
+**Running an export** [proposed]
+
+- Exports go through a **background queue**: not blocking, cancellable, with a report for each
+  file.
+- Each image is rendered from its original through the full pipeline, at full quality.
+- Export of one or several versions per photo, the main version by default (§5.4).
 - Destination: the workspace or any folder. Exporting into a source folder shows a warning
   [decided, D-024].
-- Export of one or several versions per photo; deterministic naming (a `{version}` token, for
-  example) [proposed].
-- Gallery export through plugins (§5.9) [decided].
+
+**Tracking publications** [decided, D-049]
+
+- Whatever the destination (a gallery, a delivery folder, a site), Auroraw records what was
+  published: photo, version, published name, date and a fingerprint of the settings used
+  [proposed]. This record is catalogue state and is also written into the workspace (D-026).
+- A photo published and then edited shows a **"modified since publication"** badge.
+- **Republishing is manual**: a "republish changes" action sends the modified items. Nothing is
+  ever sent on its own, so an unfinished edit never reaches a client.
 
 ### 5.9 Galleries and Prooftide
 
@@ -563,17 +590,43 @@ optional and backward compatible.
 1. **Gallery export plugin**: Prooftide is the first implementation, separate from the core.
    Another service plugs in through the same mechanism.
 2. **Publishing a version**: rendering (colour, resizing, watermark) happens in Auroraw's
-   pipeline, within the service's constraints (for Prooftide: JPEG, 1600 px maximum).
+   pipeline, within the service's constraints. For Prooftide: JPEG, 1600 px maximum, 15 MB per
+   file, unique file names in a gallery, and the limits of the photographer's plan. The plugin
+   warns before a publication would exceed the plan's limits.
 3. **Published name** [decided, D-009]: Auroraw generates a unique file name for each published
-   version and keeps the mapping *gallery → photo, version, published name* in the catalogue.
-   **No server change is required.** Proposed rule: the name stays that of the original when a
-   single version of the photo is published, and gets a suffix (`marie_black-and-white.jpg`) when
-   several are published or on collision.
-4. **Client feedback**: selections and annotations (text, audio, drawing in Prooftide's case)
-   come back into the catalogue, resolved through the mapping above: a "Client selection"
-   collection or flag, and annotations visible on the photo.
-5. **Delivery**: from the selection, batch export of the chosen versions through a recipe.
-   Delivered versions are rendered from the catalogue, not copied from the originals.
+   version and keeps the mapping *gallery → photo, version, published name* in the publication
+   record (§5.8). **No server change is required.** Proposed rule: the name stays that of the
+   original when a single version of the photo is published, and gets a suffix
+   (`marie_black-and-white.jpg`) when several are published or on collision.
+4. **Delivery**: from the selection, one action exports the chosen versions through a recipe, or
+   copies the original files. Delivered versions are rendered from the catalogue.
+5. **Licence key**: it is kept in the operating system's keychain, not in clear text
+   [proposed].
+
+**Client feedback** [decided, D-050]
+
+- Each published gallery gets a **"client selection" collection**, filled automatically, with a
+  badge on the photos. Selections are resolved through the published-name mapping above.
+- The photographer may also have Auroraw apply a flag, a colour label or a keyword of their
+  choice to the selected photos, per gallery. A photo chosen in two galleries never conflicts,
+  since the collection is per gallery.
+- **Annotations** (text, audio, drawing for Prooftide) are stored in the workspace with the
+  photo and shown on it, in Cull mode and in Develop: text in a panel, the drawing as an overlay,
+  the audio playable [proposed].
+- Feedback is fetched on request, and optionally checked periodically with a notification
+  [proposed].
+- A gallery published from Prooftide's own application can be **linked** to the catalogue: its
+  selections are matched to photos by file name, and ambiguous matches are put to the
+  photographer [proposed].
+
+**Prooftide API** [decided, D-051]
+
+- The routes the plugin uses become a **documented, versioned public API**, with a compatibility
+  policy, that Auroraw and any other client can use. The present application-version mechanism
+  (the 426 response) is the starting point. The plugin knows no more than any other client.
+- This is work on the Prooftide side, backward compatible: creating a gallery, uploading photos,
+  listing and deleting galleries, selections, annotations, and the account's plan limits and use,
+  which the plugin needs to warn before exceeding them [proposed].
 
 **Interoperability safeguards** [proposed]:
 
@@ -581,8 +634,6 @@ optional and backward compatible.
   be handed to the current Prooftide application or to any other service.
 - **Generic selection import**: from a list of file names or a selection file, for any gallery
   service or any client.
-- The Prooftide plugin uses only the service's public, documented API. The status of that API for
-  third-party clients is to be clarified [open] (§10).
 
 ### 5.10 Plugins
 
@@ -682,8 +733,8 @@ to it.
    reliable for colour, tone and geometry, but not for operations that depend on pixel scale:
    sharpening, noise reduction, local contrast, retouching, lens corrections at the edges. It
    could be offered for the reliable subset, with a warning.
-10. **Prooftide API for third-party clients**: status, stability and terms of use; do plugins need
-    an access key?
+10. **Prooftide API v1**: the exact scope of the documented API, its compatibility policy, and how
+    a plugin identifies itself and is authorised (work in the Prooftide repository).
 11. **Plugin model**: language, isolation, distribution, compatibility with GPL-3.0.
 12. **Importing settings** from other software (Lightroom, darktable): useful, and how far?
 13. **Dependency licenses**: compatibility with GPL-3.0 (RAW libraries, Lensfun and its database,
@@ -722,6 +773,16 @@ to it.
     detection of external changes, and how quickly a change is reported.
 29. **Geocoding database**: size, attribution required by its licence, update mechanism, and the
     levels of detail offered.
+30. **Republishing to Prooftide**: uploads are idempotent per file name and only a whole gallery
+    can be deleted, so a modified photo cannot be replaced or removed. What does "republish
+    changes" do: an optional, backward-compatible API extension (replace and remove a photo), or
+    publish the changed photos as new ones?
+31. **Modified since publication**: what enters the settings fingerprint (pipeline settings,
+    recipe, original fingerprint, metadata) and what it costs to compute.
+32. **Client feedback**: refresh rhythm, notifications, and what happens to a selection when a
+    published photo is no longer in the catalogue.
+33. **Linking an existing gallery**: how ambiguities are resolved when several photos share a
+    file name.
 
 ## 11. Next steps
 

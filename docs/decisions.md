@@ -53,3 +53,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-046 | 2026-09-19 | **Metadata in exports**: configurable per recipe with named settings; the default is everything except location and camera serial number. |
 | D-047 | 2026-09-19 | **External XMP changes** are monitored like new files: reported, and accepted with one click after import. |
 | D-048 | 2026-09-19 | **Geocoding**: a bundled offline database by default (GeoNames); finer online lookup only through an optional plugin, with consent. |
+| D-049 | 2026-09-19 | **Publication tracking**: for every publication Auroraw records what was sent (photo, version, published name, date, settings). Modified photos are flagged; republishing is manual, never automatic. |
+| D-050 | 2026-09-19 | **Client feedback**: each published gallery gets a "client selection" collection filled automatically, with an optional flag, label or keyword of the photographer's choice. Annotations are attached to the photo. |
+| D-051 | 2026-09-19 | **Prooftide API**: the routes the plugin uses become a documented, versioned public API, usable by any client. |
+| D-052 | 2026-09-19 | **Library scope**: export recipes, styles and import profiles live at user level, shared by all catalogues, and are importable and exportable as files. A publication keeps a copy of its recipe. |
