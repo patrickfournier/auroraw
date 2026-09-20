@@ -71,4 +71,4 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-064 | 2026-09-19 | **Backup and sync in v1**: a backup helper, rebuilding the catalogue from the workspace, and documented compatibility with file-sync tools. No built-in sync. |
 | D-065 | 2026-09-19 | **XMP export to the source folders** ships in M1. |
 | D-066 | 2026-09-19 | **No automatic XMP mirroring** in v1: the export to source folders is on request only. |
-| D-067 | 2026-09-19 | **Moving photos between catalogues** is in v1, by copying sidecars between workspaces. Milestone M4 proposed by Claude Code, to be confirmed. |
+| D-067 | 2026-09-19 | **Moving photos between catalogues** is in v1, by copying sidecars between workspaces. Milestone M4 (confirmed). |

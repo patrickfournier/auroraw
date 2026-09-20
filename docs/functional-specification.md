@@ -194,7 +194,7 @@ offline, those photos cannot be displayed until the source returns [proposed].
   compatibility with file-sync tools to carry a workspace between machines. **Built-in sync is
   not in v1** [decided, D-064].
 - **Moving photos between catalogues** is in v1 [decided, D-067]; the milestone is M4
-  [proposed], since it needs the version sidecars (M2) and the publication records (M4) and
+  [decided], since it needs the version sidecars (M2) and the publication records (M4) and
   shares its machinery with rebuilding from a workspace. Proposed behaviour:
   - "Copy to catalogue" and "Move to catalogue" on a selection.
   - Both copy the photo and version sidecars into the destination workspace and add the sources
@@ -840,7 +840,7 @@ must not rule them out (notably soft proofing, which depends on colour managemen
 | **M1** | Catalogues and workspaces (photo sidecars, keyword vocabulary, state files), sources, import (card and folders, import profiles), previews, culling, series and duplicates, keywords, ratings, IPTC/XMP, XMP export to source folders, search and filters, GPS | A complete culling and organising tool |
 | **M2** | Non-destructive pipeline (basic operations), versions and snapshots, presets and styles, colour management, GPU acceleration, internal modules written as plugins, minimal export (JPEG, TIFF, PNG; size, profile, metadata setting) | Basic RAW development, from the card to a file |
 | **M3** | Masks and local retouching, lens corrections, negative scan module, advanced operations | Professional-level development |
-| **M4** | Export recipes, queue and watermark, Prooftide plugin, selection feedback, backup helper, rebuild from the workspace, moving photos between catalogues [proposed milestone] | The full loop: from the card to the client |
+| **M4** | Export recipes, queue and watermark, Prooftide plugin, selection feedback, backup helper, rebuild from the workspace, moving photos between catalogues | The full loop: from the card to the client |
 | **M5** | Public, documented plugin API, AI features (subject, sky and people masks; noise reduction), polish, documentation | Openness and ecosystem |
 
 Each milestone must be usable on its own. The exact content of each will be refined when we get
@@ -884,7 +884,7 @@ Sorted by when they need an answer. No question is left to decide before the tec
    as hints for relinking.
 7. **Workspace unavailable** (for example on a network share that is down): read-only mode, or
    queue the edits?
-8. **Moving photos between catalogues**: wanted (D-067), milestone M4 proposed. To settle when
+8. **Moving photos between catalogues**: wanted, in M4 (D-067). To settle when
    planning M4: how keyword vocabularies merge, and the details of the recoverable folder.
 9. **Offline development**: reconsider after the pipeline exists (M2 or later). A proxy would be
    reliable for colour, tone and geometry, but not for operations that depend on pixel scale:
