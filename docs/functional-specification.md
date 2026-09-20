@@ -257,8 +257,8 @@ A dedicated, full-screen mode for culling. The grid stays the navigation view.
 - Culling can start on the last import, even while the copy is still running (§5.2) [proposed].
 - Quality aids that need no AI, in M1 [proposed]: focus peaking, clipping warnings, blur score,
   optional histogram.
-- AI aids (closed eyes, best frame of a series) come in M5 and only **suggest**; they never rate
-  or reject on their own [proposed].
+- AI aids (closed eyes, best frame of a series) are not among the first AI features (§5.11).
+  When they come, they only **suggest** and never rate or reject on their own [proposed].
 
 **Series** [decided, D-034 and D-035]
 
@@ -430,7 +430,7 @@ where the displayed value comes from.
   Combining masks (add, subtract, intersect) is proposed.
 - Internally a local adjustment becomes an operation with a blend mask; the photographer never
   has to know that.
-- AI-assisted selections (subject, sky) come in M5 [proposed].
+- AI-assisted selections (subject, sky, people) come in M5 (§5.11) [decided, D-058].
 
 **Lens corrections** [decided: v1, milestone M3]: through Lensfun.
 
@@ -728,9 +728,48 @@ process" phase (§10).
 
 Integrated where relevant [decided]; principles in §3 (local by default).
 
-Candidates in order of interest [proposed]: assisted culling; subject and sky selection for
-masks; noise reduction; semantic search and keyword suggestion; captions and metadata
-translation (external services, only with consent).
+**First priorities, milestone M5** [decided, D-058]
+
+- **Selections for masks**: subject, sky and people, to create the mask of a local adjustment in
+  one click (§5.6). "People" means segmenting a person in the image, not identifying anyone.
+- **Noise reduction**, with **upscaling** to follow. It is a pixel operation, so the model used
+  is recorded (see below).
+- Not prioritised for now, and considered later: assisted culling (closed eyes, sharpness, best
+  frame of a series), semantic search and keyword suggestion, captions and translation of
+  metadata.
+
+**Principles** [proposed]
+
+- **AI suggests, the photographer decides.** It never rates, rejects, tags or edits an image on
+  its own. Suggested keywords would go to a queue, and only the accepted ones become metadata in
+  the sidecar.
+- **Reproducibility**: an AI operation that touches pixels records the model's identifier and
+  fingerprint in the version sidecar, as plugins do (§5.6). Without that model, the version
+  opens with the operation disabled and marked, and no setting is lost.
+- **Derived data** (scores, visual fingerprints, suggestions) can be recomputed, so it stays in
+  the catalogue's cache and not in the workspace, unlike the catalogue state of D-026.
+- **Not planned**: face recognition (biometric and legally sensitive, for instance under the GDPR
+  and Quebec's Law 25) and generative retouching (filling in or removing objects: authenticity,
+  model provenance and licences). They would be added only at Patrick's explicit request.
+- The official index only accepts **redistributable models**, and shows the licence before
+  download.
+
+**Models** [decided, D-059]
+
+- The core ships **no model**. Each feature offers to download its model pack on demand, showing
+  its size and licence; it is cached locally and can be deleted.
+- A model pack is a plugin in the sense of §5.10: same index, same trust levels.
+
+**Hardware** [decided, D-060]
+
+- Every AI feature is available on the **CPU**, slowly: it runs as a **background task** with an
+  estimated duration and never blocks the interface. With a capable GPU it is faster.
+
+**Online AI** [decided, D-061]
+
+- The core calls **no external AI service**. A plugin may, for example for captions or
+  translation. It is **off by default**, needs consent per plugin, and shows what leaves the
+  machine (a reduced image, a crop, metadata). No telemetry.
 
 ### 5.12 Interface and languages
 
@@ -765,7 +804,7 @@ must not rule them out (notably soft proofing, which depends on colour managemen
 | **M2** | Non-destructive pipeline (basic operations), versions and snapshots, presets and styles, colour management, GPU acceleration, internal modules written as plugins | Basic RAW development |
 | **M3** | Masks and local retouching, lens corrections, negative scan module, advanced operations | Professional-level development |
 | **M4** | Batch export with recipes, Prooftide plugin, selection feedback, catalogue backup and sync | The full loop: from the card to the client |
-| **M5** | Public, documented plugin API, AI features, polish, documentation | Openness and ecosystem |
+| **M5** | Public, documented plugin API, AI features (subject, sky and people masks; noise reduction), polish, documentation | Openness and ecosystem |
 
 Each milestone must be usable on its own. The exact content of each will be refined when we get
 to it.
@@ -863,6 +902,12 @@ to it.
 35. **Source plugin details**: how a source reports changes for monitoring (§5.1), how sign-in
     and refreshed credentials are stored, and how a camera source presents its files to the
     import (§5.2).
+36. **AI runtime**: the inference technology and model format, and how CPU, GPU and the operating
+    systems' own accelerators are used on each platform (a technology decision).
+37. **Model acceptance in the official index**: the criteria on licence and provenance, notably
+    for weights released under non-commercial or research-only terms.
+38. **AI noise reduction in the pipeline**: where it sits (before or after demosaicing), and how
+    to keep results stable across CPU and GPU (see 22).
 
 ## 11. Next steps
 

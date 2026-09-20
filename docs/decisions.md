@@ -62,3 +62,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-055 | 2026-09-19 | **Plugin trust**: sandboxed by default with declared permissions shown before installation; a native level is allowed, clearly flagged and needing explicit confirmation. |
 | D-056 | 2026-09-19 | **Source plugins, first scenarios**: local disk folders and mounted cards (through the same interface), cameras and phones (PTP/MTP), and online storage. Scanner acquisition is not among the first scenarios. Importing from other software is kept for later. |
 | D-057 | 2026-09-19 | **Plugin licensing is deferred** to the technical phase, together with the isolation model. Moving the core to the LGPL is an option kept open. |
+| D-058 | 2026-09-19 | **First AI priorities (M5)**: selections for masks (subject, sky, people) and noise reduction, upscaling to follow. Assisted culling, semantic search and keyword suggestion are not prioritised for now. |
+| D-059 | 2026-09-19 | **AI models** are downloaded on demand as packs through the plugin catalogue; the core ships none. |
+| D-060 | 2026-09-19 | **AI without a capable GPU**: features run on the CPU, slowly, as background tasks with an estimated duration. |
+| D-061 | 2026-09-19 | **Online AI**: the core calls no external AI service. Plugins may, off by default, with consent per plugin and a display of what leaves the machine. No telemetry. |
