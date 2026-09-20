@@ -1,8 +1,8 @@
-# Spike 2: the image view and the interface toolkit (interim report)
+# Spike 2: the image view and the interface toolkit
 
-> **Status: interim.** Slint, iced and Qt Quick measured on Linux, on a real display, with real
-> RAW frames; Slint and iced also on Windows. macOS, Qt on Windows and macOS, and a decision are
-> still to come (see "What remains"). Nothing here is a final decision.
+> **Status: decided (D-072): Slint.** Slint, iced and Qt Quick measured on Linux, on a real
+> display, with real RAW frames; Slint and iced also on Windows. Not blocking, to be checked during
+> M1: Slint on macOS, and Qt on Windows and macOS if the fallback is ever needed.
 
 ## Question
 
@@ -192,6 +192,23 @@ updates pending and a busy disk during the run.
 4. **The tension with the language.** The core is Rust (D-068). Slint fits it naturally. Qt would
    mean a C++ interface layer, or a Rust binding (cxx-qt) that has not been tried here.
 
+## Decision
+
+**Slint (D-072).** Qt Quick stays as the documented fallback; iced is ruled out.
+
+- Every candidate meets the performance target, so performance did not decide.
+- iced has no accessibility, no virtualised list and no translations; it is out.
+- Qt is the most regular and the most complete, but it puts C++ in a Rust project, needs its
+  libraries shipped on three platforms, and its Rust binding was not measured.
+- Slint fits a Rust core (D-068), is light (D-069), holds 60 frames per second in every mode on
+  Linux and Windows, displays pixels exactly, exposes an accessibility tree, and has a licence
+  compatible with the GPL-3.0.
+
+What to watch, from what was met: an atlas of thumbnails cut with `source-clip` (use one image per
+thumbnail), the default translation context, and the render thread (Slint renders on the UI
+thread, so heavy work must stay off it). Slint's default renderer on macOS is OpenGL, which macOS
+deprecates; its Skia/Metal renderer may be needed there.
+
 ## What remains
 
 - [x] **Qt accessibility**: works in a stock Qt application on the real session (Orca reads Qt
@@ -203,7 +220,7 @@ updates pending and a busy disk during the run.
 - [ ] **Colour on a wide-gamut display**, and the display profile from the operating system.
 - [ ] **iced pixel fidelity** (not measured).
 - [ ] **Slint on Wayland and with high-DPI scaling**, not measured on a real display.
-- [ ] **A decision**, once the above are in.
+- [x] **A decision**: D-072.
 
 ## Running it
 

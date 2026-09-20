@@ -1,6 +1,6 @@
 # Technical spikes
 
-> **Status: plan, not yet started.** Phase 2 (development process) begins with the technology
+> **Status: spikes 1 and 2 done, 3 and 4 to do.** Phase 2 (development process) begins with the technology
 > stack. Four choices depend on facts we do not have yet, so we measure before we decide.
 > A spike is a small, throwaway prototype that answers one question with numbers. Its code is
 > not part of the product.
@@ -15,6 +15,8 @@ Decided so far for the stack (see [decisions.md](decisions.md), D-068 to D-071):
 - Linux is tested here, Windows by Patrick, macOS by Patrick over remote desktop; continuous
   integration builds all three.
 - The stack is fixed **after the spikes**, on measurements.
+- **Spike 1 done**: wgpu is confirmed (docs/spikes/01-gpu-pipeline.md).
+- **Spike 2 done**: the interface toolkit is **Slint**, D-072 (docs/spikes/02-image-view-and-toolkit.md).
 
 Candidates carried into the spikes:
 
