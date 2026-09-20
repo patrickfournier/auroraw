@@ -18,6 +18,9 @@ pub struct Gpu {
 impl Gpu {
     /// Picks the first adapter whose "backend name" contains `selector` (case-insensitive).
     pub fn select(selector: &str) -> Result<Gpu> {
+        if selector.trim().is_empty() || selector.trim() == "best" {
+            return Gpu::best();
+        }
         let instance = wgpu::Instance::default();
         let adapters = pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()));
         // Every word must appear in "<backend> <name>", so "vulkan nvidia" or "dx12" both work.

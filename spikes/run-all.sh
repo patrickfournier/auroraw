@@ -24,11 +24,11 @@ grep -E "\[|max buffer" "$out/adapters.txt" | head -12
 # Sample RAW files (about 225 MB), if they are not there yet.
 [ -d samples ] && [ "$(ls samples 2>/dev/null | grep -cE '\.(CR2|CR3|NEF|ARW|RAF|RW2|ORF)$')" -ge 6 ] || bash fetch-samples.sh
 
-run smoke "$(bin smoke)" --adapter " "
-run bench-24mp "$(bin bench)" --adapter " " --mp 24 --out "$out/bench-24mp.json"
-run rawbench "$(bin rawbench)" --adapter " " --out "$out/rawbench.json"
-run heavy-nikon "$(bin heavy)" --adapter " " --file samples/Nikon-D850-14bit-compressed.NEF --out "$out/heavy-nikon.json"
-run presentation "$(bin presentation)" --adapter " " --file samples/Nikon-D850-14bit-compressed.NEF --out "$out/presentation.json"
+run smoke "$(bin smoke)" --adapter best
+run bench-24mp "$(bin bench)" --adapter best --mp 24 --out "$out/bench-24mp.json"
+run rawbench "$(bin rawbench)" --adapter best --out "$out/rawbench.json"
+run heavy-nikon "$(bin heavy)" --adapter best --file samples/Nikon-D850-14bit-compressed.NEF --out "$out/heavy-nikon.json"
+run presentation "$(bin presentation)" --adapter best --file samples/Nikon-D850-14bit-compressed.NEF --out "$out/presentation.json"
 
 # The interface toolkits: eight seconds each, on this machine's display.
 for m in view grid both exact; do
