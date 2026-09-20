@@ -7,6 +7,7 @@ negative scans, non-destructively), convert, edit metadata and deliver galleries
 
 - [Functional specification](docs/functional-specification.md)
 - [Decision log](docs/decisions.md)
+- [Architecture](docs/architecture.md)
 - [Technical spikes](docs/technical-spikes.md)
 
 ## License
