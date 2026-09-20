@@ -1,6 +1,6 @@
 # Auroraw: testing strategy
 
-> **Status: first draft, for review.** How Auroraw is tested: what is checked at which level, with
+> **Status: adopted (D-081).** How Auroraw is tested: what is checked at which level, with
 > what data, on which machines, and what stops a change from being merged. It builds on the
 > [architecture](architecture.md) and on what the spikes already proved works. Items are tagged
 > **[decided]** (a decision exists), **[proposed]** (to be validated) or **[open]**. Continuous

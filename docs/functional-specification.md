@@ -779,8 +779,9 @@ Four families [decided]: **import** (including RAW reading), **export** (images 
 - Operation plugins must be able to run on the GPU and declare where they sit in the pipeline
   (§5.6).
 
-**Licensing** [open, D-057]: the licence policy for plugins is settled together with the
-isolation model in the next phase (§10). Moving the core to the LGPL is an option kept open.
+**Licensing** [D-080, D-057]: the application is GPL-3.0; the plugin API, SDK and declaration
+schema are MIT OR Apache-2.0. What licence a plugin itself may use, and the exception that says
+so, are proposed in docs/governance.md.
 
 Language, ABI, isolation technology and hosting of the index are handled in the "development
 process" phase (§10).
@@ -970,10 +971,10 @@ Sorted by when they need an answer. No question is left to decide before the tec
     published photo is no longer in the catalogue.
 33. **Linking an existing gallery**: how ambiguities are resolved when several photos share a
     file name.
-34. **Plugin licensing (D-057)**: options are keeping GPL-3.0 with a plugin exception, licensing
-    the plugin API and SDK permissively, or moving the core to the LGPL. This is best decided
-    before accepting outside contributions, since relicensing later needs the consent of every
-    contributor. It is legal as well as technical, and depends on the isolation model.
+34. **Plugin licensing (D-057)**: partly settled by D-080 (core stays GPL-3.0, API and SDK
+    MIT OR Apache-2.0). Left: the plugin exception and the contributor agreement, proposed in
+    docs/governance.md. Best settled before accepting outside contributions, since relicensing
+    later needs the consent of every contributor.
 35. **Source plugin details**: how a source reports changes for monitoring (§5.1), how sign-in
     and refreshed credentials are stored, and how a camera source presents its files to the
     import (§5.2).

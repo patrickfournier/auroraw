@@ -1,10 +1,10 @@
 # Auroraw: continuous integration and releases
 
-> **Status: first draft, for review.** Where and when the tests of the
+> **Status: adopted (D-081).** Where and when the tests of the
 > [testing strategy](testing-strategy.md) run, how a change reaches `dev` and `main`, how a
 > release is built, signed and published on three platforms, and how the supply chain is kept
-> safe. Items are tagged **[decided]**, **[proposed]** or **[open]**. Two items need a
-> decision from Patrick that involves money or accounts (§6.3, §6.4).
+> safe. Items are tagged **[decided]**, **[proposed]** (adopted as the working plan) or
+> **[open]**. The signing and update policies were approved with D-081.
 
 ## 1. Aims [proposed]
 
@@ -58,7 +58,7 @@ and `macos-15` on Apple silicon, pinned by name rather than `latest` so an image
 change the result unannounced, and moved forward deliberately. Linux needs the packages the spikes
 found (`mesa-vulkan-drivers`, `libvulkan1`, fontconfig, xkbcommon, wayland and X libraries).
 Standard runners for a **public** repository are free; the repository's visibility is therefore
-part of this plan [open: confirm the repository is public before the code lands].
+part of this plan (the repository is public).
 
 ### 3.2 Nightly: `nightly.yml`
 
@@ -157,7 +157,7 @@ The plugins of the core (Prooftide export, official decoders) are **bundled as W
 with the compiled-plugin cache made at first start, per machine, not shipped (a compiled plugin
 depends on the CPU).
 
-### 6.3 Signing: a decision for Patrick [open]
+### 6.3 Signing [decided, D-081]
 
 Unsigned software triggers Windows SmartScreen and macOS Gatekeeper warnings that most
 photographers will not click past. What each platform needs:
@@ -168,15 +168,15 @@ photographers will not click past. What each platform needs:
 | **Windows** | A code-signing certificate. Options: **SignPath Foundation** signs open source projects for free after a review of the project; **Azure Trusted Signing** is a low monthly fee; a traditional certificate from an authority costs more and, since 2023, needs a hardware token. Unsigned builds work but show a warning. | Free to about 10 USD a month |
 | **Linux** | Flatpak and AppImage do not need a certificate; Flathub signs its repository. Optionally sign the tarball and checksums with a project key (a detached signature). | Free |
 
-Proposal: apply to SignPath for Windows, take the Apple membership when the first macOS build is
-ready to publish, and **ship the first 0.x pre-releases unsigned** with a clear note, so that
+Decision: apply to SignPath for Windows, use the Apple membership Patrick already holds for
+Prooftide, and **ship the first 0.x pre-releases unsigned** with a clear note, so that
 signing is never on the critical path of the milestones. The keys and the account belong to
 the project's owner, not to me: I cannot and should not hold them.
 
-### 6.4 Updates [open]
+### 6.4 Updates [decided, D-081]
 
 The application makes **no network request the user did not consent to** (D-061), so it cannot
-silently check for a new version. Proposal: a **"Check for updates"** command and an opt-in
+silently check for a new version. Decision: a **"Check for updates"** command and an opt-in
 setting that fetches one small file listing the latest version, nothing else sent; Flatpak and
 package managers update themselves without any of this; no automatic download or install in
 v1. Windows and macOS users install the new release over the old one. Whether a proper updater
@@ -244,12 +244,12 @@ docs/                 as today
 
 | # | Item | To settle |
 | --- | --- | --- |
-| 1 | The repository is public (free runners) | Patrick, before code lands |
-| 2 | Signing: SignPath and Apple membership, and who holds the accounts | Patrick, before the first release |
+| 1 | ~~The repository is public~~ | Done: public, free runners |
+| 2 | ~~Signing~~ | Decided, D-081; the SignPath application is still to be made |
 | 3 | Flatpak details: permissions, the runtime, Vulkan and GPU access on the sandbox | M1 packaging spike, small |
 | 4 | Intel Macs (x86_64): supported, or Apple silicon only | Before the first macOS release |
 | 5 | Linux on arm64, Windows on arm64 | After the first release, on demand |
-| 6 | Updates: opt-in check only, or a real updater | After the first release |
+| 6 | Whether a real updater is worth it, beyond the opt-in check (D-081) | After the first release |
 | 7 | Real-GPU runs: the `xtask` command is enough, or dedicated hardware later | After M2 |
 | 8 | Branch protection rules on `dev` | When the first outside contributor arrives |
 | 9 | Hosting for large test data (the sample RAW files) if the source goes away | With the first golden tests |
