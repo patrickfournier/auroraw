@@ -65,6 +65,9 @@ jobs:
             spikes/target/release/rawbench${{ matrix.ext }}
             spikes/target/release/heavy${{ matrix.ext }}
             spikes/target/release/smoke${{ matrix.ext }}
+            spikes/target/release/viewer-slint${{ matrix.ext }}
+            spikes/target/release/viewer-iced${{ matrix.ext }}
+            spikes/target/release/presentation${{ matrix.ext }}
             spikes/target/release/memtest${{ matrix.ext }}
             spikes/target/release/adapters${{ matrix.ext }}
             spikes/fetch-samples.sh

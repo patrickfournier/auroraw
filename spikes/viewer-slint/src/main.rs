@@ -180,7 +180,7 @@ fn main() -> Result<()> {
     let n_frames = 60usize;
     let mut frames: Vec<Vec<u8>> = Vec::new();
     if show_view {
-        let gpu: &'static Gpu = Box::leak(Box::new(Gpu::select("vulkan nvidia").or_else(|_| Gpu::select("vulkan"))?));
+        let gpu: &'static Gpu = Box::leak(Box::new(Gpu::best()?));
         let scene = match get("--file") {
             Some(f) if Path::new(&f).exists() => raw::load(Path::new(&f), false)?,
             _ if Path::new("samples/Nikon-D850-14bit-compressed.NEF").exists() => raw::load(Path::new("samples/Nikon-D850-14bit-compressed.NEF"), false)?,

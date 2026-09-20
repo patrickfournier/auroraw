@@ -1,0 +1,10 @@
+[package]
+name = "viewer-iced"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+gpu-pipeline = { version = "0.1.0", path = "../gpu-pipeline" }
+iced = { version = "0.14.0", features = ["image", "wgpu"] }
+serde_json = "1.0.151"

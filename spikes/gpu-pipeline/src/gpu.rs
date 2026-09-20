@@ -39,6 +39,24 @@ impl Gpu {
         Ok(Gpu { device, queue, info, limits })
     }
 
+    /// The best adapter on Vulkan, Metal or DirectX 12: a discrete GPU, else an integrated one,
+    /// else whatever exists (including software adapters).
+    pub fn best() -> Result<Gpu> {
+        let instance = wgpu::Instance::default();
+        let mut adapters = pollster::block_on(instance.enumerate_adapters(wgpu::Backends::VULKAN | wgpu::Backends::METAL | wgpu::Backends::DX12));
+        adapters.sort_by_key(|a| match a.get_info().device_type {
+            wgpu::DeviceType::DiscreteGpu => 0,
+            wgpu::DeviceType::IntegratedGpu => 1,
+            wgpu::DeviceType::VirtualGpu => 2,
+            _ => 3,
+        });
+        let adapter = adapters.into_iter().next().context("no graphics adapter")?;
+        let info = adapter.get_info();
+        let limits = adapter.limits();
+        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor { required_limits: limits.clone(), ..Default::default() }))?;
+        Ok(Gpu { device, queue, info, limits })
+    }
+
     pub fn wait(&self) -> Result<()> {
         self.device.poll(wgpu::PollType::wait_indefinitely()).map_err(|e| anyhow!("poll: {e:?}"))?;
         Ok(())

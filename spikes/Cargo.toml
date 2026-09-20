@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["gpu-pipeline", "viewer-slint"]
+members = ["gpu-pipeline", "viewer-slint", "viewer-iced"]
 
 [profile.release]
 debug = 1

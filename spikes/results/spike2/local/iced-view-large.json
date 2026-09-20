@@ -1,0 +1,25 @@
+{
+  "first_frame_ms": 492.51443199999994,
+  "fps": 48.24181178041038,
+  "frame_interval_ms": {
+    "max": 999.8491819999999,
+    "mean": 20.728906380047512,
+    "median": 16.687598,
+    "p95": 17.968215,
+    "p99": 18.880985
+  },
+  "frames_measured": 421,
+  "frames_over_20ms": 2,
+  "mode": "View",
+  "prepare_frames_ms": 1070.848434,
+  "rss_mb": 1064.2109375,
+  "toolkit": "iced 0.14 (wgpu)",
+  "update_ms": {
+    "median": 2.056002,
+    "p95": 2.672358
+  },
+  "view": [
+    2200,
+    1400
+  ]
+}
