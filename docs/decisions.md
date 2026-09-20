@@ -41,3 +41,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-034 | 2026-09-19 | **Series formation**: objective series (bursts, bracketing) form automatically; visually similar photos are only suggested and the photographer confirms. |
 | D-035 | 2026-09-19 | **Resolving a series** keeps the designated photos and gives the others the Rejected flag. The series stays expandable. Nothing is deleted. |
 | D-036 | 2026-09-19 | **Exact duplicates** are one photo with several locations. An optional duplicates report helps the photographer tidy up; Auroraw itself deletes nothing. |
+| D-037 | 2026-09-19 | **Develop interface**: guided panels by task, advanced tools added on demand, and a default pipeline that works out of the box. Operations are not reordered in everyday use. The pipeline must be configurable for advanced users and plugins, outside the everyday interface. |
+| D-038 | 2026-09-19 | **Main version**: each photo has one main version (chosen by the photographer, by default the last edited) that supplies the grid thumbnail and the default for export and publication. Other versions are collapsed under the photo. |
+| D-039 | 2026-09-19 | **Reusing settings**: selective copy and paste, styles, and an optional auto-sync switch. Application is one-off, with no lasting link between photos. |
+| D-040 | 2026-09-19 | **One concept, the style**: a named set of settings on one or several tools; a tool preset is a single-tool style. |

@@ -289,19 +289,57 @@ A dedicated, full-screen mode for culling. The grid stays the navigation view.
 - **Near duplicates** are handled as series suggestions, not as duplicates.
 - Import already skips files it has imported before (§5.2).
 
-### 5.4 Development versions
+### 5.4 Development experience and versions
 
-This is a central point [decided: versions, virtual copies and snapshots in v1].
+**Interface** [decided, D-037]
+
+- The Develop view is organised in **guided panels by task** (Light, Colour, Detail, Geometry
+  and so on) showing the common controls. Advanced tools are added on demand and appear only
+  once used [proposed].
+- The internal order of operations is **not something the photographer rearranges** in everyday
+  use: a default pipeline that works out of the box is provided (§5.6). Configuring the pipeline
+  is possible for advanced users and plugin authors, outside the everyday interface.
+- Tools shared by every view [proposed]: before/after (split or side by side), histogram,
+  clipping warnings, 100% zoom, and moving to the previous or next photo from the keyboard
+  without leaving Develop.
+
+**History and snapshots** [proposed, principle decided in D-006]
+
+- Each version has a **linear history**, kept persistently in its sidecar; a button compacts it.
+  Editing after an undo discards the undone steps: exploring variants is what versions and
+  snapshots are for.
+- A **snapshot** is a named bookmark in a version's history. It can be compared with the current
+  state, restored, or turned into a new version.
+
+**Versions** [decided: versions, virtual copies and snapshots in v1]
 
 - A photo can have as many versions as wanted ("high-contrast black and white", "client
   version", "cinema experiment"). A version is created from scratch, from another version, from
-  a snapshot or from a style.
-- Versions **share the original**, copy no pixels, and are displayed grouped under the photo;
-  switching between them is a single gesture [proposed].
-- Each version has its full history and its named snapshots [decided].
+  a snapshot or from a style. A one-key "duplicate and try" creates a version from the current
+  one [proposed].
+- Versions **share the original** and copy no pixels.
+- **Main version** [decided, D-038]: each photo has one main version, chosen by the photographer
+  (by default the last one edited). It supplies the grid thumbnail and is the default for export
+  and publication. Other versions are **collapsed** under the photo, with a badge showing how
+  many there are, and unfold on demand.
+- In Develop, a **version strip** switches between versions with one key [proposed].
+- The grid shows the main version's effective metadata (§5.5) [proposed].
 - Two versions can be compared side by side or with a wipe [proposed].
-- Every output operation (export, publication) applies to a chosen version, or to a set of
-  versions [proposed].
+- Every output operation (export, publication) applies to a chosen version, to the main version
+  or to a set of versions [proposed].
+
+**Reusing settings between photos** [decided, D-039 and D-040]
+
+- **Selective copy and paste**: copy chosen settings, paste them onto one or several photos.
+- **Styles**: a style is a named set of settings covering one or several tools. There is **one
+  concept only**: what other software calls a tool preset is simply a style that holds a single
+  tool, and appears in that tool's menu as well as in the global style list.
+- Applying a style or a paste is a one-off action; it leaves **no lasting link** between photos.
+  Changing a style later does not alter photos that already used it.
+- **Auto-sync** (optional switch): each adjustment made on the active photo is applied live to
+  the selection, for a series or a whole shoot.
+- A style can be applied at import (import profile, §5.2) and can be applied selectively
+  (which tools) [proposed].
 
 **Persistence of versions** [proposed]:
 
@@ -312,9 +350,8 @@ This is a central point [decided: versions, virtual copies and snapshots in v1].
 | Version sidecar (workspace) | A copy of the photo's metadata, the version's own metadata, its chain, history and snapshots | Open, documented format built on XMP if practical, with a schema version in each file |
 
 The workspace lets the catalogue be rebuilt from the sidecars and the sources. Development
-settings from other
-software are not portable as-is; a partial import of common settings (Lightroom, darktable) is
-conceivable later [open].
+settings from other software are not portable as-is; a partial import of common settings
+(Lightroom, darktable) is conceivable later [open].
 
 ### 5.5 Metadata: photo and version [decided]
 
@@ -353,12 +390,34 @@ where the displayed value comes from.
 - Masks and local retouching [decided, v1]: gradients, brushes, selection by luminosity and by
   colour; AI-assisted selections [proposed].
 - Lens corrections through Lensfun [decided: v1, milestone M3].
-- Presets and styles, with settings sync between images [decided, v1]: selective copy/paste,
-  apply to a selection, named styles.
+- Styles and settings reuse between images [decided, v1]: see §5.4.
 - Negative scans [decided, priority 2]:
   - v1: inversion, film-base (orange mask) sampling, per-channel curves, frame cropping.
   - Later: emulsion profiles, infrared dust detection, multi-exposure scans.
 - Later [decided]: merges (HDR, panorama, focus stacking).
+
+**Pipeline composition and operation plugins** [proposed, following D-037]
+
+The photographer does not manage the order of operations, but plugins must fit into it. The
+model:
+
+- The pipeline is described by a **pipeline definition**: a documented, versioned list of
+  **stages**, each working in a defined data space (for example: raw, scene-linear working
+  space, display-referred, output). Auroraw ships a default definition that works.
+- Each operation, built-in or plugin, **declares** its stage, optional ordering constraints
+  within the stage ("after exposure", "before sharpening"), and its capabilities (GPU shader,
+  needs neighbouring pixels and how many, depends on pixel scale, supports masks) and the panel
+  it belongs in (Light, Colour, Detail...).
+- Auroraw **places** an operation from its declaration; a plugin with no constraint goes at the
+  end of its stage. Conflicts are reported at load time, not silently resolved.
+- The order used is **recorded in each version's sidecar**, with the version of each operation
+  and its plugin. An old edit therefore renders the same way after a plugin is installed or
+  updated.
+- A version that uses a **missing plugin** opens with that operation disabled and clearly marked;
+  its settings are kept in the sidecar and are never dropped.
+- Advanced users and plugin authors can **configure the pipeline definition** (a documented,
+  shareable file). Configuration is outside the everyday interface, changes only apply to new
+  versions, and is validated (an operation cannot leave its stage).
 
 ### 5.7 Metadata editing
 
@@ -421,7 +480,8 @@ High-level requirements [proposed]:
 
 - Auroraw's internal modules (operations, base formats) use the same interface as external
   plugins, so the interface is validated as early as milestone M2.
-- Operation plugins must be able to run on the GPU.
+- Operation plugins must be able to run on the GPU and declare where they sit in the pipeline
+  (§5.6).
 - A plugin declares its permissions (network, disk access); the user sees them before
   installation.
 - The public API is frozen in milestone M5, not before.
@@ -524,6 +584,14 @@ to it.
     multi-location photo prefers (online first, then fastest).
 16. **Duplicates with different metadata**: when two copies of the same file carry different XMP
     (ratings, keywords) found at import, how are they merged?
+17. **Pipeline definition**: exact stages and data spaces, the ordering-constraint language, how a
+    plugin's shader is packaged, and how conflicts between plugins are shown to the user.
+18. **Auto-sync**: how it behaves with photos that already have different settings for the same
+    tool (overwrite, or only relative changes such as an exposure delta)?
+19. **Main version and metadata**: the grid shows the main version's effective rating; confirm
+    this is what the photographer expects when sorting a catalogue by rating.
+20. **History size**: brush strokes and masks can make histories large; what does "compact"
+    keep, and at what point is it proposed automatically?
 
 ## 11. Next steps
 
