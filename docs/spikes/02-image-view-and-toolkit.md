@@ -116,17 +116,25 @@ for every candidate, and a toolkit must simply not alter pixels, which all pass.
 | Text field, typing | works | works | works |
 | Accents, dead keys, input method | works (checked by Patrick) | works (checked by Patrick) | not yet checked |
 | Translations | gettext, built in, switch at run time | none built in | Qt Linguist, switch at run time |
-| **Accessibility** | **works**: a tree of window, labels and list, read through AT-SPI | **none**: no accessibility code in the toolkit, and no application visible to a screen reader | not established (see below) |
+| **Accessibility** | **works**: a tree of window, labels and list, read through AT-SPI | **none**: no accessibility code in the toolkit, and no application visible to a screen reader | **not verifiable here**: Qt's layer is active, its bridge publishes nothing (see below) |
 | Language of the code | Rust | Rust | C++ and QML |
 | Licence | GPL-3.0, or royalty-free, or commercial | MIT | LGPL and GPL |
 
-### Accessibility of Qt: unresolved
+### Accessibility of Qt: not verifiable in this session
 
-With the same script that shows a complete tree for Slint, Qt Quick shows only an empty
-application node, and so does Qt Linguist, a standard Qt 6 application of the same system. The
-node reports GTK as its toolkit. Since a stock Qt application behaves the same way, the cause
-lies in this environment, and a likely one is that the screen reader Orca was not running
-(`ScreenReaderEnabled` was false). This is to be retested with Orca running.
+With the script that shows a complete tree for Slint, Qt Quick shows only an empty application
+node, and so does Qt Linguist, a standard Qt 6 application of the same system. This was retried
+with the accessibility bus enabled and with the Orca screen reader running (`orca` running,
+`IsEnabled` true, `ScreenReaderEnabled` still false).
+
+What is established: Qt's own log shows its accessibility layer **is active** and builds an
+interface for the window (`name="Auroraw spike 2" role=Window`), so the application's items are
+described correctly on Qt's side. What is not: its AT-SPI bridge does not publish them on the
+bus here. The empty node comes from GTK, which the session loads into every process through
+`GTK_MODULES=gail:atk-bridge` (its toolkit is reported as `gtk`). The same happens with a stock Qt
+application, so this points at the session or packaging, not at the prototype. Qt's accessibility
+on Linux is generally reported to work; this test cannot confirm it. A manual check with Orca
+and Linguist, outside this sandbox, would settle it.
 
 ## Things met on the way
 
@@ -157,7 +165,7 @@ lies in this environment, and a likely one is that the screen reader Orca was no
 
 ## What remains
 
-- [ ] **Qt accessibility**, retested with Orca running.
+- [x] **Qt accessibility**, retested with Orca running: still not verifiable in this session (see above). A manual check outside the sandbox remains possible.
 - [ ] **Qt through Rust.** These measures used C++ and QML. The Rust-side cost of driving Qt
   (cxx-qt) is unmeasured.
 - [ ] **Windows and macOS.** The viewers are built by continuous integration and can be run on
