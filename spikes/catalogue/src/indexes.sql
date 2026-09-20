@@ -1,0 +1,11 @@
+CREATE INDEX photo_time ON photo(capture_time);
+CREATE INDEX photo_visible_time ON photo(stack_visible, capture_time);
+CREATE INDEX photo_rating_time ON photo(rating, capture_time);
+CREATE INDEX photo_eff_rating_time ON photo(effective_rating, capture_time);
+CREATE INDEX photo_camera_time ON photo(camera_id, capture_time);
+CREATE INDEX photo_iso ON photo(iso);
+CREATE INDEX photo_series ON photo(series_id);
+CREATE INDEX photo_fingerprint ON photo(fingerprint);
+CREATE INDEX version_photo ON version(photo_id);
+CREATE INDEX keyword_path ON keyword(path);
+CREATE INDEX photo_keyword_kw ON photo_keyword(keyword_id, photo_id);

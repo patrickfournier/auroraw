@@ -1,0 +1,210 @@
+{
+  "LIKE '%word%' on caption and filename": {
+    "median_ms": 23.954982,
+    "note": "no index",
+    "p95_ms": 26.507521,
+    "rows": 200,
+    "worst_ms": 26.507521
+  },
+  "OFFSET 80,000 page": {
+    "median_ms": 2.718711,
+    "note": "the slow way",
+    "p95_ms": 3.228215,
+    "rows": 200,
+    "worst_ms": 3.228215
+  },
+  "a collection (20 to 2,000 photos)": {
+    "median_ms": 0.7463380000000001,
+    "note": "",
+    "p95_ms": 1.257646,
+    "rows": 200,
+    "worst_ms": 3.489236
+  },
+  "add a keyword to 1,000 photos (sync FULL)": {
+    "median_ms": 40.783225,
+    "note": "",
+    "p95_ms": 72.21475500000001,
+    "rows": 1000,
+    "worst_ms": 72.21475500000001
+  },
+  "add a keyword to 1,000 photos (sync NORMAL)": {
+    "median_ms": 41.373049,
+    "note": "",
+    "p95_ms": 84.59787,
+    "rows": 1000,
+    "worst_ms": 84.59787
+  },
+  "camera + ISO 800-3200": {
+    "median_ms": 0.22841899999999998,
+    "note": "page",
+    "p95_ms": 0.792232,
+    "rows": 200,
+    "worst_ms": 3.543951
+  },
+  "camera + ISO 800-3200, count": {
+    "median_ms": 0.9327209999999999,
+    "note": "",
+    "p95_ms": 1.258818,
+    "rows": 3758,
+    "worst_ms": 1.292701
+  },
+  "category + rating >= 3 + a year": {
+    "median_ms": 12.085283,
+    "note": "combined",
+    "p95_ms": 13.327986,
+    "rows": 118,
+    "worst_ms": 13.327986
+  },
+  "count of visible photos": {
+    "median_ms": 2.338615,
+    "note": "",
+    "p95_ms": 2.4511979999999998,
+    "rows": 87715,
+    "worst_ms": 2.596479
+  },
+  "db_size_mb": 56.078125,
+  "expand a series": {
+    "median_ms": 0.020744,
+    "note": "",
+    "p95_ms": 0.02505,
+    "rows": 8,
+    "worst_ms": 0.054737999999999995
+  },
+  "facet: ratings under a keyword category": {
+    "median_ms": 14.767591,
+    "note": "GROUP BY",
+    "p95_ms": 16.542939999999998,
+    "rows": 6,
+    "worst_ms": 16.542939999999998
+  },
+  "facet: top 20 keywords under a category": {
+    "median_ms": 53.047301,
+    "note": "the heavy one",
+    "p95_ms": 61.163751000000005,
+    "rows": 20,
+    "worst_ms": 61.163751000000005
+  },
+  "full-text search (prefix), count": {
+    "median_ms": 0.332288,
+    "note": "",
+    "p95_ms": 0.514836,
+    "rows": 1250,
+    "worst_ms": 0.726178
+  },
+  "full-text search (prefix), page": {
+    "median_ms": 1.11175,
+    "note": "FTS5",
+    "p95_ms": 2.8828650000000002,
+    "rows": 200,
+    "worst_ms": 6.942798
+  },
+  "keyset page at a random date": {
+    "median_ms": 0.6218940000000001,
+    "note": "capture_time < ?",
+    "p95_ms": 1.815433,
+    "rows": 200,
+    "worst_ms": 2.478187
+  },
+  "keyword category, count": {
+    "median_ms": 11.340533,
+    "note": "",
+    "p95_ms": 12.895118,
+    "rows": 21984,
+    "worst_ms": 12.895118
+  },
+  "keyword category, page": {
+    "median_ms": 20.756215,
+    "note": "200 keywords",
+    "p95_ms": 24.366564,
+    "rows": 200,
+    "worst_ms": 24.366564
+  },
+  "keyword group, count": {
+    "median_ms": 0.48386399999999996,
+    "note": "",
+    "p95_ms": 0.907894,
+    "rows": 1371,
+    "worst_ms": 0.9435749999999999
+  },
+  "keyword group, page": {
+    "median_ms": 1.416556,
+    "note": "a group of 10 keywords",
+    "p95_ms": 2.6236520000000003,
+    "rows": 200,
+    "worst_ms": 2.955593
+  },
+  "newest 200 visible": {
+    "median_ms": 0.078057,
+    "note": "",
+    "p95_ms": 0.081948,
+    "rows": 200,
+    "worst_ms": 0.125393
+  },
+  "one month of shooting": {
+    "median_ms": 0.101031,
+    "note": "date range",
+    "p95_ms": 0.113469,
+    "rows": 200,
+    "worst_ms": 0.160783
+  },
+  "open_cold_ms": {
+    "median": 6.4116420000000005,
+    "worst": 11.672853
+  },
+  "rating >= 4, computed by join": {
+    "median_ms": 0.398972,
+    "note": "page",
+    "p95_ms": 0.44061,
+    "rows": 200,
+    "worst_ms": 0.528161
+  },
+  "rating >= 4, computed by join, count": {
+    "median_ms": 15.756113,
+    "note": "",
+    "p95_ms": 15.917567,
+    "rows": 18200,
+    "worst_ms": 16.630074
+  },
+  "rating >= 4, stored effective rating": {
+    "median_ms": 0.24180100000000002,
+    "note": "page",
+    "p95_ms": 0.26643,
+    "rows": 200,
+    "worst_ms": 2.01659
+  },
+  "rating >= 4, stored, count": {
+    "median_ms": 5.166498000000001,
+    "note": "",
+    "p95_ms": 5.857488,
+    "rows": 18200,
+    "worst_ms": 79.901274
+  },
+  "set the rating of 1,000 photos (sync FULL)": {
+    "median_ms": 39.877224000000005,
+    "note": "one transaction",
+    "p95_ms": 42.58219,
+    "rows": 1000,
+    "worst_ms": 42.58219
+  },
+  "set the rating of 1,000 photos (sync NORMAL)": {
+    "median_ms": 39.941927,
+    "note": "one transaction",
+    "p95_ms": 68.359104,
+    "rows": 1000,
+    "worst_ms": 68.359104
+  },
+  "set the rating of one photo (sync FULL)": {
+    "median_ms": 0.6231709999999999,
+    "note": "one transaction each",
+    "p95_ms": 0.885094,
+    "rows": 1,
+    "worst_ms": 1.051001
+  },
+  "set the rating of one photo (sync NORMAL)": {
+    "median_ms": 0.023219,
+    "note": "one transaction each",
+    "p95_ms": 0.028832,
+    "rows": 1,
+    "worst_ms": 0.6328
+  }
+}

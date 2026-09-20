@@ -1,0 +1,67 @@
+{
+  "blobs_32k": {
+    "size_mb": 947.65625,
+    "write_seconds": 0.471598567
+  },
+  "blobs_4k": {
+    "size_mb": 865.5234375,
+    "write_seconds": 0.624916615
+  },
+  "display_decode_ms": 0.24594200000000002,
+  "files": {
+    "count": 100000,
+    "data_mb": 787.4402780532837,
+    "disk_mb": 985.99609375,
+    "write_seconds": 0.34563389
+  },
+  "generation": {
+    "avg_kb": 8.063388447265625,
+    "count": 100000,
+    "per_second": 805.4460396153204,
+    "seconds": 124.154809983,
+    "threads": 16,
+    "total_mb": 787.4402780532837
+  },
+  "one_core_ms": {
+    "decode": 7.019010909090909,
+    "encode": 0.48124872727272733,
+    "resize": 2.9299810181818198,
+    "total": 10.430240654545457
+  },
+  "read_blobs_32k_contiguous": {
+    "cold_ms": 6.200378000000001,
+    "warm_ms": 0.924647
+  },
+  "read_blobs_32k_every": {
+    "cold_ms": 30.532271,
+    "warm_ms": 1.4042830000000002
+  },
+  "read_blobs_32k_random,": {
+    "cold_ms": 42.074914,
+    "warm_ms": 1.507423
+  },
+  "read_blobs_4k_contiguous": {
+    "cold_ms": 5.844207,
+    "warm_ms": 0.9315
+  },
+  "read_blobs_4k_every": {
+    "cold_ms": 52.678495,
+    "warm_ms": 0.992373
+  },
+  "read_blobs_4k_random,": {
+    "cold_ms": 70.80346399999999,
+    "warm_ms": 1.2665009999999999
+  },
+  "read_files_contiguous": {
+    "cold_ms": 27.179076,
+    "warm_ms": 0.676738
+  },
+  "read_files_every": {
+    "cold_ms": 28.10462,
+    "warm_ms": 0.723294
+  },
+  "read_files_random,": {
+    "cold_ms": 33.681594000000004,
+    "warm_ms": 0.7277870000000001
+  }
+}

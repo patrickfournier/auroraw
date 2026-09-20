@@ -1,5 +1,7 @@
-# Rust build output
+# Rust build output, including any extra target directory
 target/
+target-*/
+**/target/
 spikes/samples/
 
 # Screenshots written by the spikes are large and reproducible

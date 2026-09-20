@@ -1,0 +1,19 @@
+{
+  "edit_with_fsync": {
+    "median_ms": 0.7499600000000001,
+    "p95_ms": 0.967001,
+    "worst_ms": 185.779853
+  },
+  "edit_without_fsync": {
+    "median_ms": 0.042543000000000004,
+    "p95_ms": 0.04844,
+    "worst_ms": 0.189917
+  },
+  "write": {
+    "photo_kb": 1.560878603515625,
+    "photo_sidecars": 100000,
+    "seconds": 1.201840735,
+    "version_kb": 3.3193214159215896,
+    "version_sidecars": 143106
+  }
+}

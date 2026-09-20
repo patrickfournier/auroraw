@@ -1,0 +1,82 @@
+{
+  "cell_lookups": {
+    "hits": 3684,
+    "misses": 3476
+  },
+  "filters": [
+    {
+      "filter": "all",
+      "photos": 87715,
+      "query_ms": 123.187804,
+      "to_full_page_ms": 130.17553
+    },
+    {
+      "filter": "rating 4+",
+      "photos": 18368,
+      "query_ms": 109.774822,
+      "to_full_page_ms": 115.685053
+    },
+    {
+      "filter": "keyword group",
+      "photos": 1917,
+      "query_ms": 1.717855,
+      "to_full_page_ms": 15.260537000000001
+    },
+    {
+      "filter": "keyword category",
+      "photos": 29549,
+      "query_ms": 22.624301,
+      "to_full_page_ms": 43.672741
+    },
+    {
+      "filter": "all",
+      "photos": 87715,
+      "query_ms": 34.045604,
+      "to_full_page_ms": 39.171657999999994
+    },
+    {
+      "filter": "rating 4+",
+      "photos": 18368,
+      "query_ms": 26.15396,
+      "to_full_page_ms": 33.915785
+    },
+    {
+      "filter": "keyword group",
+      "photos": 1917,
+      "query_ms": 1.351597,
+      "to_full_page_ms": 16.376
+    },
+    {
+      "filter": "keyword category",
+      "photos": 29549,
+      "query_ms": 22.407726,
+      "to_full_page_ms": 28.368291
+    }
+  ],
+  "jumps_to_full_page_ms": {
+    "count": 25,
+    "max": 31.382223,
+    "median": 16.8237,
+    "p95": 17.093533
+  },
+  "list_len": 29549,
+  "scroll": {
+    "frames": 601,
+    "frames_checked": 601,
+    "frames_over_20ms": 0,
+    "frames_with_an_empty_cell": 0,
+    "interval_ms": {
+      "max": 18.800265,
+      "median": 16.620966,
+      "p95": 17.453027,
+      "p99": 18.465545
+    }
+  },
+  "thumbnail_latency_ms": {
+    "count": 3421,
+    "max": 392.807597,
+    "median": 15.996199999999998,
+    "p95": 17.495301,
+    "p99": 392.757399
+  }
+}

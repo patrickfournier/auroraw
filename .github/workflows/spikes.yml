@@ -68,6 +68,13 @@ jobs:
             spikes/target/release/viewer-slint${{ matrix.ext }}
             spikes/target/release/viewer-iced${{ matrix.ext }}
             spikes/target/release/presentation${{ matrix.ext }}
+            spikes/target/release/build_db${{ matrix.ext }}
+            spikes/target/release/query_bench${{ matrix.ext }}
+            spikes/target/release/thumbgen${{ matrix.ext }}
+            spikes/target/release/workspace${{ matrix.ext }}
+            spikes/target/release/exifcost${{ matrix.ext }}
+            spikes/target/release/viewer-catalogue${{ matrix.ext }}
+            spikes/run-spike3.sh
             spikes/target/release/memtest${{ matrix.ext }}
             spikes/target/release/adapters${{ matrix.ext }}
             spikes/fetch-samples.sh
