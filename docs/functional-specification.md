@@ -136,7 +136,8 @@ The milestone of each feature (M1 to M5) is described in §8.
   software. It writes the photo sidecars of the RAW files next to the originals, on explicit
   request only (for a selection, a folder or a whole source). It is one-way and covers
   photo-level metadata. The naming convention (`photo.xmp` or `photo.ARW.xmp`) is the
-  photographer's choice, `photo.xmp` by default [decided, D-028].
+  photographer's choice, `photo.xmp` by default [decided, D-028]. It is on request only:
+  automatic mirroring is not planned for v1 [decided, D-066].
 - **Existing XMP** files found next to originals at import (from Lightroom or others) are read,
   never modified, and their ratings and keywords are copied into the photo sidecar [proposed].
 - Because sidecars live in the workspace, metadata edits are written immediately, whatever the
@@ -185,7 +186,26 @@ offline, those photos cannot be displayed until the source returns [proposed].
 - Search, filter and sort on all metadata (EXIF, IPTC, tags, ratings, dates, lens, version,
   publication state, etc.) [decided].
 - Manual and smart collections, hierarchical tags, ratings [decided].
-- Catalogue backup and sync [decided, v1]: details to be designed (§10).
+
+**Backup, rebuild and moving photos** [decided, D-064 and D-067]
+
+- **Backup** is copying the workspace, which holds everything that must not be lost. v1 offers a
+  **backup helper** and **rebuilding the catalogue from the workspace**, plus documented
+  compatibility with file-sync tools to carry a workspace between machines. **Built-in sync is
+  not in v1** [decided, D-064].
+- **Moving photos between catalogues** is in v1 [decided, D-067]; the milestone is M4
+  [proposed], since it needs the version sidecars (M2) and the publication records (M4) and
+  shares its machinery with rebuilding from a workspace. Proposed behaviour:
+  - "Copy to catalogue" and "Move to catalogue" on a selection.
+  - Both copy the photo and version sidecars into the destination workspace and add the sources
+    to the destination catalogue if needed. The destination's keyword vocabulary merges by path,
+    and conflicts are put to the photographer.
+  - A move then removes the photos from the origin catalogue's index. Their sidecars go to a
+    recoverable folder in the origin workspace rather than being deleted. Originals are never
+    touched.
+  - Publications and client-selection collections stay with the origin catalogue, since the
+    galleries were published from it.
+  - Sidecars are self-contained (D-023), so no special format is needed.
 
 ### 5.2 Import
 
@@ -334,7 +354,9 @@ A dedicated, full-screen mode for culling. The grid stays the navigation view.
   and publication. Other versions are **collapsed** under the photo, with a badge showing how
   many there are, and unfold on demand.
 - In Develop, a **version strip** switches between versions with one key [proposed].
-- The grid shows the main version's effective metadata (§5.5) [proposed].
+- The grid shows the main version's effective metadata (§5.5) and marks a photo whose value is
+  overridden. Cull mode works on the photo's values (the composition) and Develop on the
+  version's values (the rendering) [decided, D-063].
 - Two versions can be compared side by side or with a wipe [proposed].
 - Every output operation (export, publication) applies to a chosen version, to the main version
   or to a set of versions [proposed].
@@ -579,6 +601,9 @@ model:
   file.
 - Each image is rendered from its original through the full pipeline, at full quality.
 - Export of one or several versions per photo, the main version by default (§5.4).
+- **Milestones** [decided, D-062]: a minimal export (JPEG, TIFF, PNG; size, profile, metadata
+  setting) ships in M2 so that development is usable on its own. Recipes, the queue, the
+  watermark and publication come in M4.
 - Destination: the workspace or any folder. Exporting into a source folder shows a warning
   [decided, D-024].
 
@@ -812,10 +837,10 @@ must not rule them out (notably soft proofing, which depends on colour managemen
 
 | Milestone | Content | What it gives the user |
 | --- | --- | --- |
-| **M1** | Catalogues and workspaces (photo sidecars, keyword vocabulary, state files), sources, import (card and folders, import profiles), previews, culling, series and duplicates, keywords, ratings, IPTC/XMP, XMP export to source folders [proposed], search and filters, GPS | A complete culling and organising tool |
-| **M2** | Non-destructive pipeline (basic operations), versions and snapshots, presets and styles, colour management, GPU acceleration, internal modules written as plugins | Basic RAW development |
+| **M1** | Catalogues and workspaces (photo sidecars, keyword vocabulary, state files), sources, import (card and folders, import profiles), previews, culling, series and duplicates, keywords, ratings, IPTC/XMP, XMP export to source folders, search and filters, GPS | A complete culling and organising tool |
+| **M2** | Non-destructive pipeline (basic operations), versions and snapshots, presets and styles, colour management, GPU acceleration, internal modules written as plugins, minimal export (JPEG, TIFF, PNG; size, profile, metadata setting) | Basic RAW development, from the card to a file |
 | **M3** | Masks and local retouching, lens corrections, negative scan module, advanced operations | Professional-level development |
-| **M4** | Batch export with recipes, Prooftide plugin, selection feedback, catalogue backup and sync | The full loop: from the card to the client |
+| **M4** | Export recipes, queue and watermark, Prooftide plugin, selection feedback, backup helper, rebuild from the workspace, moving photos between catalogues [proposed milestone] | The full loop: from the card to the client |
 | **M5** | Public, documented plugin API, AI features (subject, sky and people masks; noise reduction), polish, documentation | Openness and ecosystem |
 
 Each milestone must be usable on its own. The exact content of each will be refined when we get
@@ -833,21 +858,17 @@ to it.
 
 ## 10. Open questions
 
-Sorted on 2026-09-19 by when they need an answer:
+Sorted by when they need an answer. No question is left to decide before the technical phase.
 
 | When | Questions |
 | --- | --- |
-| **Decide now**, before the technical phase | 1, 5, 8, 19, 39, 40 |
-| **Technical phase** | 2, 3, 4, 6, 10, 11, 13, 17, 20, 21, 22, 25, 28, 29, 31, 34, 35, 36, 38 |
-| **Milestone planning**, when the milestone is reached | 7, 9, 12, 14, 15, 16, 18, 23, 24, 26, 27, 30, 32, 33, 37 |
+| **Resolved** | 5, 19, 39, 40 |
+| **Technical phase** | 1, 2, 3, 4, 6, 10, 11, 13, 17, 20, 21, 22, 25, 28, 29, 31, 34, 35, 36, 38 |
+| **Milestone planning**, when the milestone is reached | 7, 8, 9, 12, 14, 15, 16, 18, 23, 24, 26, 27, 30, 32, 33, 37 |
 
-1. **Catalogue backup and sync**: the workspace is plain files, so a file-sync tool can carry it
-   between machines. How does the second machine's local database notice and absorb changes
-   (rescan by modification time and fingerprint)? Is built-in sync wanted, or only documented
-   compatibility with such tools? D-007 lists "catalogue backup and sync" in v1, but the workspace
-   design already covers backup (copying a folder) and rebuilding. Proposed: v1 offers a backup
-   helper and rebuild from the workspace, plus documented compatibility with file-sync tools;
-   built-in sync is not in v1.
+1. **Second machine and file sync**: backup and sync are settled for v1 by D-064. What remains:
+   how the second machine's local database notices and absorbs changes in a synced workspace
+   (rescan by modification time and fingerprint).
 2. **Workspace layout and default location**: mirror of the source folder tree, or one folder per
    photo? Human-readable names plus a short identifier, or identifiers only? Where does a new
    workspace go by default?
@@ -855,8 +876,7 @@ Sorted on 2026-09-19 by when they need an answer:
    collections, sources, gallery publications).
 4. **Format of the version sidecar**: pure XMP with an Auroraw namespace, or XMP plus a companion
    file for the history.
-5. **Automatic XMP mirroring** into the source folders, in addition to the on-demand export
-   (D-024): wanted or not?
+5. ~~Automatic XMP mirroring~~: resolved, not in v1 (D-066).
 6. **Content fingerprint**: what is hashed (whole file or head, tail and size) so relinking and
    sidecar association stay fast on network shares without false matches. A fingerprint alone
    cannot follow a file edited elsewhere, since its content changes: a photo needs a stable
@@ -864,8 +884,8 @@ Sorted on 2026-09-19 by when they need an answer:
    as hints for relinking.
 7. **Workspace unavailable** (for example on a network share that is down): read-only mode, or
    queue the edits?
-8. **Moving photos between catalogues** with their versions and metadata: copying sidecars
-   between workspaces is probably enough. Confirm the wish for it, and its milestone.
+8. **Moving photos between catalogues**: wanted (D-067), milestone M4 proposed. To settle when
+   planning M4: how keyword vocabularies merge, and the details of the recoverable folder.
 9. **Offline development**: reconsider after the pipeline exists (M2 or later). A proxy would be
    reliable for colour, tone and geometry, but not for operations that depend on pixel scale:
    sharpening, noise reduction, local contrast, retouching, lens corrections at the edges. It
@@ -891,8 +911,7 @@ Sorted on 2026-09-19 by when they need an answer:
     plugin's shader is packaged, and how conflicts between plugins are shown to the user.
 18. **Auto-sync**: how it behaves with photos that already have different settings for the same
     tool (overwrite, or only relative changes such as an exposure delta)?
-19. **Main version and metadata**: the grid shows the main version's effective rating; confirm
-    this is what the photographer expects when sorting a catalogue by rating. See also 40.
+19. ~~Main version and metadata~~: resolved by D-063.
 20. **History size**: brush strokes and masks can make histories large; what does "compact"
     keep, and at what point is it proposed automatically?
 21. **Working space**: fixed in the Rec.2020 class, or selectable? How are OCIO and ACES handled
@@ -933,21 +952,15 @@ Sorted on 2026-09-19 by when they need an answer:
     for weights released under non-commercial or research-only terms.
 38. **AI noise reduction in the pipeline**: where it sits (before or after demosaicing), and how
     to keep results stable across CPU and GPU (see 22).
-39. **Export before M4**: milestone M2 ("basic RAW development") has no way out without export,
-    which arrives in M4, so M2 would not be usable on its own. Proposed: a minimal export (JPEG,
-    TIFF and PNG; size, profile, metadata setting) ships in M2, while recipes, the queue, the
-    watermark and publication stay in M4.
-40. **Rating level while culling**: the grid shows the main version's effective rating (§5.4), and
-    a version may override it. Proposed: Cull mode works on the photo's values (the composition),
-    Develop works on the version's values (the rendering), and the grid shows the effective value
-    and marks a photo whose value is overridden.
+39. ~~Export before M4~~: resolved by D-062.
+40. ~~Rating level while culling~~: resolved by D-063.
 
 ## 11. Next steps
 
 1. ~~Detail each domain of §5 with usage scenarios.~~ Done on 2026-09-19 for sources and
    catalogues, culling, development and versions, metadata, export and Prooftide, plugins and AI.
 2. ~~Review the whole specification for consistency, and sort the open questions of §10.~~ Done
-   on 2026-09-19. The six questions marked "decide now" remain.
+   on 2026-09-19. The six questions it raised were settled the same day (D-062 to D-067).
 3. Define the development process (architecture, technology stack, testing, continuous
    integration, open source governance, plugin licensing).
 4. Plan milestone M1.

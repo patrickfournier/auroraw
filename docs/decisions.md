@@ -11,7 +11,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-004 | 2026-09-19 | **Collaboration**: single-user for now, no shared catalogue. |
 | D-005 | 2026-09-19 | **Positioning**: simpler and more intuitive than darktable; at least on par with Lightroom in speed, simplicity and capabilities. |
 | D-006 | 2026-09-19 | **Versions**: a photo can have several kept development versions; virtual copies, versions and snapshots are in v1. |
-| D-007 | 2026-09-19 | **v1 scope**: fast culling, duplicates and series, versions, presets and styles, masks and local retouching, GPS, memory-card import, IPTC/XMP, catalogue backup and sync, batch export. Lens corrections through Lensfun: v1, in milestone M3. |
+| D-007 | 2026-09-19 | **v1 scope**: fast culling, duplicates and series, versions, presets and styles, masks and local retouching, GPS, memory-card import, IPTC/XMP, catalogue backup and sync, batch export. *Backup and sync refined by D-064.* Lens corrections through Lensfun: v1, in milestone M3. |
 | D-008 | 2026-09-19 | **Not in v1**: merges (HDR, panorama, focus stacking), soft proofing and printing, tethering. |
 | D-009 | 2026-09-19 | **Prooftide, naming**: Auroraw generates a unique file name for each published version and keeps the mapping; no server change required. |
 | D-010 | 2026-09-19 | **Prooftide, interoperability**: no interdependence. Auroraw stays compatible with other gallery services; Prooftide stays compatible with Lightroom and other workflows. Prooftide extensions for tighter integration with Auroraw are allowed if they are optional. |
@@ -66,3 +66,9 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-059 | 2026-09-19 | **AI models** are downloaded on demand as packs through the plugin catalogue; the core ships none. |
 | D-060 | 2026-09-19 | **AI without a capable GPU**: features run on the CPU, slowly, as background tasks with an estimated duration. |
 | D-061 | 2026-09-19 | **Online AI**: the core calls no external AI service. Plugins may, off by default, with consent per plugin and a display of what leaves the machine. No telemetry. |
+| D-062 | 2026-09-19 | **Minimal export in M2** (JPEG, TIFF, PNG; size, profile, metadata setting), so that development is usable on its own. Recipes, queue, watermark and publication stay in M4. |
+| D-063 | 2026-09-19 | **Rating level**: Cull mode works on the photo's values, Develop on the version's values; the grid shows the effective value and marks a photo whose value is overridden. |
+| D-064 | 2026-09-19 | **Backup and sync in v1**: a backup helper, rebuilding the catalogue from the workspace, and documented compatibility with file-sync tools. No built-in sync. |
+| D-065 | 2026-09-19 | **XMP export to the source folders** ships in M1. |
+| D-066 | 2026-09-19 | **No automatic XMP mirroring** in v1: the export to source folders is on request only. |
+| D-067 | 2026-09-19 | **Moving photos between catalogues** is in v1, by copying sidecars between workspaces. Milestone M4 proposed by Claude Code, to be confirmed. |
