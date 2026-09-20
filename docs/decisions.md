@@ -72,3 +72,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-065 | 2026-09-19 | **XMP export to the source folders** ships in M1. |
 | D-066 | 2026-09-19 | **No automatic XMP mirroring** in v1: the export to source folders is on request only. |
 | D-067 | 2026-09-19 | **Moving photos between catalogues** is in v1, by copying sidecars between workspaces. Milestone M4 (confirmed). |
+| D-068 | 2026-09-19 | **Core language**: Rust, for the catalogue, the pipeline and the plugin host. |
+| D-069 | 2026-09-19 | **Interface priorities**: the performance and colour fidelity of the image view, and lightness (fast start, little memory). A web view (Tauri) is therefore not a candidate unless the native toolkits fail. |
+| D-070 | 2026-09-19 | **The stack is fixed after short spikes** on four risks (the GPU pipeline, the image view and toolkit, the catalogue and grid, the plugin sandbox), on measurements. See technical-spikes.md. |
+| D-071 | 2026-09-19 | **Test platforms**: Linux on the development machine, Windows by Patrick, macOS by Patrick over remote desktop. Continuous integration builds all three. Colour is judged on Linux and Windows, not over remote desktop. |
