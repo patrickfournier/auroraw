@@ -47,7 +47,8 @@ galleries, all in a simple, fast and professional workflow.
 
 ## 3. Guiding principles
 
-1. **Originals are never modified** [decided, implicit in "non-destructive"].
+1. **Originals are never modified** [decided]. After import Auroraw does not move, rename or
+   delete them either (D-018).
 2. **Nothing is trapped in the catalogue** [proposed]. The catalogue is an index and a working
    area that can be rebuilt. Metadata and versions are also written to open files next to the
    originals (see §5.4).
@@ -77,17 +78,72 @@ dialog in between.
 
 The milestone of each feature (M1 to M5) is described in §8.
 
-### 5.1 Sources and catalogue
+### 5.1 Sources and catalogues
 
-- Local, network and offline sources [decided]. A photo whose source is offline stays visible,
-  searchable and sortable thanks to cached previews and metadata; operations that need the
-  original are shown as unavailable, not hidden [proposed].
-- Tracking of file moves and renames (by content fingerprint) so photos and their versions are
-  not lost [proposed].
-- Catalogue backup and sync [decided, v1]: details to be designed (§10).
-- Manual and smart collections, hierarchical tags, ratings [decided].
+**Catalogues** [decided, D-017]
+
+- A photographer can have **several catalogues, all equal**, and picks one when opening the
+  application. The intended use is separate areas of activity (family versus professional, for
+  example).
+- The application must be **fully functional with a single catalogue**. The first launch creates
+  one silently; switching and creating catalogues is available from a menu but never required
+  [proposed].
+- Catalogues are isolated: search, collections, keyword lists and duplicate detection work within
+  the open catalogue [proposed].
+- Location [proposed]: by default in the user's data folder, movable (for example to an external
+  drive). Previews live in a separate cache, per catalogue, that can be deleted without losing
+  anything.
+- A source folder belongs to **one catalogue at a time** [proposed, to confirm], since two
+  catalogues writing versions next to the same original would diverge (see §10).
+
+**Originals are read-only** [decided, D-018]
+
+- After import, Auroraw never modifies, moves, renames or deletes an original. It writes to a
+  source in exactly two cases: copying files at import, and writing sidecar and XMP files, which
+  are *new* files next to the originals [proposed reading, to confirm].
+- Consequences [proposed]: the Rejected flag deletes nothing. A "Rejected" view offers *Show in
+  file manager* and an exportable list of rejected files, so tidying happens outside Auroraw.
+  Adding a folder "in place" copies and touches nothing.
+
+**Source states** [proposed]
+
+| State | Meaning | What works |
+| --- | --- | --- |
+| Online | Reachable and writable | Everything |
+| Read-only | Reachable, not writable | Everything, except sidecar files (see below) |
+| Offline | Not reachable (unplugged drive, network down) | Browse, search, sort, rate, tag, view previews. Metadata is kept in the catalogue and synced to the sidecar when the source returns. Operations that need the original are shown as unavailable, not hidden. |
+| Missing | The expected location no longer exists | Same as offline, plus a prompt to relocate the source |
+
+Each source shows its state as a badge. Whether development can continue on an offline source is
+open (§10).
+
+**Detecting new, changed and moved files** [decided, D-019]
+
+- Online sources are **monitored**. New files are reported ("42 new photos in this folder") and
+  added with one click; nothing enters the catalogue without confirmation. Folders or patterns
+  can be ignored [proposed].
+- **Moved or renamed** files are found again through a content fingerprint. An unambiguous match
+  is relinked automatically and silently; ambiguous cases are put to the photographer.
+- **Changed** files (edited in another application) keep their versions; the photo is marked
+  "original changed" and previews are refreshed on request [proposed].
+- **Deleted** files show as missing and are never removed from the catalogue automatically; a
+  "Remove missing photos" action exists [proposed].
+- Network shares do not deliver reliable change notifications, so those sources are rescanned on
+  demand and at intervals [proposed].
+
+**Sidecars on sources that cannot be written to** [decided, D-020]
+
+- The sidecar is written next to the original when possible.
+- Otherwise the versions live in the catalogue only, and a discreet warning says that rebuilding
+  from the disks will not cover those photos.
+- Sidecars can be exported elsewhere at any time.
+
+**Search, filters and sorting**
+
 - Search, filter and sort on all metadata (EXIF, IPTC, tags, ratings, dates, lens, version,
   publication state, etc.) [decided].
+- Manual and smart collections, hierarchical tags, ratings [decided].
+- Catalogue backup and sync [decided, v1]: details to be designed (§10).
 
 ### 5.2 Import
 
@@ -308,6 +364,18 @@ to it.
 5. **Importing settings** from other software (Lightroom, darktable): useful, and how far?
 6. **Dependency licenses**: compatibility with GPL-3.0 (RAW libraries, Lensfun and its database,
    AI models).
+7. **Development on offline sources**: can a photographer keep developing when the original is
+   unreachable, using a reduced-resolution editable proxy kept in the catalogue (export would
+   then wait for the original)? Or is development simply unavailable?
+8. **Several catalogues**: may one folder belong to two catalogues? How are photos moved from one
+   catalogue to another with their versions and metadata? How does a catalogue detect that a
+   folder is already claimed by another one (a marker in the sidecars)?
+9. **Sidecar files under "read-only originals"**: confirm that writing new sidecar and XMP files
+   next to originals is compatible with D-018 (originals themselves are never touched).
+10. **Content fingerprint**: what is hashed (whole file or head, tail and size) so relinking stays
+    fast on network shares without false matches.
+11. **Import from a card**: destination folder templates, renaming tokens, duplicate backup,
+    checksum verification, and the "safe to erase the card" signal.
 
 ## 11. Next steps
 

@@ -21,3 +21,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-014 | 2026-09-19 | **Keyword overrides**: in v1 a version can only add keywords to those of its photo, not remove them. |
 | D-015 | 2026-09-19 | **Project language**: English for all repository documentation and code. Conversation with Patrick stays in French. |
 | D-016 | 2026-09-19 | **Git workflow**: same rules as Prooftide. Work on `dev`, merge into `main` only at release. Claude Code commits as `Claude Code <claude-code@straycat.ca>`. |
+| D-017 | 2026-09-19 | **Catalogues**: several catalogues, all equal, chosen at opening (typically separate areas of activity, such as family and professional). The application must be fully functional with a single catalogue. |
+| D-018 | 2026-09-19 | **Originals are read-only** except at import: Auroraw does not modify, move, rename or delete them afterwards. |
+| D-019 | 2026-09-19 | **Change detection**: online sources are monitored; new files are reported and added with one click after confirmation; moved files are relinked by content fingerprint. |
+| D-020 | 2026-09-19 | **Non-writable sources**: sidecars are written next to the original when possible, otherwise versions live in the catalogue only, with a warning; sidecars can be exported on demand. |
