@@ -475,13 +475,70 @@ model:
   shareable file). Configuration is outside the everyday interface, changes only apply to new
   versions, and is validated (an operation cannot leave its stage).
 
-### 5.7 Metadata editing
+### 5.7 Metadata
 
-- Editing of EXIF, IPTC and XMP tags (copyright, captions, hierarchical keywords), one by one or
-  in batch [decided, v1].
-- Metadata templates applicable at import and at export [proposed].
-- EXIF edits do not touch the original by default; writing into the file is an explicit action
+**Fields** [proposed]
+
+- EXIF: all fields are read; the common ones can be edited.
+- IPTC Core and a subset of IPTC Extension: title, caption, creator, copyright, usage terms,
+  credit, source, location (sublocation, city, region, country), date created, keywords.
+- XMP basics: title, description, creator, rights, keywords, rating, label.
+- Custom fields are conceivable later, through plugins [open].
+
+**EXIF edits are overlays** [proposed, following D-018]
+
+- Originals are never modified, so a correction (time and time zone, GPS, camera and lens names
+  for old lenses, orientation) is stored in the photo sidecar as an **overlay**. The original
+  value stays visible and can be restored.
+- The overlay applies in the catalogue, in exports and in the XMP export to source folders.
+
+**Batch editing** [proposed]
+
+- With several photos selected, the metadata panel shows "multiple values" wherever they differ,
+  and an edit applies to the whole selection.
+- Metadata templates (creator, copyright, keywords) apply at import (D-029) and at export.
+- Find and replace on a field; time shift on the whole selection (for a camera clock that was
+  off), which also feeds the GPX matching (§5.2).
+
+**Keywords** [decided, D-045]
+
+- A **hierarchical vocabulary** (Place > Canada > Quebec) that the photographer builds and
+  reorganises, with optional **synonyms** and a **do not export** flag per keyword, for private
+  words (client names, internal notes). At export the recipe chooses whether parents are
+  included.
+- Renaming, merging or moving a keyword updates every photo that uses it. The vocabulary is
+  written into the workspace (D-026), so it follows the catalogue.
+- Assigning is fast: type-ahead from the vocabulary, or drag and drop [proposed].
+- A version can add keywords to those of its photo (D-014).
+- For compatibility, sidecars carry both the flat keyword list and the hierarchy in the forms
+  other software reads, and the hierarchies written by other software are understood on import
   [proposed].
+
+**Location** [decided, D-048]
+
+- Photos are shown on a map. A location is set by GPX matching (§5.2), by dragging photos onto
+  the map, or by hand [decided, v1].
+- Place names (city, region, country) come from a **bundled offline database** (GeoNames, under
+  a CC BY licence), so nothing leaves the machine. Finer place names (district, street) come
+  from an optional plugin that queries an online service, only with the photographer's consent.
+
+**Metadata in exported files** [decided, D-046]
+
+- It is **configurable per export recipe**, with named settings offered: *Everything*, *No
+  location*, *Rights only*, *None*.
+- The **default** is everything except the location and the camera's serial number, the two
+  classic leaks.
+- The metadata written is the **effective** metadata of the exported version (§5.5).
+
+**External changes to XMP files next to originals** [decided, D-047]
+
+- Monitored sources (§5.1) also report XMP files changed by another application after the
+  import: "12 photos have metadata changed by another application". The photographer accepts
+  with one click, or ignores.
+- The merge compares against the last state Auroraw read, so only fields changed outside are
+  applied, and a field changed on both sides is put to the photographer [proposed].
+- Auroraw recognises the XMP files it exported itself (D-024) and never reports them as external
+  changes [proposed].
 
 ### 5.8 Export
 
@@ -658,6 +715,13 @@ to it.
     detection works, and what a camera-scanned negative needs (light source, exposure) to convert
     well.
 25. **Masks**: how brush strokes are stored so they stay independent of the image resolution.
+26. **Field list**: the exact IPTC Extension fields, and whether custom fields are wanted.
+27. **Keyword vocabulary**: importing an existing vocabulary (a Lightroom keyword list, digiKam),
+    and which hierarchical XMP forms are written and read.
+28. **XMP monitoring**: how to avoid feedback loops between the XMP export (D-024) and the
+    detection of external changes, and how quickly a change is reported.
+29. **Geocoding database**: size, attribution required by its licence, update mechanism, and the
+    levels of detail offered.
 
 ## 11. Next steps
 

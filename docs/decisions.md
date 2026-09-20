@@ -49,3 +49,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-042 | 2026-09-19 | **Base look**: a style applied when a version is created; neutral by default, with flat linear among the choices. A look imitating the camera's embedded JPEG is a planned evolution. |
 | D-043 | 2026-09-19 | **Local adjustments** are first-class objects (a mask plus its settings), listed, stackable and reorderable. |
 | D-044 | 2026-09-19 | **Negatives, first inputs**: camera-scanned on a light table, dedicated film scanners, and third-party or lab scans. Flatbed files open as ordinary images. |
+| D-045 | 2026-09-19 | **Keywords**: a hierarchical vocabulary with optional synonyms and a "do not export" flag per keyword, written into the workspace. |
+| D-046 | 2026-09-19 | **Metadata in exports**: configurable per recipe with named settings; the default is everything except location and camera serial number. |
+| D-047 | 2026-09-19 | **External XMP changes** are monitored like new files: reported, and accepted with one click after import. |
+| D-048 | 2026-09-19 | **Geocoding**: a bundled offline database by default (GeoNames); finer online lookup only through an optional plugin, with consent. |
