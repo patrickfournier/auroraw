@@ -606,7 +606,7 @@ optional and backward compatible.
 5. **Licence key**: it is kept in the operating system's keychain, not in clear text
    [proposed].
 
-**Revisions of a gallery** [proposed, from an idea of Patrick's]
+**Revisions of a gallery** [decided, D-053]
 
 - "Republish changes" on a gallery publishes the **whole collection again as a new gallery**, a
   revision (v2, v3...), named after the first one ("Marie wedding (v2)") and with a new link for
@@ -619,6 +619,7 @@ optional and backward compatible.
   offered.
 - At republish time the photographer chooses the scope: the **whole collection** (default) or
   only the modified and new photos.
+- The revision is named after the first gallery with a suffix: "Marie wedding (v2)".
 - Each revision uses a gallery slot and its photos count towards the plan's limits. The plugin
   says so before publishing and offers to delete earlier revisions once they are no longer
   needed. On a plan with a single gallery, that means deleting before publishing.
