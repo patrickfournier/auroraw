@@ -908,7 +908,12 @@ Sorted by when they need an answer. No question is left to decide before the tec
 16. **Duplicates with different metadata**: when two copies of the same file carry different XMP
     (ratings, keywords) found at import, how are they merged?
 17. **Pipeline definition**: exact stages and data spaces, the ordering-constraint language, how a
-    plugin's shader is packaged, and how conflicts between plugins are shown to the user.
+    plugin's shader is packaged, and how conflicts between plugins are shown to the user. Spike 1
+    adds three inputs: the order of operations decides how interactive the application feels
+    (white balance after the denoiser is 200 times cheaper to change), so a definition may need to
+    express which operations are heavy and rarely changed; an operation may need a cheaper draft
+    quality for dragging; and a plugin's shader must stay within a subset of WGSL that every
+    graphics API accepts, since DirectX rejected a construct Vulkan and Metal allowed.
 18. **Auto-sync**: how it behaves with photos that already have different settings for the same
     tool (overwrite, or only relative changes such as an exposure delta)?
 19. ~~Main version and metadata~~: resolved by D-063.

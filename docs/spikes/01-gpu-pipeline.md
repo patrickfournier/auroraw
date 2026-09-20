@@ -176,6 +176,21 @@ of each band. It would be faster with bigger bands.
    its cost grows with the square of the search radius, and the AI denoiser planned for
    milestone M5 has a different profile.
 
+### A portability lesson, found on Windows
+
+The first Windows run of `rawbench` on Patrick's machine failed to create the generic
+demosaicing pipeline. WGSL is translated to each platform's shader language, and on DirectX 12
+the legacy FXC compiler rejected a construct that Vulkan and Metal accept: writing one component
+of a vector through a dynamic index inside a loop (`sum[c] = ...`). Nothing in the continuous
+integration had exercised that shader on Windows. The shader now uses masks instead, and a
+**smoke test** compiles every shader and checks it against the CPU reference on every platform,
+as a blocking step of the build. All the shaders now pass on Vulkan, Metal and DirectX 12.
+
+This matters beyond the spike. **A shader that works on one graphics API can fail on another.**
+Shaders shipped by operation plugins (specification §5.6 and §5.10) will need the same treatment:
+a portable subset of WGSL that they must stay within, and a check on every back end before a
+plugin is accepted into the index, because the author will usually have tried only one.
+
 ## What it means
 
 1. **The architecture holds.** Caching the camera RGB at the stage boundary makes a downstream
