@@ -1,0 +1,55 @@
+{
+  "accuracy_small_vs_cpu": {
+    "fraction_over_one_level": 0.0,
+    "max_level": 1,
+    "mean_level": 1.483493381076389e-6
+  },
+  "adapter": {
+    "backend": "Dx12",
+    "driver": "",
+    "name": "Microsoft Basic Render Driver",
+    "type": "Cpu"
+  },
+  "band_rows": 1747,
+  "cpu_reference": {
+    "full_ms": 1130.0662,
+    "gpu_vs_cpu_full": {
+      "fraction_over_one_level": 0.0,
+      "max_level": 1,
+      "mean_level": 2.5555555555555557e-6
+    },
+    "threads": 4
+  },
+  "export_compute_ms": 3056.4101,
+  "export_readback_ms": 13.7255,
+  "image": {
+    "height": 4000,
+    "megapixels": 24.0,
+    "width": 6000
+  },
+  "view_100": {
+    "patch_vs_cpu": {
+      "fraction_over_one_level": 0.0,
+      "max_level": 0,
+      "mean_level": 0.0
+    },
+    "recompute_median_ms": 451.9145,
+    "recompute_p95_ms": 456.50780000000003,
+    "tone_only_median_ms": 122.1494,
+    "tone_only_p95_ms": 132.8271,
+    "viewport": [
+      2560,
+      1440
+    ]
+  },
+  "view_fit": {
+    "cold_ms": 2522.098,
+    "factor": 3,
+    "size": [
+      2000,
+      1334
+    ],
+    "slider_median_ms": 88.34599999999999,
+    "slider_p95_ms": 98.9704
+  }
+}

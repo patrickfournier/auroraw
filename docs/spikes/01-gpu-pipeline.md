@@ -1,7 +1,9 @@
 # Spike 1: the GPU pipeline (interim report)
 
-> **Status: interim.** Measured on Linux only, with synthetic data. Windows, macOS and real RAW
-> files are still to come (see "What remains"). Nothing here is a final decision.
+> **Status: interim.** Measured on Linux with a real GPU, and on Linux, Windows and macOS
+> through continuous integration (no discrete GPU there), all with synthetic data. Real RAW
+> files and real Windows and macOS GPUs are still to come (see "What remains"). Nothing here is a
+> final decision.
 
 ## Question
 
@@ -43,6 +45,19 @@ software adapter is llvmpipe (Mesa 25.2, LLVM 20), which runs the very same shad
 | Pixels differing by more than 1 level (target: under 0.1%) | 0% | 0% | 0% |
 | CPU reference, 16 threads | 354 ms | 966 ms | 401 ms |
 
+### The three platforms, through continuous integration
+
+The GitHub runners have no discrete GPU, so these are the adapters they offer. They test that
+the shaders run and agree, not that a real GPU is fast. All four have 3 to 4 CPU threads.
+
+| Adapter | Full render, 24 MP | 100% view, tone only | Fit view, slider | Worst difference vs CPU | Rust CPU reference |
+| --- | --- | --- | --- | --- | --- |
+| macOS, **Metal**, Apple paravirtual GPU | 89 ms | 2.0 ms | 1.8 ms | 1 level | 1,094 ms |
+| Linux, **Vulkan**, llvmpipe (software) | 677 ms | 57.9 ms | 42.7 ms | 1 level | 1,288 ms |
+| Windows, **DirectX 12**, WARP (software) | 3,056 ms | 122.2 ms | 88.4 ms | 1 level | 1,130 ms |
+
+In every case the fraction of pixels differing by more than one level is 0%.
+
 Other facts:
 
 - **Memory.** The 61 MP run used about 700 MB of GPU memory in the process. The desktop was
@@ -62,28 +77,33 @@ Other facts:
    reduction, sharpening, local contrast, masks, lens correction and more, and heavy operations
    will eat into the headroom. The budget is safe for now, not proven for M3.
 3. **Banding works** and is what makes 61 MP images fit small GPUs.
-4. **Same shaders on a software back end are a credible CPU fallback.** llvmpipe was about
-   9 times slower than the GPU (target: under 20 times) and gave the same result within one
-   level. A separate hand-written Rust CPU implementation was **not faster** (354 ms against
-   235 ms for the shaders on llvmpipe at 24 MP), and it would have to be kept equivalent. That
-   favours the "same shaders" strategy, provided a software Vulkan driver exists: Windows has
-   WARP, macOS always has a GPU, and on Linux without a Vulkan driver a driver such as lavapipe
-   would have to be installed or shipped.
-5. **The GPU and CPU agree**: at most one level of difference, on no more than 0% of pixels
-   beyond one level, on both adapters.
+4. **The CPU fallback depends on the platform.** On Linux, the same shaders on llvmpipe were
+   about 9 times slower than the GPU (target: under 20 times), gave the same result within one
+   level, and were **faster** than a hand-written Rust CPU implementation (235 ms against 354 ms
+   on 16 threads; 677 ms against 1,288 ms on 4). That favours the shared-shader strategy there.
+   **On Windows the picture reverses:** WARP took 3,056 ms, nearly three times slower than the
+   Rust CPU code on the same cores (1,130 ms), and its slider time (88 ms) misses the 50 ms
+   target. macOS always has a GPU. In practice almost every Windows machine has a DirectX 12
+   capable GPU, including integrated ones, so the fallback matters for old or virtual machines.
+   Decision deferred: the choices are shared shaders everywhere (simple, slow on Windows
+   without a GPU) or shared shaders plus a Rust CPU path used where the software adapter is too
+   slow (faster, two implementations to keep equal).
+5. **The four adapters agree.** NVIDIA and llvmpipe on Vulkan, Metal, and DirectX 12 all give
+   the same image within one 8-bit level, on 0% of pixels beyond one level. This is the
+   cross-platform result the spike was after, on the three graphics APIs.
 
 ## What remains
 
-- [ ] **Windows and macOS.** The continuous integration workflow builds and runs the benchmark
-  on both. The hosted runners have no discrete GPU, so this checks that the shaders run and
-  agree there (DirectX 12 through WARP, Metal through the virtual GPU). Real measures need
-  Patrick's machines.
+- [ ] **Real GPUs on Windows and macOS.** The workflow's binaries can be run on Patrick's
+  machines to get real numbers. Correctness on both is already shown.
 - [ ] **Real RAW files**, from several makers, decoded with a real decoder.
 - [ ] **A heavier pipeline** (noise reduction, local contrast, a mask) to see where the budget
   starts to bind.
 - [ ] **Presentation.** These numbers stop at the buffer: no window, no swap chain, no vertical
   sync. That belongs to spike 2.
 - [ ] **A second GPU**, such as the Intel UHD 630, or an AMD card.
+- [ ] **Sensors that are not Bayer.** The spike demosaics an RGGB mosaic only. Fujifilm's
+  X-Trans and other patterns need their own demosaicing, which the pipeline must accommodate.
 
 ## Running it
 
