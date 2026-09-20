@@ -28,9 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install a software Vulkan driver (Linux)
+      - name: Install a software Vulkan driver and the toolkits' libraries (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+        run: sudo apt-get update && sudo apt-get install -y mesa-vulkan-drivers libvulkan1 libfontconfig1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcb1-dev libgl1-mesa-dev
 
       - name: Toolchain
         run: rustup update stable && rustc --version
