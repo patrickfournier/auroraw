@@ -45,3 +45,7 @@ Decisions confirmed by Patrick, in order. A reversed decision is not deleted: it
 | D-038 | 2026-09-19 | **Main version**: each photo has one main version (chosen by the photographer, by default the last edited) that supplies the grid thumbnail and the default for export and publication. Other versions are collapsed under the photo. |
 | D-039 | 2026-09-19 | **Reusing settings**: selective copy and paste, styles, and an optional auto-sync switch. Application is one-off, with no lasting link between photos. |
 | D-040 | 2026-09-19 | **One concept, the style**: a named set of settings on one or several tools; a tool preset is a single-tool style. |
+| D-041 | 2026-09-19 | **Scene-referred core** (linear, floating point) with familiar controls exposed in the interface. |
+| D-042 | 2026-09-19 | **Base look**: a style applied when a version is created; neutral by default, with flat linear among the choices. A look imitating the camera's embedded JPEG is a planned evolution. |
+| D-043 | 2026-09-19 | **Local adjustments** are first-class objects (a mask plus its settings), listed, stackable and reorderable. |
+| D-044 | 2026-09-19 | **Negatives, first inputs**: camera-scanned on a light table, dedicated film scanners, and third-party or lab scans. Flatbed files open as ordinary images. |

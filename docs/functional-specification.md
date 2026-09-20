@@ -382,19 +382,75 @@ where the displayed value comes from.
 
 ### 5.6 Development (RAW, scans, images)
 
-- Non-destructive RAW development with GPU acceleration [decided].
-- Colour management [decided]: input profiles, wide floating-point working space, output
-  profiles; soft proofing is planned for later but the architecture allows it.
-- Basic operations [proposed]: exposure, white balance, curves, colour and tone, sharpening,
-  noise reduction, crop and straighten.
-- Masks and local retouching [decided, v1]: gradients, brushes, selection by luminosity and by
-  colour; AI-assisted selections [proposed].
-- Lens corrections through Lensfun [decided: v1, milestone M3].
-- Styles and settings reuse between images [decided, v1]: see §5.4.
-- Negative scans [decided, priority 2]:
-  - v1: inversion, film-base (orange mask) sampling, per-channel curves, frame cropping.
-  - Later: emulsion profiles, infrared dust detection, multi-exposure scans.
-- Later [decided]: merges (HDR, panorama, focus stacking).
+**Rendering model** [decided, D-041]
+
+- The pipeline is **scene-referred**: calculation is linear, in floating point, with no
+  brightness ceiling, and a single display transform produces the visible image.
+- The interface exposes **familiar controls** (exposure, contrast, highlights, shadows, whites,
+  blacks) that drive suitable operations internally. The scene-referred model's own tools are not
+  shown as such (consistent with D-037).
+- What this brings: highlight recovery, the film-industry formats (OpenEXR, ACES) and more
+  accurate rendering, without darktable's learning curve.
+
+**Colour management** [decided]
+
+- Input profiles, a wide-gamut linear working space, output profiles. Soft proofing is planned
+  for later and the architecture allows it.
+- The working space is fixed by default, in the Rec.2020 class [proposed]. The display profile
+  is detected on each operating system [proposed].
+
+**GPU and CPU** [decided: GPU acceleration; proposed: CPU fallback]
+
+- Development runs on the GPU. A **CPU fallback** is required for machines without a capable
+  GPU: the same result within a stated tolerance, only slower.
+
+**Base look** [decided, D-042]
+
+- When a version is created, Auroraw applies a **base look**, which is a style (D-040): a
+  faithful, pleasant, tone-mapped image with no artistic treatment.
+- The photographer can choose another base look by default, in the preferences or in an import
+  profile. The base looks shipped include the neutral one and a **flat linear** one.
+- A base look that imitates the camera's embedded JPEG is a **planned evolution** [decided]. The
+  manufacturers' renderings are proprietary and differ for every camera, so it is more likely a
+  plugin or a community profile.
+
+**Operations** [proposed]
+
+| Milestone | Operations |
+| --- | --- |
+| M2 | RAW input (demosaicing, white balance, exposure and black point, highlight reconstruction, hot pixels). Tone (contrast, highlights, shadows, whites, blacks, curve). Colour (saturation, vibrance, hue-saturation-luminance, colour grading). Detail (sharpening, noise reduction). Geometry (crop, straighten). |
+| M3 | Local adjustments, lens corrections, negative conversion, and advanced operations (dehaze, clarity, perspective, vignetting, grain). |
+
+**Local adjustments** [decided, D-043; milestone M3]
+
+- A local adjustment is a **first-class object**: a mask together with the settings it carries.
+  They form a list that can be stacked, reordered and hidden.
+- Mask types [decided, v1]: gradient, radial, brush, luminosity range and colour range.
+  Combining masks (add, subtract, intersect) is proposed.
+- Internally a local adjustment becomes an operation with a blend mask; the photographer never
+  has to know that.
+- AI-assisted selections (subject, sky) come in M5 [proposed].
+
+**Lens corrections** [decided: v1, milestone M3]: through Lensfun.
+
+**Styles and settings reuse** [decided, v1]: see §5.4.
+
+**Negative scans** [decided, priority 2; D-044]
+
+- The inputs supported first are:
+  - negatives photographed with a **camera on a light table** (RAW);
+  - files from a **dedicated film scanner** (16-bit TIFF or DNG, with or without an infrared
+    channel);
+  - **third-party or lab scans**, including positives and partly processed files.
+- Flatbed scanner files open as ordinary images. They get no specific handling (scanner
+  profile) in v1.
+- v1 tool: inversion, film-base (orange mask) sampling, per-channel curves, frame cropping.
+  Later: emulsion profiles, infrared dust detection, multi-exposure scans.
+- The inversion is an operation in the input stage of the pipeline, working on linear data
+  [proposed].
+- Driving a scanner (acquisition) would be the job of a source plugin, outside v1 [proposed].
+
+**Later** [decided]: merges (HDR, panorama, focus stacking).
 
 **Pipeline composition and operation plugins** [proposed, following D-037]
 
@@ -592,6 +648,16 @@ to it.
     this is what the photographer expects when sorting a catalogue by rating.
 20. **History size**: brush strokes and masks can make histories large; what does "compact"
     keep, and at what point is it proposed automatically?
+21. **Working space**: fixed in the Rec.2020 class, or selectable? How are OCIO and ACES handled
+    for the cinema formats?
+22. **GPU programming interface** on the three platforms, and the tolerance that defines "the same
+    result" between GPU and CPU (a technology decision for the next phase).
+23. **Base look**: the tone-mapping method, and how the flat linear look is presented to the
+    photographer.
+24. **Negative conversion**: how the film base and the emulsion are modelled, how infrared dust
+    detection works, and what a camera-scanned negative needs (light source, exposure) to convert
+    well.
+25. **Masks**: how brush strokes are stored so they stay independent of the image resolution.
 
 ## 11. Next steps
 
