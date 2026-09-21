@@ -1,12 +1,12 @@
 # Design note 004: the content fingerprint and relinking
 
-> **Status: proposal, awaiting approval.** Fourth and last design note of work package WP1
+> **Status: adopted (D-088).** Fourth and last design note of work package WP1
 > ([M1 plan](../m1-plan.md) §5 and §6, item 5). It answers question 6 of the specification (§10):
 > what is hashed so that moved and renamed files are found again, duplicates are recognised and
 > imports skip what is already there, while staying fast on network shares and never confusing two
 > different files? It builds on [note 001](001-workspace-layout.md) (identifiers),
 > [note 002](002-state-files.md) and [note 003](003-sidecars.md) (where the values are recorded: the
-> `aur:Files` entries). Items are **[proposed]** until approved; the approval becomes decision D-088.
+> `aur:Files` entries). Items are **[decided]** since D-088.
 
 ## 1. The question
 
