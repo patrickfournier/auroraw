@@ -120,7 +120,8 @@ at 100,000 photos read in a fraction of a second (about 1.1 MB in all).
   did not change is **not rewritten** (no new modification time, no sync traffic), and a file can
   be compared with a diff or a checksum.
 - **Unknown keys are kept**: the reader keeps everything it does not understand in an `extra`
-  part and writes it back where it found it (requirement 3). Unknown array **entries** of a kind the
+  part and writes it back after the known keys, sorted by name (requirement 3), which keeps the
+  canonical form deterministic. Unknown array **entries** of a kind the
   reader cannot interpret are kept as they are.
 - **Identifiers** of state entities (keyword, collection, series, source, publication) are **64 random
   bits**, 16 lowercase hexadecimal characters, like version identifiers (note 001). A **photo

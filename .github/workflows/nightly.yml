@@ -12,6 +12,7 @@ on:
     paths:
       - .github/workflows/nightly.yml
       - crates/workspace/tests/large.rs
+      - crates/workspace/tests/write_costs.rs
       - fuzz/**
 
 permissions:
@@ -45,7 +46,7 @@ jobs:
       - name: Each target for two minutes
         run: |
           for target in xmp_reader sidecars state_files; do
-            cargo +nightly fuzz run "$target" -- -max_total_time=120
+            cargo +nightly fuzz run --target x86_64-unknown-linux-gnu "$target" -- -max_total_time=120
           done
       - name: Keep the inputs that crashed a reader
         if: failure()
@@ -73,3 +74,5 @@ jobs:
         run: cargo test -p auroraw-workspace --release --locked --test large -- --ignored --nocapture
         env:
           AUR_LARGE: "100000"
+      - name: What each step of an atomic write costs
+        run: cargo test -p auroraw-workspace --release --locked --test write_costs -- --ignored --nocapture
