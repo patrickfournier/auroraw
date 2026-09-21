@@ -362,3 +362,35 @@ fn develop_settings_of_other_software_are_all_there_after_a_rewrite() {
         other => panic!("{other:?}"),
     }
 }
+
+// ---- hostile input: what RUSTSEC-2026-0194 and 0195 were about (quick-xml before 0.40) ----
+
+#[test]
+fn a_tag_with_thousands_of_attributes_is_read_in_bounded_time() {
+    let mut doc = String::from(
+        r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:t="urn:t:""#,
+    );
+    for i in 0..20_000 {
+        doc.push_str(&format!(" t:a{i}=\"1\""));
+    }
+    doc.push_str("/></rdf:RDF></x:xmpmeta>");
+    let started = std::time::Instant::now();
+    let _ = Xmp::from_bytes(doc.as_bytes());
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(5),
+        "took {:?}",
+        started.elapsed()
+    );
+}
+
+#[test]
+fn thousands_of_namespace_declarations_are_refused_not_allocated() {
+    let mut doc = String::from(
+        r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description"#,
+    );
+    for i in 0..50_000 {
+        doc.push_str(&format!(" xmlns:p{i}=\"urn:p:{i}\""));
+    }
+    doc.push_str("/></rdf:RDF></x:xmpmeta>");
+    assert!(Xmp::from_bytes(doc.as_bytes()).is_err());
+}

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+use quick_xml::XmlVersion;
 use quick_xml::escape::resolve_predefined_entity;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -53,11 +54,9 @@ fn xml_err(e: impl std::fmt::Display) -> XmpError {
 
 fn resolved(r: ResolveResult<'_>) -> Result<Option<String>, XmpError> {
     match r {
-        ResolveResult::Bound(n) => Ok(Some(String::from_utf8_lossy(n.as_ref()).into_owned())),
+        ResolveResult::Bound(n) => Ok(Some(n.as_ref().to_string())),
         ResolveResult::Unbound => Ok(None),
-        ResolveResult::Unknown(p) => Err(XmpError::UnboundPrefix(
-            String::from_utf8_lossy(&p).into_owned(),
-        )),
+        ResolveResult::Unknown(p) => Err(XmpError::UnboundPrefix(p)),
     }
 }
 
@@ -67,26 +66,29 @@ fn make_element(
     element_ns: Option<String>,
     prefixes: &mut Vec<(String, String)>,
 ) -> Result<El, XmpError> {
-    let local = String::from_utf8_lossy(start.local_name().as_ref()).into_owned();
+    let local = start.local_name().as_ref().to_string();
     let mut attrs = Vec::new();
     for attribute in start.attributes() {
         let attribute = attribute.map_err(xml_err)?;
         let key = attribute.key.as_ref();
-        let value = attribute.unescape_value().map_err(xml_err)?.into_owned();
-        if key == b"xmlns" {
+        let value = attribute
+            .normalized_value(XmlVersion::Implicit1_0)
+            .map_err(xml_err)?
+            .into_owned();
+        if key == "xmlns" {
             continue;
         }
-        if let Some(prefix) = key.strip_prefix(b"xmlns:") {
-            let prefix = String::from_utf8_lossy(prefix).into_owned();
+        if let Some(prefix) = key.strip_prefix("xmlns:") {
+            let prefix = prefix.to_string();
             if !prefixes.iter().any(|(p, u)| *p == prefix && *u == value) {
                 prefixes.push((prefix, value));
             }
             continue;
         }
-        let (res, local) = reader.resolve_attribute(attribute.key);
+        let (res, local) = reader.resolver().resolve_attribute(attribute.key);
         attrs.push(Attr {
             ns: resolved(res)?,
-            local: String::from_utf8_lossy(local.as_ref()).into_owned(),
+            local: local.as_ref().to_string(),
             value,
         });
     }
@@ -140,19 +142,19 @@ fn parse_dom(bytes: &[u8], prefixes: &mut Vec<(String, String)>) -> Result<El, X
                 }
             }
             Event::Text(t) => {
-                let text = t.xml_content().map_err(xml_err)?;
+                let text = t.xml10_content();
                 push_text(&mut stack, &text);
             }
             Event::CData(c) => {
-                let text = c.decode().map_err(xml_err)?;
+                let text = c.xml10_content();
                 push_text(&mut stack, &text);
             }
             Event::GeneralRef(r) => {
                 let text = match r.resolve_char_ref().map_err(xml_err)? {
                     Some(c) => c.to_string(),
                     None => {
-                        let name = r.decode().map_err(xml_err)?;
-                        resolve_predefined_entity(&name)
+                        let name: &str = r.as_ref();
+                        resolve_predefined_entity(name)
                             .ok_or_else(|| xml_err(format!("unknown entity &{name};")))?
                             .to_string()
                     }
