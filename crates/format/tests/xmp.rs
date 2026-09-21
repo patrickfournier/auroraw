@@ -422,3 +422,24 @@ fn names_that_cannot_be_written_are_refused_when_read() {
       <rdf:Description xmlns:t="urn:t:"><t:a:b>1</t:a:b></rdf:Description></rdf:RDF></x:xmpmeta>"#;
     assert!(Xmp::from_bytes(doc.as_bytes()).is_err());
 }
+
+#[test]
+fn stray_control_characters_are_replaced_when_read_so_that_what_is_read_can_be_written() {
+    // Found by the nightly fuzzer: a control character in a namespace address was read as it was
+    // but written as U+FFFD, so a second write differed from the first.
+    let doc = "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\
+      <rdf:Description xmlns:t=\"urn:a\u{1f}b:\"><t:p t:q=\"x\u{0}y\">caption\u{b}here</t:p></rdf:Description></rdf:RDF></x:xmpmeta>";
+    let xmp = Xmp::from_bytes(doc.as_bytes()).unwrap();
+    assert_eq!(xmp.properties[0].ns, "urn:a\u{FFFD}b:");
+    assert_eq!(xmp.properties[0].as_text(), Some("caption\u{FFFD}here"));
+    let once = xmp.to_bytes();
+    assert_eq!(Xmp::from_bytes(&once).unwrap().to_bytes(), once);
+}
+
+#[test]
+fn control_characters_in_attribute_values_are_replaced_too() {
+    let doc = "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\
+      <rdf:Description xmlns:t=\"urn:t:\" t:q=\"x\u{0}y\"/></rdf:RDF></x:xmpmeta>";
+    let xmp = Xmp::from_bytes(doc.as_bytes()).unwrap();
+    assert_eq!(xmp.properties[0].as_text(), Some("x\u{FFFD}y"));
+}

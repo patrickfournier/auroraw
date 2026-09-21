@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 
 use super::model::{ArrayKind, Item, Property, Value, Xmp};
-use super::names::{KNOWN, is_ncname, ns};
+use super::names::{KNOWN, is_ncname, is_xml_char, ns};
 
 const INDENT: &str = "  ";
 
@@ -69,11 +69,6 @@ fn assign_prefixes(xmp: &Xmp) -> BTreeMap<String, String> {
     map
 }
 
-/// A character XML 1.0 allows.
-fn xml_char(c: char) -> bool {
-    matches!(c, '\t' | '\n' | '\r' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}')
-}
-
 fn escape_text(out: &mut String, s: &str) {
     for c in s.chars() {
         match c {
@@ -81,7 +76,7 @@ fn escape_text(out: &mut String, s: &str) {
             '<' => out.push_str("&lt;"),
             '>' => out.push_str("&gt;"),
             '\r' => out.push_str("&#13;"),
-            c if !xml_char(c) => out.push('\u{FFFD}'),
+            c if !is_xml_char(c) => out.push('\u{FFFD}'),
             c => out.push(c),
         }
     }
@@ -97,7 +92,7 @@ fn escape_attribute(out: &mut String, s: &str) {
             '\r' => out.push_str("&#13;"),
             '\n' => out.push_str("&#10;"),
             '\t' => out.push_str("&#9;"),
-            c if !xml_char(c) => out.push('\u{FFFD}'),
+            c if !is_xml_char(c) => out.push('\u{FFFD}'),
             c => out.push(c),
         }
     }

@@ -6,7 +6,7 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use super::model::{ArrayKind, Item, Property, Value, Xmp};
-use super::names::{is_ncname, ns};
+use super::names::{clean, is_ncname, ns};
 
 /// Why an XMP document could not be read.
 #[derive(Debug, thiserror::Error)]
@@ -56,11 +56,11 @@ fn resolved(r: ResolveResult<'_>) -> Result<Option<String>, XmpError> {
     match r {
         // The reader keeps namespace values as written, entity references included: read them
         // the way the XML specification does, or `a&amp;b` and `a&b` would be two namespaces.
-        ResolveResult::Bound(n) => Ok(Some(
+        ResolveResult::Bound(n) => Ok(Some(clean(
             quick_xml::escape::unescape(n.as_ref())
                 .map_err(xml_err)?
                 .into_owned(),
-        )),
+        ))),
         ResolveResult::Unbound => Ok(None),
         ResolveResult::Unknown(p) => Err(XmpError::UnboundPrefix(p)),
     }
@@ -82,10 +82,12 @@ fn make_element(
     for attribute in start.attributes() {
         let attribute = attribute.map_err(xml_err)?;
         let key = attribute.key.as_ref();
-        let value = attribute
-            .normalized_value(XmlVersion::Implicit1_0)
-            .map_err(xml_err)?
-            .into_owned();
+        let value = clean(
+            attribute
+                .normalized_value(XmlVersion::Implicit1_0)
+                .map_err(xml_err)?
+                .into_owned(),
+        );
         if key == "xmlns" {
             continue;
         }
@@ -118,6 +120,7 @@ fn make_element(
 }
 
 fn push_text(stack: &mut [El], text: &str) {
+    let text = &*clean(text.to_string());
     if let Some(top) = stack.last_mut() {
         match top.children.last_mut() {
             Some(Node::Text(t)) => t.push_str(text),

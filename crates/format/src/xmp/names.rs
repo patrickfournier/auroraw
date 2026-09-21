@@ -53,3 +53,21 @@ pub(crate) fn is_ncname(s: &str) -> bool {
     matches!(chars.next(), Some(c) if c.is_alphabetic() || c == '_')
         && chars.all(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'))
 }
+
+/// A character XML 1.0 allows in text and attribute values.
+pub(crate) fn is_xml_char(c: char) -> bool {
+    matches!(c, '\t' | '\n' | '\r' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}')
+}
+
+/// The text with every character XML does not allow replaced by U+FFFD, which is what the writer
+/// would do: a file with stray control characters (some tools write them) stays readable, and what
+/// is read is what is written.
+pub(crate) fn clean(s: String) -> String {
+    if s.chars().all(is_xml_char) {
+        s
+    } else {
+        s.chars()
+            .map(|c| if is_xml_char(c) { c } else { '\u{FFFD}' })
+            .collect()
+    }
+}
