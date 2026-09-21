@@ -92,7 +92,7 @@ schema can be published there. The version of this part of the file is `aur:Sche
 | **Title** | `dc:title` | Language alternative, `x-default`. |
 | **Caption** | `dc:description` | Language alternative. |
 | **Keywords, flat** | `dc:subject` | The **leaf** keywords assigned, by name. |
-| **Keywords, hierarchy** | `lr:hierarchicalSubject` | Full paths with `|` (`Place|Canada|Quebec`), the form Lightroom, digiKam-compatible tools and others read. |
+| **Keywords, hierarchy** | `lr:hierarchicalSubject` | Full paths with `\|` (`Place\|Canada\|Quebec`), the form Lightroom, digiKam-compatible tools and others read. |
 | **Keywords, identity** | `aur:KeywordIds` | A bag of the assigned keywords' identifiers (§6). |
 | **Other metadata** | The list of §7 | Creator, rights, credit, location, and so on. |
 | **The original's data**, as read | `exif:DateTimeOriginal` (with `exif:OffsetTimeOriginal` and the sub-seconds), `tiff:Make`, `tiff:Model`, `aux:SerialNumber`, `aux:Lens`, `exif:ExposureTime`, `exif:FNumber`, `exif:ISOSpeedRatings`, `exif:FocalLength`, `exif:FocalLengthIn35mmFilm`, `exif:PixelXDimension` and `exif:PixelYDimension`, `tiff:Orientation`, `exif:GPSLatitude`, `exif:GPSLongitude`, `exif:GPSAltitude` | The standard properties, **holding the original's values**, as XMP sidecars conventionally do (D-074). |
