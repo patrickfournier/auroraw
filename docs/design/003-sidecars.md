@@ -144,9 +144,17 @@ Other software often encodes "rejected" as `xmp:Rating = -1`. Auroraw keeps **st
 (a rejected three-star photo keeps its three stars, spec §5.3), so the workspace sidecar carries the
 stars in `xmp:Rating` and the flag in `aur:Flag`. The mapping is made at the **boundary**:
 
-- **Reading foreign XMP**: `xmp:Rating = -1` becomes flag *rejected* with no stars; other values are stars.
+- **Reading XMP that has Auroraw's own properties** (`aur:Flag`, `aur:Stars`): they win. The flag
+  and the stars are taken from them, whatever `xmp:Rating` says.
+- **Reading foreign XMP** (no `aur:Flag`): `xmp:Rating = -1` becomes flag *rejected* with no stars;
+  other values are stars.
 - **The XMP export to the source folders** (D-024), where other software is the reader, offers to
-  write `-1` for rejected photos, which loses the stars in that file and not in the workspace.
+  write `-1` for rejected photos, since that is what they understand. **The stars are not lost in
+  that file**: an exported rejected photo carries `xmp:Rating = -1` for the other software **and**
+  `aur:Flag = rejected` and `aur:Stars = <the stars>` for Auroraw. Re-reading its own export
+  (which it recognises, D-047) gives back exactly the same flag and stars, and another tool
+  ignores the two `aur:` properties. Without the `-1` option, `xmp:Rating` holds the stars and
+  `aur:Flag` the flag, as in the workspace, and the round trip is exact too.
 
 ## 5. The version sidecar
 
@@ -251,7 +259,7 @@ over. Three boundaries have their own mapping, made by the code that crosses the
 | Boundary | What is done |
 | --- | --- |
 | **Reading foreign XMP** at import (Lightroom, darktable, digiKam, ExifTool; never modified) | Read: `xmp:Rating` (-1 is rejected), `xmp:Label`, `dc:subject`, `lr:hierarchicalSubject`, `digiKam:TagsList`, the title, caption, creator, rights and IPTC properties above. Ignored (and not copied): develop settings of other software, which are not portable (spec §5.8). Ratings and keywords are copied into the photo sidecar, and keywords are matched to the vocabulary **by path**. |
-| **XMP export to the source folders** (D-024, D-028) | A **derived** file built from the photo sidecar: the effective EXIF values in the standard properties (overlays applied), `-1` for rejected if chosen, the **do-not-export keywords removed**, and **no `aur:Files`, locations or identifiers of Auroraw** other than the marker that lets Auroraw recognise its own export (D-047). |
+| **XMP export to the source folders** (D-024, D-028) | A **derived** file built from the photo sidecar: the effective EXIF values in the standard properties (overlays applied), `-1` for rejected if chosen, the **do-not-export keywords removed**, and **no `aur:Files`, locations or identifiers of Auroraw** other than the marker that lets Auroraw recognise its own export (D-047) and the few properties that make the round trip exact: `aur:Flag` and, when `-1` is written, `aur:Stars`. |
 | **Metadata in exported images** (D-046) | The effective metadata of the exported version according to the recipe: by default everything except the location and the camera's serial number, and never the do-not-export keywords, paths or workspace identifiers. |
 
 ## 9. Consequences for WP1
@@ -262,7 +270,9 @@ over. Three boundaries have their own mapping, made by the code that crosses the
 - **Tests**: round trip; canonical bytes; unknown properties, extra namespaces and second
   `rdf:Description` blocks kept; the attribute form and the element form read the same; a truncated or
   invalid file is an error and is never overwritten; a newer `aur:Schema` is not modified; **ExifTool reads the
-  fixtures back correctly** (in CI); the digest of the copied fields is stable across platforms.
+  fixtures back correctly** (in CI); the digest of the copied fields is stable across platforms; **an export read back gives the same
+  rating, flag, label, title, caption and keywords** (rejected photos with stars included, with and
+  without the `-1` option).
 - A **parse benchmark** on 100,000 photo and 143,000 version sidecars, to hold requirement 9
   (tens of thousands of files a second on all cores), run on the three platforms.
 - The schema is written as a short **public page** (in `docs/`, later on auroraw.org) so that other tools
