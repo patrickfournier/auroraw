@@ -1,0 +1,26 @@
+Auroraw plugin exception (draft, to be reviewed by a qualified person before the first release)
+
+Auroraw is licensed under the GNU General Public License, version 3 or (at your option) any
+later version. As an additional permission under section 7 of the GNU General Public License
+version 3, the copyright holders of Auroraw give you the following permission.
+
+1. In this text, the "Plugin API" means the interface documented in the Auroraw repository by
+   which a plugin declares itself to Auroraw and exchanges data with it (the declaration schema,
+   the functions and data types of the plugin API and of the plugin SDK). A "Plugin" is a work
+   that communicates with Auroraw solely through the Plugin API, either as a WebAssembly module
+   run by the sandbox that Auroraw provides, or as a separate program that Auroraw runs and talks
+   to through the Plugin API.
+
+2. A Plugin is not a work based on Auroraw for the purposes of the GNU General Public License.
+   You may create, propagate and convey a Plugin under terms of your choice, including terms
+   that are not those of the GNU General Public License and terms that are proprietary,
+   provided that the Plugin does not contain any part of Auroraw other than the Plugin API and the
+   Plugin SDK, which are licensed under MIT OR Apache-2.0.
+
+3. This permission does not apply to Auroraw itself, or to a modified version of Auroraw, which
+   remain under the GNU General Public License. If you modify Auroraw, you may extend this
+   exception to your version, but you are not obliged to do so. If you do not wish to do so,
+   delete this exception statement from your version.
+
+If this exception ever conflicts with the GNU General Public License, the GNU General Public
+License applies (docs/governance.md, D-080).

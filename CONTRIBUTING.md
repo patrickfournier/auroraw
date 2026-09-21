@@ -1,0 +1,75 @@
+# Contributing to Auroraw
+
+Thank you for your interest. Auroraw is a free application for photographers (organise, develop
+RAW files and negative scans non-destructively, convert, edit metadata, deliver galleries).
+
+**Where the project is.** It is in its design phase: the functional specification, the
+architecture, the testing strategy, the release plan and the governance are written, four
+technical spikes have been measured, and the product code begins with milestone M1. Until then the
+most useful contributions are **reading the documents in [docs/](docs/) and telling us what is
+wrong or missing**, and **sample files** (see below).
+
+## Ground rules
+
+- **Everything is in English**: code, comments, commit messages, documents, issues and
+  discussions. This keeps the project readable by everyone who may contribute.
+- **Be kind.** The [code of conduct](CODE_OF_CONDUCT.md) applies everywhere. Reports go to
+  auroraw-conduct@straycat.ca.
+- **Decisions are recorded.** What Auroraw does, its file formats, the plugin API, the licence
+  and the governance change only through an approved decision in
+  [docs/decisions.md](docs/decisions.md). See [docs/governance.md](docs/governance.md).
+
+## Proposing a change
+
+1. **Open an issue first** for anything larger than a small fix: what problem, why, what
+   alternatives. A pull request with a new feature and no prior issue may be declined without a
+   review of the code.
+2. Keep pull requests **small and focused**: one concern each.
+3. Branch from `dev` and open the pull request against `dev`. `main` holds releases only.
+
+## Sign your commits (the DCO)
+
+Every commit must carry a `Signed-off-by` line, which certifies that you wrote the change or
+have the right to submit it under the project's licence
+([Developer Certificate of Origin](https://developercertificate.org/)):
+
+```bash
+git commit -s
+```
+
+A check on each pull request refuses commits without it. If you used AI tools to write a
+substantial part of a change, say so in the pull request; you remain responsible for it.
+
+## Licences
+
+- The application is **GPL-3.0-or-later**. Every source file starts with
+  `SPDX-License-Identifier: GPL-3.0-or-later`.
+- The plugin API, the plugin SDK, the declaration schema and the example plugins are
+  **MIT OR Apache-2.0**, and say so in their headers.
+- Plugins that use only the plugin API may have any licence ([PLUGIN-EXCEPTION](PLUGIN-EXCEPTION)).
+- A new dependency must have a licence compatible with the GPL-3.0 (no AGPL, proprietary or
+  non-commercial licences) and must be justified in the pull request.
+
+## Before you ask for a review
+
+The pull request template lists what "ready" means. In short: it builds without warnings on
+Linux, Windows and macOS; it has tests (a bug fix has a regression test); a format change carries
+a fixture and a migration; new strings are translatable and new controls are keyboard-reachable
+and named for screen readers. The reasons are in [docs/testing-strategy.md](docs/testing-strategy.md) §9.
+
+## Translations
+
+Translations are gettext `.po` files, **sent as pull requests**. Say in an issue which language
+you take, so that nobody works on the same one twice. A language ships when it is at least 90 %
+translated for the main views, passes the automatic checks, and has a named person who reviews
+its changes. Source strings are in English. See [docs/governance.md](docs/governance.md) §5.
+
+## Sample files
+
+A camera whose files do not open needs a sample. Only files that are **CC0 or otherwise
+redistributable** can be used (raw.pixls.us accepts such files). Do not send photos of people
+without their permission.
+
+## Security
+
+Report vulnerabilities privately (see [SECURITY.md](SECURITY.md)), not as public issues.

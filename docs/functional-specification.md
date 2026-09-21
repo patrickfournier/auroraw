@@ -9,7 +9,7 @@
 
 ## 1. Vision
 
-Auroraw is a free (GPL-3.0) application for photographers: organise photos, develop RAW files and
+Auroraw is a free (GPL-3.0-or-later) application for photographers: organise photos, develop RAW files and
 film negative scans non-destructively, convert between formats, edit metadata and deliver
 galleries, all in a simple, fast and professional workflow.
 
@@ -779,9 +779,9 @@ Four families [decided]: **import** (including RAW reading), **export** (images 
 - Operation plugins must be able to run on the GPU and declare where they sit in the pipeline
   (§5.6).
 
-**Licensing** [D-080, D-057]: the application is GPL-3.0; the plugin API, SDK and declaration
-schema are MIT OR Apache-2.0. What licence a plugin itself may use, and the exception that says
-so, are proposed in docs/governance.md.
+**Licensing** [D-080, D-082]: the application is GPL-3.0-or-later; the plugin API, SDK and
+declaration schema are MIT OR Apache-2.0; a plugin that uses only the plugin API may have any
+licence (docs/governance.md §2.3).
 
 Language, ABI, isolation technology and hosting of the index are handled in the "development
 process" phase (§10).
@@ -971,10 +971,8 @@ Sorted by when they need an answer. No question is left to decide before the tec
     published photo is no longer in the catalogue.
 33. **Linking an existing gallery**: how ambiguities are resolved when several photos share a
     file name.
-34. **Plugin licensing (D-057)**: partly settled by D-080 (core stays GPL-3.0, API and SDK
-    MIT OR Apache-2.0). Left: the plugin exception and the contributor agreement, proposed in
-    docs/governance.md. Best settled before accepting outside contributions, since relicensing
-    later needs the consent of every contributor.
+34. **Plugin licensing (D-057)**: settled by D-080 and D-082 (core GPL-3.0-or-later, API and SDK
+    MIT OR Apache-2.0, plugins under any licence through the plugin exception).
 35. **Source plugin details**: how a source reports changes for monitoring (§5.1), how sign-in
     and refreshed credentials are stored, and how a camera source presents its files to the
     import (§5.2).

@@ -1,11 +1,10 @@
 # Auroraw: governance and contributions
 
-> **Status: first draft, for review.** How the project is run in the open: who decides, under
+> **Status: adopted (D-082).** How the project is run in the open: who decides, under
 > what licence code is accepted, how someone contributes, how conduct, translations, plugins and
 > security reports are handled. Items are tagged **[decided]**, **[proposed]** or **[open]**.
-> The repository is public and outside contributions are possible from now on, so the points
-> marked **before the first outside contribution** should be settled first: relicensing later
-> needs the consent of every contributor, which is why the licence questions come first.
+> The repository is public and outside contributions are possible. The licence questions were
+> settled first, because relicensing later needs the consent of every contributor (D-082).
 >
 > This is a practical policy, not legal advice. The wording of the licence exception (§2.3)
 > should be read by someone qualified before the first release.
@@ -34,13 +33,13 @@ How decisions are made:
 - The **specification and the architecture** are living documents: a change to them is a pull
   request like any other, and the code follows them, not the reverse.
 
-## 2. Licences [decided in part, D-013, D-080]
+## 2. Licences [decided, D-013, D-080, D-082]
 
 ### 2.1 What is under which licence
 
 | Part | Licence | Notes |
 | --- | --- | --- |
-| The application: every crate except those below | **GPL-3.0** (D-013, D-080) | LGPL was considered and dropped (D-080). |
+| The application: every crate except those below | **GPL-3.0-or-later** (D-013, D-080, D-082) | LGPL was considered and dropped (D-080). |
 | The plugin API, the plugin SDK, the declaration schema and the example plugins | **MIT OR Apache-2.0** (D-080) | So that a plugin, free or not, can include them without any obligation. |
 | Documentation | **CC BY-SA 4.0** [proposed] | Or the GPL, if a single licence is preferred [open]. |
 | Translations | Same as the application (GPL-3.0) | Translators agree to this when they contribute. |
@@ -53,8 +52,8 @@ small interface files that plugin authors must be free to include.
 
 ### 2.2 Files and dependencies
 
-- Every source file starts with an **SPDX identifier** (`SPDX-License-Identifier: GPL-3.0-only`,
-  or `GPL-3.0-or-later` [open: "only" or "or later"], or `MIT OR Apache-2.0` for the SDK), checked in CI.
+- Every source file starts with an **SPDX identifier** (`SPDX-License-Identifier: GPL-3.0-or-later`, or
+  `MIT OR Apache-2.0` for the SDK), checked in CI.
 - Each crate declares its `license` in `Cargo.toml`; `cargo deny` fails a build whose dependency
   licences are incompatible with the GPL-3.0 (testing strategy §9, CI §5). MIT, Apache-2.0, BSD,
   ISC, Zlib, MPL-2.0 and LGPL dependencies pass; **AGPL, proprietary, "non-commercial" and
@@ -63,10 +62,10 @@ small interface files that plugin authors must be free to include.
   lens and place-name databases) need a redistributable licence, shown to the user, as already
   required for models in the specification (§5.11).
 
-### 2.3 Plugins [proposed, awaiting approval; finishes D-057]
+### 2.3 Plugins [decided, D-082; finishes D-057]
 
 A plugin is loaded into a sandbox and talks to Auroraw only through the documented plugin API,
-never by linking with the application's code. The proposal:
+never by linking with the application's code. The policy:
 
 1. **A plugin may be under any licence**, free or proprietary, provided it uses only the plugin API.
    The SDK being MIT OR Apache-2.0 is what makes this workable for a WebAssembly module, which
@@ -74,8 +73,8 @@ never by linking with the application's code. The proposal:
 2. The project states this in an **additional permission under section 7 of the GPL-3.0**, in a
    file named `PLUGIN-EXCEPTION`, that says a work that communicates with Auroraw solely through
    the plugin API, as a separate program or WebAssembly module, is not a work based on Auroraw
-   for the purposes of the licence. The text is short, standard in form and to be reviewed
-   before the first release (see the note above).
+   for the purposes of the licence. The text is in the repository, marked as a draft; it is to be
+   reviewed by a qualified person before the first release (see the note above).
 3. The **official index** (§6) shows each plugin's licence and accepts free and proprietary
    plugins alike, as long as they meet its criteria; the user sees the licence and the
    permissions before installing (D-055).
@@ -85,7 +84,7 @@ never by linking with the application's code. The proposal:
 If this exception turns out to conflict with the GPL, the tie-break of §2.1 applies and the
 plugins' licences are reconsidered, not the application's.
 
-### 2.4 The contributor agreement [open, before the first outside contribution]
+### 2.4 The contributor agreement [decided, D-082]
 
 Two usual ways to state that a contributor may submit their work:
 
@@ -96,11 +95,10 @@ Two usual ways to state that a contributor may submit their work:
 | **Relicensing later** | **Needs every contributor's consent.** | **Possible by the project alone.** |
 | Used by | The Linux kernel, many GPL projects | Projects that dual-license or may change licence |
 
-**Proposal: the DCO.** It is the light way, and D-080 has just confirmed that the licence is not
-going to change. The price is that a change of licence, in either direction, would need the
-consent of everyone who contributed. If Patrick wants to keep the freedom to relicense (for
-instance to add a commercial licence one day), a CLA is the only way, and it must be in place
-before the first outside contribution. This is his decision.
+**Decision: the DCO.** It is the light way, and D-080 has just confirmed that the licence is not
+going to change. The price is that a change of licence, in either direction, needs the consent
+of everyone who contributed. Every commit carries a `Signed-off-by` line, checked on each pull
+request by `.github/workflows/dco.yml`.
 
 ### 2.5 Contributions written with AI help [proposed]
 
@@ -111,8 +109,7 @@ before the first outside contribution. This is his decision.
 - Do not submit code whose licence you do not know (including generated code that reproduces
   someone else's project). When in doubt, do not.
 - The owner works with Claude Code as a collaborator on the repository (§1); those commits are the
-  owner's responsibility, and the DCO line is the owner's [open: whether commits by Claude Code
-  carry a sign-off from the owner].
+  owner's responsibility, and **they carry the owner's `Signed-off-by` line** (D-082).
 
 ## 3. Contributing [proposed]
 
@@ -138,9 +135,8 @@ Files to add at the root of the repository, all short:
   and justifies a new dependency (testing strategy §9).
 - **Reviews** are by a maintainer other than the author; the owner reviews changes to formats,
   the plugin API, the pipeline definition, the write path and the sandbox.
-- **Language.** Code, comments, commit messages, documents and issues are in **English**; the
-  discussion in an issue can be in French when everyone in it reads French, and is
-  summarised in English before the decision.
+- **Language.** Code, comments, commit messages, documents, issues, pull requests and
+  discussions are **all in English**, with no exception (D-082).
 - **Commit messages**: a short imperative title, then a body that says why. History is
   kept clean on `dev`.
 - **Style.** `rustfmt` and `clippy` decide. Names, comments and structure follow the
@@ -160,9 +156,8 @@ are maintainers, by two people, and are confidential.
 
 - **Source strings are English**, in gettext form (architecture §10). The French translation
   is maintained by the owner, and is the first checked in review.
-- **How people translate**: through **Weblate**, whose hosted service is free for libre projects
-  and gives translators a web interface with no need to know Git [open: Patrick to choose between
-  Weblate and plain `.po` files in pull requests; both can coexist].
+- **How people translate**: **`.po` files sent as pull requests** (D-082). No translation
+  platform for now; one can be added later if translators ask for it.
 - **A language ships** when it is at least **90 %** translated for the strings of the main
   views, passes the pseudo-locale and message-id checks (testing strategy §6), and has a named
   person who agrees to review its changes.
@@ -205,8 +200,8 @@ each release notes API changes. Until M5 the API is experimental and says so (ar
 
 ## 7. Security [proposed]
 
-- **`SECURITY.md`** asks reporters to use GitHub's **private vulnerability reporting**, which
-  needs to be switched on in the repository settings [open: Patrick to do it, or to allow it].
+- **`SECURITY.md`** asks reporters to use GitHub's **private vulnerability reporting**, which is
+  **switched on** for the repository.
 - **In scope**: an escape from the plugin sandbox, a plugin reading what it was not granted, a
   crash or code execution from a crafted sidecar, RAW file, plugin package or index entry,
   a way to make the application send data without consent, a flaw in the update check or the
@@ -232,31 +227,21 @@ each release notes API changes. Until M5 the API is experimental and says so (ar
 server at first: chat needs moderation and fragments what should be findable. A channel is
 added when there are enough people to justify it. Announcements go in the release notes.
 
-## 10. Funding [open]
+## 10. Funding [decided, D-082]
 
-Nothing is decided. If donations are wanted (GitHub Sponsors and similar), the owner adds the
-button and states what the money is for. The project does not depend on it, and no feature is
-withheld for money.
+`.github/FUNDING.yml` shows the owner's GitHub Sponsors button. The project does not depend
+on it, and no feature is withheld for money.
 
 ## 11. What is next
 
-1. Patrick answers the open points marked **before the first outside contribution**: DCO or CLA
-   (§2.4), the plugin exception (§2.3), "only" or "or later" for the GPL (§2.2).
-2. Then the repository gets its files (§3): `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`,
-   the templates, and the SPDX header check. I add them and open no outside process before you approve.
-3. **The plan of milestone M1.**
+The repository files of §3 are in place (`CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`,
+`PLUGIN-EXCEPTION`, the issue and pull request templates, `FUNDING.yml`, the DCO check). The SPDX
+header check comes with the first product code. Next: **the plan of milestone M1.**
 
 ## 12. Open points
 
 | # | Item | Needed before |
 | --- | --- | --- |
-| 1 | DCO or CLA | The first outside contribution |
-| 2 | The plugin exception (`PLUGIN-EXCEPTION`) and a review of its wording | The first release |
-| 3 | GPL-3.0-only or -or-later | The first outside contribution |
-| 4 | Documentation licence: CC BY-SA 4.0 or the GPL | Publishing the docs |
-| 5 | The conduct contact address | The first outside contribution |
-| 6 | Private vulnerability reporting switched on | The first public release |
-| 7 | Weblate or plain `.po` files | The first translation |
-| 8 | Name and trademark check | The first public release |
-| 9 | Whether commits by Claude Code carry a sign-off from the owner | If the DCO is chosen |
-| 10 | Funding | Whenever |
+| 1 | A qualified review of the `PLUGIN-EXCEPTION` wording | The first release |
+| 2 | Documentation licence: CC BY-SA 4.0 or the GPL | Publishing the docs |
+| 3 | Name and trademark check | The first public release |
