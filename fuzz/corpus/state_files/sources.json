@@ -1,0 +1,20 @@
+{
+  "format": "auroraw/sources",
+  "schema": 1,
+  "updated": "2026-09-21T14:02:11Z",
+  "sources": [
+    {
+      "id": "b83e1f52a09c47d6",
+      "kind": "local-folder",
+      "name": "Working disk",
+      "hint": {
+        "path": "/mnt/photos"
+      },
+      "ignore": [
+        "*.tmp",
+        "Thumbs.db"
+      ],
+      "config": {}
+    }
+  ]
+}

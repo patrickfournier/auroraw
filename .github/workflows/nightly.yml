@@ -12,6 +12,7 @@ on:
     paths:
       - .github/workflows/nightly.yml
       - crates/workspace/tests/large.rs
+      - fuzz/**
 
 permissions:
   contents: read
@@ -30,6 +31,28 @@ jobs:
       - run: cargo test --workspace --release --locked
         env:
           PROPTEST_CASES: "5000"
+
+  fuzz:
+    name: fuzzing the readers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup toolchain install nightly --profile minimal
+      - uses: taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
+        with:
+          tool: cargo-fuzz
+      - name: Each target for two minutes
+        run: |
+          for target in xmp_reader sidecars state_files; do
+            cargo +nightly fuzz run "$target" -- -max_total_time=120
+          done
+      - name: Keep the inputs that crashed a reader
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-crashes
+          path: fuzz/artifacts
 
   large-workspace:
     name: large workspace (${{ matrix.name }})

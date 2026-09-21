@@ -1,0 +1,34 @@
+[package]
+name = "auroraw-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+auroraw-format = { path = "../crates/format" }
+
+# Not part of the main workspace: it needs a nightly compiler and is built by `cargo fuzz`.
+[workspace]
+
+[[bin]]
+name = "xmp_reader"
+path = "fuzz_targets/xmp_reader.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "sidecars"
+path = "fuzz_targets/sidecars.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "state_files"
+path = "fuzz_targets/state_files.rs"
+test = false
+doc = false
