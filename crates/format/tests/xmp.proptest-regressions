@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc f3953710ab6a82a2b92c890b6beb08412030d24fad20ba61183942b9593cf144 # shrinks to props = [Property { ns: "http://purl.org/dc/elements/1.1/", name: "A", lang: None, value: Array(Seq, [Item { lang: Some("x-default"), value: Resource("http://e.org/a") }]) }]

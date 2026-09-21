@@ -50,8 +50,18 @@ jobs:
       - uses: taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
         with:
           tool: nextest
+      - name: Install ExifTool (interoperability tests)
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Linux) sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl ;;
+            macOS) brew install exiftool ;;
+            Windows) choco install exiftool -y --no-progress ;;
+          esac
       - run: cargo build --workspace --locked
       - run: cargo nextest run --workspace --locked
+        env:
+          AUR_REQUIRE_EXIFTOOL: "1"
       - run: cargo test --workspace --doc --locked
       - name: Launch test
         run: cargo run --locked --package auroraw-app -- --self-test

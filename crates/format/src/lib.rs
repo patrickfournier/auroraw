@@ -6,4 +6,6 @@
 //! same content always gives the same bytes (design notes 001 to 004, architecture §3.1).
 
 pub mod fingerprint;
+pub mod sidecar;
 pub mod state;
+pub mod xmp;
