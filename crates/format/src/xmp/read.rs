@@ -6,7 +6,7 @@ use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
 use super::model::{ArrayKind, Item, Property, Value, Xmp};
-use super::names::ns;
+use super::names::{is_ncname, ns};
 
 /// Why an XMP document could not be read.
 #[derive(Debug, thiserror::Error)]
@@ -73,6 +73,11 @@ fn make_element(
     prefixes: &mut Vec<(String, String)>,
 ) -> Result<El, XmpError> {
     let local = start.local_name().as_ref().to_string();
+    if !is_ncname(&local) {
+        return Err(XmpError::Unsupported(format!(
+            "the name {local:?} is not a valid XML name"
+        )));
+    }
     let mut attrs = Vec::new();
     for attribute in start.attributes() {
         let attribute = attribute.map_err(xml_err)?;
@@ -92,6 +97,12 @@ fn make_element(
             continue;
         }
         let (res, local) = reader.resolver().resolve_attribute(attribute.key);
+        if !is_ncname(local.as_ref()) {
+            return Err(XmpError::Unsupported(format!(
+                "the attribute name {:?} is not a valid XML name",
+                local.as_ref()
+            )));
+        }
         attrs.push(Attr {
             ns: resolved(res)?,
             local: local.as_ref().to_string(),

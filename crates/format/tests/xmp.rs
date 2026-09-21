@@ -410,3 +410,15 @@ fn a_namespace_with_an_entity_in_its_address_is_the_same_namespace_once_written_
     assert_eq!(back.properties[0].ns, "urn:a&b>c:");
     assert_eq!(back.to_bytes(), once);
 }
+
+#[test]
+fn names_that_cannot_be_written_are_refused_when_read() {
+    // Found by the nightly fuzzer: an attribute named `multi_priorit/` was accepted, then written
+    // as an element that no reader can parse. What is accepted must be writable.
+    let doc = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+      <rdf:Description xmlns:t="urn:t:"><t:a t:bad/name="1"/></rdf:Description></rdf:RDF></x:xmpmeta>"#;
+    assert!(Xmp::from_bytes(doc.as_bytes()).is_err());
+    let doc = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+      <rdf:Description xmlns:t="urn:t:"><t:a:b>1</t:a:b></rdf:Description></rdf:RDF></x:xmpmeta>"#;
+    assert!(Xmp::from_bytes(doc.as_bytes()).is_err());
+}

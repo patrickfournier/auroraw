@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 
 use super::model::{ArrayKind, Item, Property, Value, Xmp};
-use super::names::{KNOWN, ns};
+use super::names::{KNOWN, is_ncname, ns};
 
 const INDENT: &str = "  ";
 
@@ -67,12 +67,6 @@ fn assign_prefixes(xmp: &Xmp) -> BTreeMap<String, String> {
         map.insert((*uri).to_string(), prefix);
     }
     map
-}
-
-fn is_ncname(s: &str) -> bool {
-    let mut chars = s.chars();
-    matches!(chars.next(), Some(c) if c.is_alphabetic() || c == '_')
-        && chars.all(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'))
 }
 
 /// A character XML 1.0 allows.

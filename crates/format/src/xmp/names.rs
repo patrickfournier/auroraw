@@ -45,3 +45,11 @@ pub(crate) const KNOWN: &[(&str, &str)] = &[
     ("xmp", ns::XMP),
     ("xmpRights", ns::XMP_RIGHTS),
 ];
+
+/// Whether `s` can be written as an XML name without a colon (an NCName). The reader refuses
+/// names that are not, so that everything it accepts can be written and read again.
+pub(crate) fn is_ncname(s: &str) -> bool {
+    let mut chars = s.chars();
+    matches!(chars.next(), Some(c) if c.is_alphabetic() || c == '_')
+        && chars.all(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | '.'))
+}
