@@ -1,6 +1,6 @@
 # Milestone M1 plan: a complete culling and organising tool
 
-> **Status: first draft, for review.** The plan of the first milestone of the product, from the
+> **Status: adopted (D-084).** The plan of the first milestone of the product, from the
 > first line of product code to a usable pre-release. It follows the milestone table of the
 > [specification](functional-specification.md) (§8), the [architecture](architecture.md), the
 > [testing strategy](testing-strategy.md) and the [release plan](continuous-integration.md).
@@ -59,7 +59,7 @@ where possible and by the release checklist (testing strategy §11) otherwise:
 | Series (automatic), similar-photo suggestions, exact duplicates and their report | |
 | Keywords (hierarchy, synonyms), collections, smart collections, IPTC/XMP fields, batch edit | Importing a Lightroom or digiKam vocabulary (stretch, §5 WP10) |
 | Search, filters, sorting | |
-| GPS: reading, GPX matching with clock offset, offline place names, filter by place | **A map view** [open, §9 item 3]: it needs map tiles, which means a network request |
+| GPS: reading, GPX matching with clock offset, offline place names, filter by place | **A map view**, postponed by D-084: it needs map tiles, which means a network request |
 | XMP export to source folders (opt-in), external XMP change detection | Automatic XMP mirroring (not in v1, D-066) |
 | Plugin API v0, host, and the RAW decoder as a real WebAssembly plugin | The public plugin API (M5); operation plugins (M2) |
 
@@ -317,9 +317,9 @@ The sizes above are re-estimated at the end of A, when the actual pace is known.
 
 | # | Item | Risk | Mitigation or decision |
 | --- | --- | --- | --- |
-| 1 | **Colour of previews** | Embedded previews are sRGB, Adobe RGB or something else, and a wide-gamut screen shows wrong colours without the display profile (a task per platform, architecture §6.5). | M1 converts previews to sRGB and displays them as sRGB [proposed]; reading the display profile and full colour management come with the pipeline in M2 [open: acceptable for culling?] |
+| 1 | **Colour of previews** | Embedded previews are sRGB, Adobe RGB or something else, and a wide-gamut screen shows wrong colours without the display profile (a task per platform, architecture §6.5). | Decided (D-084): M1 converts previews to sRGB and displays them as sRGB; the display profile and full colour management come with the pipeline in M2. |
 | 2 | **NTFS and antivirus** | D-075 is provisional; 243,000 small files on Windows. | WP1 measures on NTFS first; the thumbnail files fallback exists. |
-| 3 | **A map view** | It needs map tiles, hence a network request (D-061 says not without consent). | [open] Leave the map to a later milestone, or offer it as an opt-in source of tiles with a clear notice. GPS reading, GPX and place names stay in M1. |
+| 3 | **A map view** | It needs map tiles, hence a network request (D-061 says not without consent). | Decided (D-084): the map is left to a later milestone; GPS reading, GPX and place names stay in M1. |
 | 4 | **Slint on macOS** | OpenGL is deprecated; a keyword tree and a big grid are heavier than spike 2's tests. | The first increment runs on macOS; Skia or Metal renderer evaluated in WP8 if needed. |
 | 5 | **Card detection per platform** | Three sets of system calls; a Mac and a card reader are not always to hand. | Detect mounted volumes with a DCIM folder in a small platform module; test with a disk image; the manual folder import always works. |
 | 6 | **Decoder coverage and speed** | `rawler` does not know every camera; WebAssembly decoding is 1.3 to 2 times slower. | Camera-support issues with samples (governance §3); decode several files in parallel; LibRaw as a later plugin. |
