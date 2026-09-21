@@ -106,6 +106,12 @@ harnesses that the testing strategy keeps are **moved, not rewritten**.
 Done when: an empty application builds and starts on three platforms from CI, and a trivial
 test of each kind runs.
 
+**Status: done** (CI run 35551629942, all jobs green on Linux, Windows and macOS). Differences from
+the plan: the dataset generator moves in WP2; `cargo audit` is replaced by `cargo deny`, which reads
+the same advisories; a `cargo xtask layers` check enforces the dependency rules of the architecture,
+and found that `plugin-api` (MIT OR Apache-2.0) must not depend on `types` (GPL), so it depends on
+nothing. Fuzz targets and crash-consistency tests start with the formats in WP1.
+
 ### WP1 Formats and workspace (L). Needs WP0
 
 `types` and `format`, then `workspace`.
