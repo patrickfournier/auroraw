@@ -162,8 +162,12 @@ so a portability check must run on every platform before a plugin enters the ind
 
 ## What remains
 
-- [ ] **Windows and macOS.** Continuous integration runs the sandbox tests on both; a real
-  Windows machine would confirm the permission behaviour (paths, file access rules).
+- [x] **Windows and macOS, in continuous integration.** Run 35535924382 (commit 57eca26) passed the
+  sandbox tests on both: every hostile case left the host alive, on Windows too (panic, loops
+  stopped by the timer and by fuel, the memory limit). Timings from shared runners are not
+  comparable with the Linux figures and are not recorded here.
+- [ ] **A real Windows machine** would still confirm the permission behaviour (paths, file access
+  rules) on the granted-folder cases.
 - [ ] **The component model.** These plugins use a hand-made C interface. wasmtime's component model
   and WIT would give typed interfaces; its cost was not measured.
 - [ ] **WebAssembly threads**, which would recover the parallel decoders, are not enabled.

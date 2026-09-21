@@ -11,6 +11,7 @@ negative scans, non-destructively), convert, edit metadata and deliver galleries
 - [Testing strategy](docs/testing-strategy.md)
 - [Continuous integration and releases](docs/continuous-integration.md)
 - [Governance and contributions](docs/governance.md)
+- [Milestone M1 plan](docs/m1-plan.md)
 - [Technical spikes](docs/technical-spikes.md)
 
 ## License

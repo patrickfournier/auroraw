@@ -991,6 +991,7 @@ Sorted by when they need an answer. No question is left to decide before the tec
    catalogues, culling, development and versions, metadata, export and Prooftide, plugins and AI.
 2. ~~Review the whole specification for consistency, and sort the open questions of §10.~~ Done
    on 2026-09-19. The six questions it raised were settled the same day (D-062 to D-067).
-3. Define the development process (architecture, technology stack, testing, continuous
-   integration, open source governance, plugin licensing).
-4. Plan milestone M1.
+3. ~~Define the development process~~ (architecture, technology stack, testing, continuous
+   integration, open source governance, plugin licensing). Done on 2026-09-20: see the
+   documents listed in the README (D-068 to D-083).
+4. ~~Plan milestone M1~~: drafted in [m1-plan.md](m1-plan.md).

@@ -1,6 +1,6 @@
 # Technical spikes
 
-> **Status: spikes 1 and 2 done, 3 and 4 measured on Linux.** Phase 2 (development process) begins with the technology
+> **Status: spikes 1 and 2 done, 3 and 4 measured on Linux (4 also passed on Windows and macOS in CI).** Phase 2 (development process) begins with the technology
 > stack. Four choices depend on facts we do not have yet, so we measure before we decide.
 > A spike is a small, throwaway prototype that answers one question with numbers. Its code is
 > not part of the product.

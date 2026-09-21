@@ -575,9 +575,6 @@ deprecates OpenGL; Slint's Skia or Metal renderer may be needed there. To check 
 
 ## 15. Next
 
-1. Review this document.
-2. **The test strategy**: what is tested at which level, the CPU references, the smoke tests,
-   the performance harness.
-3. **Continuous integration and releases** on three platforms.
-4. **Governance**: contributions, decisions, the plugin licence.
-5. **The plan of milestone M1.**
+The documents that follow this one are written: the [testing strategy](testing-strategy.md),
+[continuous integration and releases](continuous-integration.md), [governance](governance.md) and
+the [plan of milestone M1](m1-plan.md).
