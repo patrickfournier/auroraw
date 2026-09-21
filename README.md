@@ -16,6 +16,7 @@ negative scans, non-destructively), convert, edit metadata and deliver galleries
 - [Governance and contributions](docs/governance.md)
 - [Milestone M1 plan](docs/m1-plan.md)
 - [Technical spikes](docs/technical-spikes.md)
+- Design notes: [001 workspace layout](docs/design/001-workspace-layout.md), [002 state files](docs/design/002-state-files.md)
 
 ## Building
 

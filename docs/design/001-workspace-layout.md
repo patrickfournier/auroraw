@@ -1,11 +1,11 @@
 # Design note 001: the layout of a workspace
 
-> **Status: proposal, awaiting approval.** First design note of work package WP1
+> **Status: adopted (D-085).** First design note of work package WP1
 > ([M1 plan](../m1-plan.md) §5 and §6, items 2 and part of 5). It answers question 2 of the
 > specification (§10): how is a workspace organised on disk, what are the files called, and where
 > does a workspace go by default? It does **not** settle the formats of the files themselves
 > (notes 002 to 004), only where they live and how they are named and written. Statuses are
-> **[proposed]** until approved; the approval becomes decision D-085.
+> **[decided]** since D-085; the approval is decision D-085.
 
 ## 1. The question
 
