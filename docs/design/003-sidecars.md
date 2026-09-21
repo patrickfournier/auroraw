@@ -27,7 +27,7 @@ we do not understand is lost?
 | 1 | The photo sidecar is **standard XMP**, and a foreign tool reading it finds rating, label, title, caption, keywords (flat and hierarchical), creator, rights and location in the places it expects. | Spec §5.7, §5.8 |
 | 2 | It **caches the original's capture data** (time, camera, lens, exposure, size, GPS) so a rebuild never reopens the originals. | D-074 |
 | 3 | **EXIF corrections are overlays**: the original value stays visible and can be restored. | Spec §5.7 |
-| 4 | **Keywords have a stable identity** in the vocabulary; renaming or moving one updates every photo that uses it. | D-045 |
+| 4 | **Keywords have a stable identity** in the vocabulary; renaming or moving one updates every photo that uses it, **without rewriting their sidecars**. | D-045 |
 | 5 | A version sidecar is **self-contained**: it copies the photo's metadata and adds its own, and records **which fields it overrides**; when the photo changes, the copies **follow**, except for the overridden fields. | D-023, D-027, spec §5.5 |
 | 6 | **Effective value** = the version's if it defines one, otherwise the photo's; keywords are the **union**; a version can only **add** keywords. | Spec §5.5, D-014 |
 | 7 | **Existing XMP** files from other software are read (never modified) and their ratings and keywords are copied in; hierarchies written by other software are understood. | Spec §5.2, §5.7 |
@@ -91,8 +91,8 @@ schema can be published there. The version of this part of the file is `aur:Sche
 | **Colour label** | `xmp:Label` | The label's name, as other software writes it. |
 | **Title** | `dc:title` | Language alternative, `x-default`. |
 | **Caption** | `dc:description` | Language alternative. |
-| **Keywords, flat** | `dc:subject` | The **leaf** keywords assigned, by name. |
-| **Keywords, hierarchy** | `lr:hierarchicalSubject` | Full paths with `\|` (`Place\|Canada\|Quebec`), the form Lightroom, digiKam-compatible tools and others read. |
+| **Keywords, flat** | `dc:subject` | The **leaf** keywords assigned, by name: **a snapshot** (§6). |
+| **Keywords, hierarchy** | `lr:hierarchicalSubject` | Full paths with `\|` (`Place\|Canada\|Quebec`), the form Lightroom, digiKam-compatible tools and others read: **a snapshot** (§6). |
 | **Keywords, identity** | `aur:KeywordIds` | A bag of the assigned keywords' identifiers (§6). |
 | **Other metadata** | The list of §7 | Creator, rights, credit, location, and so on. |
 | **The original's data**, as read | `exif:DateTimeOriginal` (with `exif:OffsetTimeOriginal` and the sub-seconds), `tiff:Make`, `tiff:Model`, `aux:SerialNumber`, `aux:Lens`, `exif:ExposureTime`, `exif:FNumber`, `exif:ISOSpeedRatings`, `exif:FocalLength`, `exif:FocalLengthIn35mmFilm`, `exif:PixelXDimension` and `exif:PixelYDimension`, `tiff:Orientation`, `exif:GPSLatitude`, `exif:GPSLongitude`, `exif:GPSAltitude` | The standard properties, **holding the original's values**, as XMP sidecars conventionally do (D-074). |
@@ -182,7 +182,8 @@ source of truth.
 ### 5.3 How the copy follows, and what an action costs [proposed]
 
 The digest in `aur:CopiedFrom` is a **BLAKE3 hash of the canonical form of the fields that are copied**
-(the properties of §4.3 other than the identity, the files and the locations). The write path of
+(the properties of §4.3 other than the identity, the files and the locations, with the keywords
+counted **by identifier**, not by name: §6). The write path of
 architecture §5.3 becomes:
 
 1. Write the **photo sidecar** (atomic), then the database transaction. **This is all an action waits for.**
@@ -205,26 +206,47 @@ companion file is named `<photo id>.<version id>.<suffix>` (for example `.histor
 name an M1 reader lists as unknown and never touches (note 001 §5.6). A version with a development a
 reader does not understand is opened **read-only for the development** and its metadata still works.
 
-## 6. Keywords: identity and names [proposed]
+## 6. Keywords: identity, and names as a snapshot [proposed]
 
 - **A keyword is identified by its identifier** in the vocabulary (note 002); `aur:KeywordIds` in a
-  sidecar says which keywords a photo has, and **the names in `dc:subject` and
-  `lr:hierarchicalSubject` are a copy for other software**.
+  sidecar says which keywords a photo has. **Auroraw displays, searches and filters by identifier.**
+- **The names in `dc:subject` and `lr:hierarchicalSubject` are a snapshot**: what the names were
+  when the sidecar was last written. They are there for three reasons, none of which is the
+  everyday running of Auroraw:
+  1. **Recovery.** `vocabulary.json` is a single file. If it is lost or damaged, the vocabulary is
+     rebuilt from the sidecars: each identifier with its path gives back the entry, **with the same
+     identifier**, so nothing else has to change.
+  2. **Self-contained sidecars** (D-023). Photos copied to another catalogue carry the paths that
+     the destination's vocabulary merges by (D-067).
+  3. **Other software** that reads a workspace sidecar directly, which is rare, since the
+     workspace is not next to the originals; the XMP export is the normal channel (§8).
+- **Renaming, moving or merging a keyword changes the vocabulary file and nothing else.** No
+  sidecar is rewritten, no background job runs, no stamp is kept. A rename of a keyword used by
+  22,000 photos is one small write, not fifty thousand.
+- **The snapshot is refreshed only when it costs nothing**: whenever a sidecar is **written anyway**
+  (an edit of that photo, a version copy refresh, an import step), its names are rewritten from the
+  current vocabulary; and **always in an export** (§8), which builds names from the vocabulary and
+  not from the snapshot. There is also a maintenance command, **"Refresh keyword names in the
+  sidecars"**, run on request (and by the backup helper of M4), for someone who wants other software
+  to see current names.
+- **Consequence to accept**: a tool that reads the workspace sidecars directly can see an old
+  keyword name until the sidecar is next written or the command is run. Auroraw itself never does.
+- **The digest of the version copies** (§5.3) is computed over the keyword **identifiers**, not
+  the names, so renaming a keyword does not make every version copy look out of date.
+- **On rebuild**, for each identifier in a sidecar:
+  - found in the vocabulary: **the vocabulary's name and path win**, the snapshot is ignored;
+  - **not found** (the vocabulary was lost, or the photo comes from another workspace): the entry is
+    **created with that identifier and the snapshot's path**, which is the recovery above, and
+    reported so that the photographer knows the vocabulary was rebuilt from sidecars;
+  - a sidecar **without identifiers** (foreign XMP, or written before the vocabulary existed) is
+    resolved **by path**, creating the missing entries with new identifiers.
 - **Vocabulary names cannot contain `|`** (the separator of the hierarchical form); the interface
   refuses it.
-- **Renaming, moving or merging a keyword** changes the vocabulary file at once, which is the whole
-  change for Auroraw: it displays and searches by identifier. The **name copies in the sidecars
-  are refreshed in the background**, in one batch, like the version copies. A crash in the middle leaves
-  some names stale, which affects only other software reading those files. At start-up, a
-  refresh runs again if the vocabulary changed after the last completed one (a stamp in the local
-  registry).
-- **A keyword removed from the vocabulary** (merged or deleted) is replaced by its merge target, or
-  removed from the photos in a batch, and the identifier is never reused.
+- **A keyword removed from the vocabulary** (deleted, or merged into another) is removed from the
+  photos, or replaced by its merge target, **in one batch job** (this one does need to touch the
+  sidecars, since the photos' keyword sets change), and the identifier is never reused.
 - **Do-not-export keywords** (D-045) are written in the workspace, which is private, and **dropped
-  from what leaves it**: exports and the XMP export to source folders (§8).
-- **On rebuild**, an identifier found in the vocabulary wins; one not found is a **dangling keyword**,
-  listed in a report and kept in the sidecar; a sidecar **without identifiers** (foreign, or written before
-  the vocabulary existed) is resolved **by path**, creating the missing vocabulary entries.
+  from what leaves it**: exports and the XMP export to the source folders (§8).
 
 ## 7. The metadata fields of M1 [proposed]
 
@@ -270,7 +292,10 @@ over. Three boundaries have their own mapping, made by the code that crosses the
 - **Tests**: round trip; canonical bytes; unknown properties, extra namespaces and second
   `rdf:Description` blocks kept; the attribute form and the element form read the same; a truncated or
   invalid file is an error and is never overwritten; a newer `aur:Schema` is not modified; **ExifTool reads the
-  fixtures back correctly** (in CI); the digest of the copied fields is stable across platforms; **an export read back gives the same
+  fixtures back correctly** (in CI); the digest of the copied fields is stable across platforms and **does not change when a keyword is
+  renamed**; **renaming a keyword writes no sidecar**; a sidecar written for another reason gets current
+  names; a **lost vocabulary is rebuilt from the sidecars with the same identifiers**; the maintenance
+  command refreshes the names; **an export read back gives the same
   rating, flag, label, title, caption and keywords** (rejected photos with stars included, with and
   without the `-1` option).
 - A **parse benchmark** on 100,000 photo and 143,000 version sidecars, to hold requirement 9
@@ -294,7 +319,7 @@ Approval of: the choice of writing and reading XMP with our own code (§3); the 
 namespace (§4.2); the content of the photo sidecar (§4.3) and the treatment of rating and flag (§4.5);
 the content of the version sidecar and the rule that **the photo plus the version's overrides is the
 truth and the copy is derived** (§5.1 to §5.3); the room reserved for the development (§5.4); the
-treatment of keywords (§6); the field list of M1 (§7); and the boundaries (§8), as **D-087**.
+treatment of keywords (§6), where **names in sidecars are a snapshot** and a rename writes no sidecar; the field list of M1 (§7); and the boundaries (§8), as **D-087**.
 The point most worth a second look is §5.3: **version copies are refreshed in the background**, which
 is faster than writing them with every action, and slightly relaxes the letter of D-027 ("the copies
 follow") into "the copies follow, shortly, and are repaired if a crash interrupts them".
