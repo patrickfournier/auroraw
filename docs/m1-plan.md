@@ -138,8 +138,9 @@ sidecars of note 003 with the derived copy and its digest), `workspace` (creatio
 atomic writes with the Windows retry, typed reading and writing, the scan, recoverable removal), fixtures,
 generated round trips, Lightroom and darktable style files, an ExifTool interoperability test on the three
 platforms, fuzz targets run nightly, and the large-workspace measurement (design note 001 §4.2). The fuzzer
-found one real bug in its first run (namespace addresses with entities), fixed; `cargo deny` found two
-advisories in the XML library the same day, fixed by upgrading. Reading 225,000 sidecars takes 1.9 s on the
+found four real bugs in its first runs (namespace addresses with entities, names that cannot be written,
+control characters, and floats that did not round trip exactly), all fixed with a regression test and a seed in
+the corpus; `cargo deny` found two advisories in the XML library the same day, fixed by upgrading. Reading 225,000 sidecars takes 1.9 s on the
 developer machine and 10 to 45 s on the slowest CI runners; writing them takes 500 to 700 s on the Windows
 runner. **Left: the same measurement on Patrick's Windows machine**, the number that decides whether batch
 writing needs more than a background job.
