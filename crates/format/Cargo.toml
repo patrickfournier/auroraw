@@ -13,3 +13,12 @@ workspace = true
 
 [dependencies]
 auroraw-types = { path = "../types" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+blake3.workspace = true
+quick-xml.workspace = true
+
+[dev-dependencies]
+auroraw-testkit = { path = "../testkit" }
+proptest.workspace = true

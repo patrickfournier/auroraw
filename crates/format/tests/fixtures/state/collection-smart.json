@@ -1,0 +1,20 @@
+{
+  "format": "auroraw/collection",
+  "schema": 1,
+  "id": "6e6f707172737475",
+  "updated": "2026-09-21T14:02:11Z",
+  "name": "Four stars and up",
+  "kind": "smart",
+  "parent": null,
+  "members": [],
+  "query": {
+    "all": [
+      {
+        "field": "rating",
+        "op": ">=",
+        "value": 4
+      }
+    ]
+  },
+  "query_schema": 1
+}

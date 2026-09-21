@@ -1,0 +1,13 @@
+{
+  "format": "auroraw/collection",
+  "schema": 1,
+  "id": "5d5e5f6061626364",
+  "updated": "2026-09-21T14:02:11Z",
+  "name": "Marie wedding",
+  "kind": "manual",
+  "parent": null,
+  "members": [
+    "3f2a91c0d77e4b5a8c1e0f9d2b6a4c31",
+    "4a2a91c0d77e4b5a8c1e0f9d2b6a4c32.7be1a0c4d2f95e08"
+  ]
+}
