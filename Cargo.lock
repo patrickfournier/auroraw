@@ -127,7 +127,11 @@ name = "auroraw-workspace"
 version = "0.0.0"
 dependencies = [
  "auroraw-format",
+ "auroraw-testkit",
  "auroraw-types",
+ "fastrand",
+ "proptest",
+ "thiserror",
 ]
 
 [[package]]

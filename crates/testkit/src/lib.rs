@@ -2,6 +2,8 @@
 //! Test helpers, used by other crates in their `dev-dependencies` only (testing strategy §1, §5).
 //! Every test is hermetic and deterministic: its own temporary directory, fixed random seeds.
 
+pub use tempfile::TempDir;
+
 /// A fresh temporary directory, removed when dropped.
 pub fn temp_dir() -> tempfile::TempDir {
     tempfile::tempdir().expect("a temporary directory")
