@@ -236,14 +236,25 @@ overwritten** until the user decides (testing strategy §8).
 
 ### 5.7 Where a workspace goes by default, and the local data [proposed]
 
-- **The default workspace of the first launch** is `<Pictures>/Auroraw/Main`, created silently
-  (D-017): `<Pictures>` being the operating system's Pictures folder (Known Folders on Windows,
-  `XDG_PICTURES_DIR` on Linux, `~/Pictures` on macOS). The workspace is **the thing to back up**,
+- **The default workspace of the first launch** is `<Pictures>/Auroraw/<catalogue name>`, created
+  silently (D-017), where the default catalogue name is **a translated string** ("Main" in
+  English, "Principal" in French). `<Pictures>` is the operating system's Pictures folder, which
+  the system already localises (Known Folders on Windows, `XDG_PICTURES_DIR` on Linux,
+  `~/Pictures` on macOS: "Images" on a French system); `Auroraw` is the product name and is not
+  translated. The workspace is **the thing to back up**,
   so it lives where users already back up their photos, visible, and not in a hidden application-data
   folder that a clean-up or a profile reset could remove.
 - **Another catalogue** asks for a name and a place, offering `<Pictures>/Auroraw/<name>`. The
-  folder name is the catalogue's name reduced to portable characters, made unique.
-  The folder is not localised, whatever the interface language.
+  folder name is the catalogue's name, normalised (composed accents) and cleaned of the
+  characters and names a file system refuses, made unique. It may contain any script.
+- **Localising the name is safe because it happens once.** The name is fixed when the catalogue
+  is created, in the interface language of that moment, and is stored in `workspace.json` and the
+  registry; changing the language later does not rename anything, and a workspace is found again
+  by its marker, never by its folder name. The **names inside the workspace** (`photos`,
+  `versions`, `state`, `exports`, `removed`, `.auroraw`) are part of the format and are **never
+  translated**: they must be identical on every machine and in every language, or a workspace
+  moved between machines could not be read. The cost of localising the root name is only that
+  support instructions cannot say "the Main folder": they say "the workspace folder".
 - **The catalogue database** is local (D-026): `<data dir>/catalogues/<workspace id>/catalogue.db`;
   **the previews database** is in the cache directory: `<cache dir>/catalogues/<workspace id>/previews.db`
   (D-075). Both are deletable and rebuilt.
