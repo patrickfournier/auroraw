@@ -131,6 +131,19 @@ Done when: round trips and unknown-content tests pass; ExifTool reads the photo 
 workspace of 100,000 photos is written and re-read in the time spike 3 measured, **including on
 NTFS** (this replaces the pending Windows run of spike 3, and settles D-075 for the workspace).
 
+**Status: done except one measurement on Patrick's own Windows machine** (CI run of 2026-09-21).
+Built: `types` (identifiers, fingerprint and hash, timestamps), `format` (the fingerprint of note 004 with
+known-answer tests; the state files of note 002; an XMP reader and canonical writer; the photo and version
+sidecars of note 003 with the derived copy and its digest), `workspace` (creation, marker, writer's lock,
+atomic writes with the Windows retry, typed reading and writing, the scan, recoverable removal), fixtures,
+generated round trips, Lightroom and darktable style files, an ExifTool interoperability test on the three
+platforms, fuzz targets run nightly, and the large-workspace measurement (design note 001 §4.2). The fuzzer
+found one real bug in its first run (namespace addresses with entities), fixed; `cargo deny` found two
+advisories in the XML library the same day, fixed by upgrading. Reading 225,000 sidecars takes 1.9 s on the
+developer machine and 10 to 45 s on the slowest CI runners; writing them takes 500 to 700 s on the Windows
+runner. **Left: the same measurement on Patrick's Windows machine**, the number that decides whether batch
+writing needs more than a background job.
+
 ### WP2 Catalogue (L). Needs WP1
 
 `catalogue`: the schema of spike 3 promoted to product (photos, versions, keywords with paths,

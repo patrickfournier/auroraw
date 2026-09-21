@@ -140,6 +140,34 @@ What they say:
   100,000 folders on NTFS; neither layout is proposed, so they cannot change the choice. The measurement is
   repeated on Patrick's Windows machine, with real sidecars, at the end of WP1.
 
+### 4.2 What the real code measured (WP1)
+
+The first `workspace` and `format` crates, with real sidecars (about 3 KB each), were run on **100,000
+photos and 125,074 versions (225,074 files)** by `crates/workspace/tests/large.rs`, nightly on the
+three platforms. Sixteen threads on the developer machine (warm), four on the runners.
+
+| | Developer machine (Linux, 16 threads) | CI Linux (4 vCPU) | CI macOS (3 vCPU) | CI Windows (4 vCPU, Defender on) |
+| --- | --- | --- | --- | --- |
+| Write every sidecar (atomic) | 4.1 s | 7.6 to 10 s | 47 to 59 s | **500 to 700 s** |
+| Walk the whole tree | 0.43 s | 0.5 to 0.8 s | 10 to 17 s | 0.5 to 0.6 s |
+| Read and parse every sidecar | **1.9 s** (119,000 files a second) | 11 to 18 s (12,000 to 20,000 a second) | 43 s (5,200 a second) | 9.6 to 14 s (16,000 to 23,000 a second) |
+
+One atomic write, step by step, one thread (milliseconds per file): Linux 0.02; macOS 0.16;
+**Windows about 1.0** (writing the temporary file 0.29, the rename **0.55**, checking that the shard
+folder exists 0.15, which is no longer done: the folder is created only when the rename finds it
+missing). Under four threads each step is 2 to 5 times slower on the runners.
+
+What it says:
+
+- **The parse is not the bottleneck**: requirement 9 of note 003 (tens of thousands of files a second on all cores) holds
+  everywhere the file system lets it. The rebuild's reading is limited by the disk, as note 004 found for hashing.
+- **A rebuild of 100,000 photos reads 225,000 files in 2 s on a fast machine and 10 to 45 s on the slowest
+  runners.** Seconds to tens of seconds, as the plan expected.
+- **Writing is where Windows hurts**, and it is the rename and the antivirus scan of every new file, in every layout
+  (note 001 §4.1). About 1 to 2 ms per file on the runner, so a batch that rewrites 10,000 photo sidecars and
+  their version copies takes **20 to 45 seconds** there, and must be a background job with progress (note 003 §5.3).
+  These runners are shared and scanned; the figures are to be repeated on Patrick's own Windows machine.
+
 ## 5. The proposal
 
 ### 5.1 The tree [proposed]

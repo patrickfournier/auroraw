@@ -195,8 +195,8 @@ architecture §5.3 becomes:
 
 Rating a photo in Cull mode therefore writes one small file, whatever the number of its versions. A
 batch edit of 10,000 photos with about 1.4 versions each rewrites 10,000 photo sidecars first
-and about 14,000 version sidecars in the background: on NTFS about 0.7 ms per file (note 001),
-7 s then 10 s, a job with progress that does not block the interface, run on several threads.
+and about 14,000 version sidecars in the background: on NTFS 1 to 2 ms per file as measured on the GitHub runner (note 001 §4.2), so
+20 to 45 seconds there, a job with progress that does not block the interface, run on several threads.
 
 ### 5.4 The development, reserved for M2 [proposed]
 
