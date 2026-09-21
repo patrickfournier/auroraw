@@ -14,7 +14,7 @@ result on Vulkan, Metal and DirectX 12, and with a CPU fallback? (docs/technical
 
 ## What was built
 
-`spikes/gpu-pipeline`, about 700 lines of Rust and WGSL:
+`spikes/gpu-pipeline` (at the tag `spikes-final`), about 700 lines of Rust and WGSL:
 
 - Three compute shaders: **demosaicing** (Malvar-He-Cutler gradient-corrected interpolation,
   with black level and white balance), **box downscale**, and **tone** (camera RGB to a wide
@@ -195,7 +195,7 @@ plugin is accepted into the index, because the author will usually have tried on
 ## The same machine under Windows
 
 Patrick booted the same PC into Windows and ran `run-all.sh` (issue #1 of the repository, results
-in `spikes/results-windows/`). Same GTX 1650 SUPER, driver 566.24, wgpu on **Vulkan**. Windows had
+in `docs/spikes/results-windows/`). Same GTX 1650 SUPER, driver 566.24, wgpu on **Vulkan**. Windows had
 many updates pending and a busy disk during the run, which could disturb timings; the figures
 below are close to Linux's, so the effect on the GPU work was small.
 
@@ -291,4 +291,4 @@ cargo build --release
 On Windows, run the shell script from Git Bash. `rawbench` writes previews to
 `samples/previews/`.
 
-Raw results are in `spikes/results/`.
+Raw results are in `docs/spikes/results/`.

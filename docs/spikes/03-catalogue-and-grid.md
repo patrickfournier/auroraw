@@ -12,7 +12,7 @@ rebuild of the catalogue from the workspace (D-026) fast enough to be routine?
 
 ## What was built
 
-`spikes/catalogue`, `spikes/viewer-catalogue`:
+`spikes/catalogue`, `spikes/viewer-catalogue` (at the tag `spikes-final`):
 
 - **A generated catalogue of 100,000 photos** (54 MB): 250 shoots of about 400 photos, 4,420
   hierarchical keywords (20 categories, 400 groups, 4,000 keywords), 653,672 keyword links (six or
@@ -180,4 +180,4 @@ cargo build --release
 ```
 
 The data goes in `$AUR_DATA` (default `/tmp/auroraw-spike3`), about 3.5 GB. Raw results are in
-`spikes/results/spike3-*.json`.
+`docs/spikes/results/spike3-*.json`.

@@ -19,7 +19,7 @@
    seeds, its own temporary directory. A test that fails sometimes is a defect, fixed or removed
    within a week (§10).
 4. **Most of the code is testable without a window or a GPU**, because the architecture makes it
-   so (rules 3 and 5 of architecture §3.2). The interface is the thin layer that needs the
+   so (rules 3 and 6 of architecture §3.2). The interface is the thin layer that needs the
    least automated checking and the most human checking.
 5. **A bug gets a test first.** A fix without a test that failed before it is incomplete.
 6. **Speed budgets are tests**, run on known hardware (§7), not aspirations.
@@ -238,8 +238,8 @@ A change is ready to merge when:
 5. If it adds a **user-visible string**, the string is translatable and the pseudo-locale check
    passes; if it adds a **control**, the control has an accessible name and a keyboard path.
 6. If it adds a **dependency**, the licence is compatible with GPL-3.0 (`cargo-deny` checks the
-   whole tree on every change), the dependency is justified in the change, and `cargo-audit` shows
-   no known vulnerability.
+   whole tree on every change), the dependency is justified in the change, and it has no known
+   vulnerability (`cargo-deny` reads the RustSec advisories as well).
 7. If it touches the pipeline or the catalogue, the **performance run** has been done on at least
    one reference machine, and the result is in the change.
 8. It is reviewed.
@@ -258,7 +258,7 @@ path, the format code and the plugin host, where a gap is expensive.
   quarantine list that grows is a process failure, reported at each release.
 - **No test depends on another's result or order.**
 - **Tooling.** `cargo nextest` (faster, isolates each test), `proptest`, `cargo-fuzz`, `insta` or a
-  small in-house comparison for golden files, `cargo-llvm-cov`, `cargo-deny`, `cargo-audit`.
+  small in-house comparison for golden files, `cargo-llvm-cov`, `cargo-deny` (which also covers the advisory database).
   The choices are ordinary and replaceable. [open: `insta` against a hand-made golden helper; the
   image comparison needs a tolerance that `insta` does not offer.]
 - **Documentation of tests.** Each module's `tests/` starts with a short note on what it covers

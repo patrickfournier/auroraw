@@ -1,0 +1,17 @@
+[package]
+name = "auroraw-import"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Import profiles, verified copy, series detection"
+
+[lints]
+workspace = true
+
+[dependencies]
+auroraw-imaging = { path = "../imaging" }
+auroraw-sources = { path = "../sources" }
+auroraw-types = { path = "../types" }

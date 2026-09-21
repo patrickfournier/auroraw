@@ -1,0 +1,21 @@
+[package]
+name = "auroraw-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "The Auroraw application"
+
+[lints]
+workspace = true
+
+[dependencies]
+auroraw-ui = { path = "../ui" }
+auroraw-engine = { path = "../engine" }
+auroraw-types = { path = "../types" }
+
+[[bin]]
+name = "auroraw"
+path = "src/main.rs"

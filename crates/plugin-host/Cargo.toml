@@ -1,0 +1,15 @@
+[package]
+name = "auroraw-plugin-host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "The WebAssembly plugin host"
+
+[lints]
+workspace = true
+
+[dependencies]
+auroraw-plugin-api = { path = "../plugin-api" }

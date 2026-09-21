@@ -1,0 +1,15 @@
+[package]
+name = "auroraw-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "The Slint user interface"
+
+[lints]
+workspace = true
+
+[dependencies]
+auroraw-engine = { path = "../engine" }

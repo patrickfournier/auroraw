@@ -30,7 +30,7 @@ texture upload, 5 MB for a 1340x964 view and 12 MB for 2200x1400.
 
 **A first attempt was made over a remote desktop session**, whose display is software rendered
 and paced by the remote client. Its numbers (about 50 frames per second for Slint, with
-stutters) say nothing about the toolkits, and are kept apart in `spikes/results/spike2/remote-desktop/`.
+stutters) say nothing about the toolkits, and are kept apart in `docs/spikes/results/spike2/remote-desktop/`.
 The tables below are from the real display.
 
 The way a developed image reaches the toolkit is measured separately (see the next section).
@@ -140,7 +140,7 @@ The prototype itself has not been checked with Orca.
 ## Windows, on the same PC
 
 Slint and iced were also run under Windows, on the same GTX 1650 SUPER and a real display at
-60 Hz (issue #1, `spikes/results-windows/`). Qt was not built for Windows. Windows had many
+60 Hz (issue #1, `docs/spikes/results-windows/`). Qt was not built for Windows. Windows had many
 updates pending and a busy disk during the run.
 
 | Mode | Toolkit | Median | p99 | Worst | Frames over 20 ms |
@@ -235,4 +235,4 @@ cd viewer-qt && mkdir build && cd build && cmake .. && make
 python3 a11y-check.py viewer-slint                          # with accessibility switched on
 ```
 
-Raw results are in `spikes/results/spike2/local/`.
+Raw results are in `docs/spikes/results/spike2/local/`.

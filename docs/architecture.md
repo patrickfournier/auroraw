@@ -87,7 +87,12 @@ flowchart TD
   host --> api["plugin-api (declaration, interface)"]
   format --> types["types (ids, errors)"]
   imaging --> types
-  api --> types
+  imaging --> api
+  sources --> api
+  sources --> types
+  import --> sources
+  import --> types
+  app --> engine
 ```
 
 | Module | Responsibility | Milestone |
@@ -103,7 +108,7 @@ flowchart TD
 | `develop` | The version model: operations, history, snapshots, styles, local adjustments, base looks. | M2 |
 | `export` | Recipes, the job queue, encoders, watermark, metadata writing. | M2 (minimal), M4 |
 | `publish` | Publication records, revisions, client feedback, the gallery interface. | M4 |
-| `plugin-api` | The types shared by the host and the plugins: declaration, permissions, interface. Small, versioned, stable from M5. | M1 |
+| `plugin-api` | The types shared by the host and the plugins: declaration, permissions, interface. Small, versioned, stable from M5. **Licensed MIT OR Apache-2.0 (D-080), so it depends on no other crate of the application.** | M1 |
 | `plugin-host` | wasmtime, permission grants, limits, compiled cache, GPU shader checks. | M1 |
 | `engine` | The application core: owns the catalogues, workspaces, job system and event bus; the only thing the interface talks to. Testable without a window. | M1 |
 | `ui` | The Slint views, the virtualised models, the translations. | M1 |
@@ -117,11 +122,13 @@ flowchart TD
    state of its own beyond what it displays.
 3. `pipeline`, `format` and `catalogue` run without the interface, so each has tests that need
    no window or display.
-4. `plugin-api` has almost no dependencies and changes rarely, because plugins are built
+4. `plugin-api` depends on no other crate of the application and changes rarely, because plugins are built
    against it.
-5. A headless `cli` exercises the whole engine; a feature that cannot be driven from it is
+5. The allowed dependencies are written down and checked by `cargo xtask layers` in CI, together
+   with the licence rule of `plugin-api`.
+6. A headless `cli` exercises the whole engine; a feature that cannot be driven from it is
    coupled to the interface and is a defect.
-6. No module starts a global async runtime; threads and channels are the default.
+7. No module starts a global async runtime; threads and channels are the default.
 
 ## 4. Running: threads and messages
 

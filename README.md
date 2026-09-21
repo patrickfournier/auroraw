@@ -3,7 +3,10 @@
 Free and open source application for photographers: organise, develop (RAW files and film
 negative scans, non-destructively), convert, edit metadata and deliver galleries.
 
-> **Status: design phase.** There is no code yet. We are defining the features.
+> **Status: milestone M1 started.** The design is complete ([documents below](#documents)) and the
+> repository has its product layout (work package WP0). There is nothing to install yet.
+
+## Documents
 
 - [Functional specification](docs/functional-specification.md)
 - [Decision log](docs/decisions.md)
@@ -13,6 +16,19 @@ negative scans, non-destructively), convert, edit metadata and deliver galleries
 - [Governance and contributions](docs/governance.md)
 - [Milestone M1 plan](docs/m1-plan.md)
 - [Technical spikes](docs/technical-spikes.md)
+
+## Building
+
+The toolchain is pinned in `rust-toolchain.toml`; `rustup` installs it on first use.
+
+```bash
+cargo build --workspace
+cargo test --workspace
+cargo xtask check      # licence headers and the allowed dependencies between crates
+```
+
+The crates are described in the [architecture](docs/architecture.md) (§3). The code of the four
+technical spikes is archived at the tag `spikes-final`.
 
 ## License
 

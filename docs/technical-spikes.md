@@ -135,8 +135,8 @@ plugin that ships WGSL and parameters and is placed in the pipeline from its dec
 
 ## 6. Logistics
 
-- **Code.** Each spike is its own crate under `spikes/` on the `dev` branch. It is throwaway and
-  removed, or archived, once the decision is recorded.
+- **Code.** Each spike was its own crate under `spikes/`. It was throwaway and is now archived at
+  the tag `spikes-final` (see [spikes/README.md](spikes/README.md)).
 - **Windows and macOS.** Continuous integration (GitHub Actions) builds each spike on Linux,
   Windows and macOS. Patrick downloads the binaries, runs them on the machines he has access to
   and sends the results. Each spike prints its measures as a small JSON file so the results are

@@ -1,0 +1,19 @@
+[package]
+name = "auroraw-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "The headless command line"
+
+[lints]
+workspace = true
+
+[dependencies]
+auroraw-engine = { path = "../engine" }
+
+[[bin]]
+name = "auroraw-cli"
+path = "src/main.rs"

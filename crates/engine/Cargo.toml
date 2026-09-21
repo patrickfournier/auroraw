@@ -1,0 +1,21 @@
+[package]
+name = "auroraw-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "The application core: commands, events, jobs"
+
+[lints]
+workspace = true
+
+[dependencies]
+auroraw-catalogue = { path = "../catalogue" }
+auroraw-workspace = { path = "../workspace" }
+auroraw-sources = { path = "../sources" }
+auroraw-import = { path = "../import" }
+auroraw-imaging = { path = "../imaging" }
+auroraw-plugin-host = { path = "../plugin-host" }
+auroraw-types = { path = "../types" }

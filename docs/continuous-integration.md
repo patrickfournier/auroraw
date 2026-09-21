@@ -40,11 +40,11 @@ Runs on every push to `dev` and to a pull request. Jobs run in parallel; the slo
 
 | Job | What | Platforms |
 | --- | --- | --- |
-| **Lint** | `rustfmt --check`, `clippy` with warnings as errors, the repository's own checks (no tabs in docs, links between documents resolve) | Linux |
+| **Lint** | `rustfmt --check`, `clippy` with warnings as errors, `cargo xtask check` (SPDX headers, the allowed dependencies between crates), and later the repository's own checks (links between documents resolve) | Linux |
 | **Build and test** | `cargo build --locked`, `cargo nextest run` (unit, property with few cases, format, catalogue, engine scenarios, plugin host and hostile plugins, crash consistency short) | Linux x64, Windows x64, macOS arm64 |
 | **Plugins** | Build the plugins for `wasm32-wasip1` (the spike's step) and run the conformance tests against them | Linux, Windows, macOS |
 | **GPU reference** | The smoke test and the stage-against-reference tests on the **software adapter** of each runner: lavapipe, WARP, the runner's Metal adapter. **Blocking.** | All three |
-| **Dependencies** | `cargo deny check` (licences compatible with GPL-3.0, bans, sources), `cargo audit` | Linux |
+| **Dependencies** | `cargo deny check` (licences compatible with GPL-3.0, bans, sources, and the RustSec advisories, which is what `cargo audit` reads) | Linux |
 | **Translations** | Message ids present and unused, pseudo-locale run of every screen, the catalogue compiles | Linux |
 | **Accessibility** | The AT-SPI check that every control has a role and a name | Linux, under a virtual display |
 | **Docs** | The documents build; the spike and decision indexes are consistent | Linux |
@@ -80,9 +80,9 @@ Runs on a tag `vX.Y.Z` pushed to `main`. See §6.
 
 ### 3.4 The spikes' workflow
 
-`spikes.yml` stays until the spike code is archived (§8), then is deleted. It is the ancestor of
-`ci.yml`, and its steps (build, adapter listing, blocking smoke test, sandbox tests) are already
-inside the jobs above.
+`spikes.yml` was deleted with the spike code (WP0, tag `spikes-final`). It is the ancestor of
+`ci.yml`; its GPU smoke test comes back with the pipeline in M2, and the sandbox tests with the
+plugin host in WP6.
 
 ## 4. Running on real machines [proposed; the open item of the testing strategy]
 
@@ -113,7 +113,8 @@ CI, and the workflow files stay short.
   `rust-toolchain.toml`; `Cargo.lock` is committed and builds use `--locked`.
 - **Dependencies.** `cargo deny` blocks a dependency with an incompatible or unknown licence,
   a known vulnerability, or a source other than crates.io without a reviewed exception.
-  New dependencies are justified in the change (testing strategy §9). Updates arrive weekly as
+  New dependencies are justified in the change (testing strategy §9). `cargo deny` also reads the
+  RustSec advisory database, so a separate `cargo audit` is not run. Updates arrive weekly as
   grouped pull requests and pass the same checks.
 - **Permissions.** Each workflow declares the least it needs (`contents: read` by default).
   Pull requests from forks run **without secrets** and cannot publish anything.
@@ -215,30 +216,33 @@ runner-minutes), a nightly run of an hour or so, a release of a few tens of minu
 of artifacts is capped by retention (14 days for nightly builds, a few days for pull requests,
 releases permanent). The recurring costs that money buys are only the signing accounts of §6.3.
 
-## 8. From the spikes to the product [proposed]
+## 8. From the spikes to the product [decided, D-081; done in WP0]
 
-- The spike code has answered its questions. Before the first product commit, it is **archived**:
-  a tag (`spikes-final`) marks the last commit that has it, and the `spikes/` directory is
-  removed from `dev`. The reports in `docs/spikes/` and the raw results stay, as they are the
-  record.
-- The repository then looks like this:
+- The spike code has answered its questions. It is **archived**: the tag `spikes-final` marks the
+  last commit that has it, and the `spikes/` directory was removed from `dev`. The reports in
+  `docs/spikes/` and the raw results stay, as they are the record.
+- The repository looks like this:
 
 ```
-Cargo.toml            workspace
+Cargo.toml            workspace (resolver 3, edition 2024, shared lints and licence)
+rust-toolchain.toml   the pinned toolchain
+deny.toml             dependency policy
 crates/               types, format, catalogue, workspace, sources, imaging, import,
-                      pipeline, develop, export, publish, plugin-api, plugin-host,
-                      engine, ui, cli, app   (architecture §3.1)
-plugins/              the core's own plugins (built for wasm32-wasip1)
-xtask/                developer commands (§4)
-packaging/            Flatpak manifest, installer scripts, bundle metadata
-fuzz/                 fuzz targets
-testdata/             fixtures per format version, golden images (small)
-docs/                 as today
+                      plugin-api (MIT OR Apache-2.0), plugin-host, engine, ui, cli, app,
+                      testkit (tests only)     (architecture §3.1; pipeline, develop,
+                      export and publish are added with M2 and M4)
+xtask/                developer commands: cargo xtask check (SPDX headers, crate layers)
+tools/                scripts: fetch-samples.sh, a11y-check.py
+testdata/             fixtures per format version, golden images (small); samples/ is fetched
+                      and ignored by git
+plugins/              the core's own plugins (built for wasm32-wasip1), from WP6
+packaging/            Flatpak manifest, installer scripts, bundle metadata, from WP12
+fuzz/                 fuzz targets, from WP1
+docs/                 as before
 ```
 
-- The harnesses of the spikes that the strategy keeps (the dataset generator, the benchmark JSON
-  output, the smoke test, the hostile plugins, the AT-SPI script) are **moved** into `xtask`, the
-  test trees and `plugins/`, not rewritten.
+- The harnesses of the spikes that the strategy keeps are **moved** as their work packages come
+  up (see [spikes/README.md](spikes/README.md)), not rewritten.
 
 ## 9. Open points
 

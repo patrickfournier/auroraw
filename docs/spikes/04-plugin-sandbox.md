@@ -10,7 +10,7 @@ GPU operations fit? (docs/technical-spikes.md, §5; decisions D-054 to D-057.)
 
 ## What was built
 
-`spikes/plugin-host` (a host on **wasmtime 48**) and `spikes/plugins` (four plugins compiled to
+`spikes/plugin-host` (at the tag `spikes-final`; a host on **wasmtime 48**) and `spikes/plugins` (four plugins compiled to
 `wasm32-wasip1`, in Rust):
 
 - **`ops`**: an operation plugin. Image kernels (a tone curve with `powf` and `sqrt`, a 5x5
@@ -178,6 +178,7 @@ so a portability check must run on every platform before a plugin enters the ind
 ## Running it
 
 ```bash
+git checkout spikes-final    # the code is archived at this tag
 cd spikes/plugins && cargo build --release --target wasm32-wasip1      # needs the wasm32-wasip1 target
 RUSTFLAGS="-C target-feature=+simd128" cargo build --release --target wasm32-wasip1 -p ops --target-dir target-simd
 cd .. && cargo build --release
@@ -187,4 +188,4 @@ cd .. && cargo build --release
 ./target/release/gpubench     # the GPU operation plugin
 ```
 
-Raw results are in `spikes/results/spike4-*.json`.
+Raw results are in `docs/spikes/results/spike4-*.json`.

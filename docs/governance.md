@@ -209,7 +209,7 @@ each release notes API changes. Until M5 the API is experimental and says so (ar
 - **Targets**: an acknowledgement within 7 days, a fix or a mitigation plan within 90, and a
   coordinated disclosure after a fix ships. Credits to reporters who want them.
 - **Supported versions**: the latest release, and the previous minor while the project is young.
-- The fuzzing, the hostile-plugin tests and `cargo audit` (testing strategy §8, CI §5) are the
+- The fuzzing, the hostile-plugin tests and the `cargo deny` advisory check (testing strategy §8, CI §5) are the
   routine defence; a security fix always gets a regression test.
 
 ## 8. The name and the project's assets [decided in part, D-083]

@@ -26,5 +26,5 @@ commit, and the platform.
 ## Supported versions
 
 The latest release. While the project is young, the previous minor release as well.
-There is no released version yet: Auroraw is in its design phase (see
-[docs/](docs/)).
+There is no released version yet: Auroraw is under development (milestone M1, see
+[docs/m1-plan.md](docs/m1-plan.md)).

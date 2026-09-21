@@ -98,8 +98,9 @@ XL more. "Needs" lists the packages that must exist first.
 The spikes are archived (tag `spikes-final`, then `spikes/` removed from `dev`, CI §8) and the
 repository takes the product layout: root workspace, `crates/` with empty crates and their
 licences, `xtask/`, `rust-toolchain.toml`, `deny.toml`, the `ci.yml` of CI §3.1 (lint, build and
-test on three platforms, dependencies), the SPDX header check, the test harness (temporary
-folders, deterministic dataset generator moved from spike 3), and the launch test. The spike
+test on three platforms, dependencies), the SPDX header check, the test harness (`testkit`:
+temporary folders and seeded random generators; the deterministic dataset generator of spike 3
+moves with the catalogue schema in WP2, since it is written against it), and the launch test. The spike
 harnesses that the testing strategy keeps are **moved, not rewritten**.
 
 Done when: an empty application builds and starts on three platforms from CI, and a trivial

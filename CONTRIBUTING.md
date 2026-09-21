@@ -3,11 +3,23 @@
 Thank you for your interest. Auroraw is a free application for photographers (organise, develop
 RAW files and negative scans non-destructively, convert, edit metadata, deliver galleries).
 
-**Where the project is.** It is in its design phase: the functional specification, the
-architecture, the testing strategy, the release plan and the governance are written, four
-technical spikes have been measured, and the product code begins with milestone M1. Until then the
+**Where the project is.** The design is complete (specification, architecture, testing strategy, release plan,
+governance, the plan of milestone M1), four technical spikes have measured the technology, and
+the product code has begun with milestone M1 (its first work package lays out the repository). For now the
 most useful contributions are **reading the documents in [docs/](docs/) and telling us what is
 wrong or missing**, and **sample files** (see below).
+
+## Building and testing
+
+```bash
+cargo build --workspace
+cargo test --workspace        # or: cargo nextest run --workspace
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
+cargo xtask check             # SPDX headers and the allowed dependencies between crates
+```
+
+Sample RAW files for the tests come from `tools/fetch-samples.sh` (CC0 files, about 225 MB, kept
+out of git in `testdata/samples/`).
 
 ## Ground rules
 
