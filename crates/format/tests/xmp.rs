@@ -394,3 +394,19 @@ fn thousands_of_namespace_declarations_are_refused_not_allocated() {
     doc.push_str("/></rdf:RDF></x:xmpmeta>");
     assert!(Xmp::from_bytes(doc.as_bytes()).is_err());
 }
+
+// ---- found by the nightly fuzzer ----
+
+#[test]
+fn a_namespace_with_an_entity_in_its_address_is_the_same_namespace_once_written_and_read() {
+    // The reader hands back namespace addresses as written, with `&gt;` unresolved; the model
+    // must hold `>`, or every rewrite would escape the ampersand once more.
+    let doc = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+      <rdf:Description xmlns:t="urn:a&amp;b&gt;c:"><t:p>1</t:p></rdf:Description></rdf:RDF></x:xmpmeta>"#;
+    let xmp = Xmp::from_bytes(doc.as_bytes()).unwrap();
+    assert_eq!(xmp.properties[0].ns, "urn:a&b>c:");
+    let once = xmp.to_bytes();
+    let back = Xmp::from_bytes(&once).unwrap();
+    assert_eq!(back.properties[0].ns, "urn:a&b>c:");
+    assert_eq!(back.to_bytes(), once);
+}

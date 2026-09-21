@@ -54,7 +54,13 @@ fn xml_err(e: impl std::fmt::Display) -> XmpError {
 
 fn resolved(r: ResolveResult<'_>) -> Result<Option<String>, XmpError> {
     match r {
-        ResolveResult::Bound(n) => Ok(Some(n.as_ref().to_string())),
+        // The reader keeps namespace values as written, entity references included: read them
+        // the way the XML specification does, or `a&amp;b` and `a&b` would be two namespaces.
+        ResolveResult::Bound(n) => Ok(Some(
+            quick_xml::escape::unescape(n.as_ref())
+                .map_err(xml_err)?
+                .into_owned(),
+        )),
         ResolveResult::Unbound => Ok(None),
         ResolveResult::Unknown(p) => Err(XmpError::UnboundPrefix(p)),
     }
