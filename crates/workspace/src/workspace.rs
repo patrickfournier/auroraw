@@ -252,10 +252,10 @@ impl Workspace {
         bytes: &[u8],
         interrupt: Interrupt,
     ) -> Result<WriteOutcome, WorkspaceError> {
-        if let Ok(existing) = fs::read(path) {
-            if existing == bytes {
-                return Ok(WriteOutcome::Unchanged);
-            }
+        if let Ok(existing) = fs::read(path)
+            && existing == bytes
+        {
+            return Ok(WriteOutcome::Unchanged);
         }
         let tmp = self
             .root
