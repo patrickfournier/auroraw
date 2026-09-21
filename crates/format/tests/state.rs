@@ -123,3 +123,16 @@ proptest! {
         let _ = read_state::<Marker>(&bytes);
     }
 }
+
+#[test]
+fn numbers_in_opaque_values_survive_a_write_and_a_read_exactly() {
+    // Found by the nightly fuzzer: without serde_json's `float_roundtrip`, a very large number in a
+    // smart collection's query came back one unit in the last place away from where it started.
+    let text = r#"{"format":"auroraw/collection","schema":1,"id":"6e6f707172737475","updated":"2026-09-21T14:02:11Z",
+      "name":"n","kind":"smart","parent":null,"query":{"v":6666666666666666666666666666666666666666666666666666666666666666666666666666664,"w":0.1,"x":1e-7}}"#;
+    let c: Collection = read_state(text.as_bytes()).unwrap().current().unwrap();
+    let written = write_state(&c);
+    let back: Collection = read_state(&written).unwrap().current().unwrap();
+    assert_eq!(back, c);
+    assert_eq!(write_state(&back), written);
+}
