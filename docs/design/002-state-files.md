@@ -1,13 +1,13 @@
 # Design note 002: the state files
 
-> **Status: proposal, awaiting approval.** Second design note of work package WP1
+> **Status: adopted (D-086).** Second design note of work package WP1
 > ([M1 plan](../m1-plan.md) §5 and §6, item 3). It answers question 3 of the specification
 > (§10): what format do the **state files** have, the files of the workspace that hold what would
 > otherwise live only in the database (collections, smart collections, series, the keyword
 > vocabulary, the list of sources, and later the publications)? It builds on
 > [note 001](001-workspace-layout.md) (where files live and how they are written). It does not
 > settle the content of the photo and version sidecars (note 003) or the fingerprint (note 004).
-> Items are **[proposed]** until approved; the approval becomes decision D-086.
+> Items are **[decided]** since D-086.
 
 ## 1. The question
 
@@ -87,7 +87,7 @@ so the same order of magnitude holds.
 
 ## 6. The proposal
 
-### 6.1 Option B, with series taking a shortcut [proposed]
+### 6.1 Option B, with series taking a shortcut [decided, D-086]
 
 **One file per collection and one per series; the vocabulary and the sources as single files.**
 
@@ -110,7 +110,7 @@ file per series, but the members' order, the cover and the resolution belong to 
 not to a photo, and a series is edited as a whole (merge, split, resolve). The 2,700 small files
 at 100,000 photos read in a fraction of a second (about 1.1 MB in all).
 
-### 6.2 The form every state file has [proposed]
+### 6.2 The form every state file has [decided, D-086]
 
 - **JSON**, UTF-8 without a byte order mark, LF line ends.
 - An **envelope** at the top of every file: `"format"` (for example `"auroraw/collection"`), `"schema"`
@@ -128,7 +128,7 @@ at 100,000 photos read in a fraction of a second (about 1.1 MB in all).
   `<photo id>.<version id>`, which is also the stem of its sidecar's name.
 - Sizes are not limited by the format; a very large file stays a normal one.
 
-### 6.3 The content of each file [proposed]
+### 6.3 The content of each file [decided, D-086]
 
 **`vocabulary.json`**
 
@@ -202,7 +202,7 @@ and writes the Rejected flag on the others **in their sidecars**, which are thei
 **`publications/<id>.json`** is reserved for M4 (spec §5.9): its content is decided in that milestone's
 note.
 
-### 6.4 Rules that apply to all of them [proposed]
+### 6.4 Rules that apply to all of them [decided, D-086]
 
 1. **A photo that is not in the workspace** (its sidecar is missing or moved out) but is named in a
    state file is **kept in the list and marked missing** when the catalogue is built, and reported;
@@ -221,7 +221,7 @@ note.
    sidecars. References to what does not exist yet are resolved after everything is read.
 6. **Nothing here is written by anything but the single writer** (note 001 §5.5).
 
-### 6.5 Synchronisation between machines [proposed]
+### 6.5 Synchronisation between machines [decided, D-086]
 
 - **Used one after the other**, as D-064 documents, nothing conflicts: each file is complete and
   replaced atomically.
@@ -235,7 +235,7 @@ note.
 - **A merge tool is not proposed**: merging state files automatically would be a feature of its
   own, and D-064 puts built-in sync outside v1.
 
-### 6.6 What goes in the local registry, not the workspace [proposed]
+### 6.6 What goes in the local registry, not the workspace [decided, D-086]
 
 Per machine and per catalogue, in the data directory: the real location of each source, the
 last known **size and modification time** of every workspace file (the reconcile, architecture §5.3),
