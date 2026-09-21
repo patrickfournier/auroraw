@@ -284,6 +284,57 @@ over. Three boundaries have their own mapping, made by the code that crosses the
 | **XMP export to the source folders** (D-024, D-028) | A **derived** file built from the photo sidecar: the effective EXIF values in the standard properties (overlays applied), `-1` for rejected if chosen, the **do-not-export keywords removed**, and **no `aur:Files`, locations or identifiers of Auroraw** other than the marker that lets Auroraw recognise its own export (D-047) and the few properties that make the round trip exact: `aur:Flag` and, when `-1` is written, `aur:Stars`. |
 | **Metadata in exported images** (D-046) | The effective metadata of the exported version according to the recipe: by default everything except the location and the camera's serial number, and never the do-not-export keywords, paths or workspace identifiers. |
 
+### 8.1 When an XMP file already exists at the destination [proposed]
+
+The XMP export writes next to the originals (D-024), where a file of the same name may already
+exist: written by Lightroom or darktable, or by an earlier Auroraw export. **The export merges by
+default; it never overwrites blindly.**
+
+**Why not simply overwrite.** The existing file often holds the other application's develop settings
+(`crs:` and other namespaces), which Auroraw cannot reproduce; replacing the file would destroy that
+work, against the spirit of D-018. And the other tool may have changed the rating or the keywords
+since Auroraw last looked.
+
+**The behaviour**
+
+1. **Merge.** The existing file is read into the same XMP model as a sidecar (§4.1), which keeps every
+   property it does not understand. The export rewrites **only the properties Auroraw owns**: rating,
+   label, title, caption, keywords and the IPTC fields of §7 (and `aur:Flag` and `aur:Stars`, §4.5).
+   Everything else, including develop settings and unknown namespaces, is written back as it was.
+2. **A three-way check first**, as D-047 describes. The **base** is what Auroraw last read from or
+   wrote to that file. For each field:
+   - unchanged in the file since the base: replaced by Auroraw's value, no question asked;
+   - changed in the file **and** unchanged in Auroraw since the base: **the file's value is taken
+     into the photo sidecar** (an external change, D-047), and the file already has it;
+   - changed on both sides to different values: a **conflict**, listed ("12 files were changed by
+     another application") for the photographer to settle: Auroraw's value, the file's value, or
+     review one by one.
+3. **Keywords** are merged as sets against the base: a keyword the other tool **added** is offered
+   (kept and added to the photo, or dropped), one it **removed** is offered the same way; the
+   result written is the photo's keyword set after the photographer's choice, so the two sides
+   end up equal. Do-not-export keywords never reach the file (§6).
+4. **The base is stored locally**, in the catalogue, not in the workspace: the values Auroraw last read
+   from or wrote to each such file, with the file's size and modification time. It describes this
+   machine's view of files outside the workspace. If it is lost (a rebuild, another machine), the
+   export has no base and **falls back to two-way**: every field that differs is treated as a
+   conflict and asked about, once.
+5. **The options in the export dialog:**
+   - **Merge** (default), as above;
+   - **Replace**, after a confirmation: the existing file is **moved to the workspace's `removed/`
+     folder**, never deleted (architecture §5.3), and a new derived file is written;
+   - **Skip files that already exist**, for someone who wants only to add the missing ones.
+6. **No feedback loop.** After writing, Auroraw records the new size and modification time as the base,
+   so its own write is not reported as an external change (D-047). A file that carries Auroraw's
+   marker and whose content matches the base is recognised as its own export.
+7. **Which file is meant** follows D-028: `photo.xmp` by default, or `photo.ARW.xmp`, as the photographer
+   chose. Two photos that would write the same name (a RAW and a JPEG sharing a stem, both with
+   `photo.xmp`) are reported before anything is written, and the pair's RAW takes the name (D-032).
+8. **A file that cannot be parsed** is **never overwritten or merged**: it is reported and skipped,
+   unless the photographer chooses Replace, which keeps the old one in `removed/`.
+9. **Writes are atomic.** The temporary file is created **beside the destination** and renamed, since the
+   workspace's `.auroraw/tmp/` (note 001) may be on another volume than the source. A read-only or
+   unreachable source is reported per file, without stopping the batch.
+
 ## 9. Consequences for WP1
 
 - The `format` crate holds the XMP model, the general **reader**, the strict canonical **writer**, and the
@@ -300,6 +351,9 @@ over. Three boundaries have their own mapping, made by the code that crosses the
   without the `-1` option).
 - A **parse benchmark** on 100,000 photo and 143,000 version sidecars, to hold requirement 9
   (tens of thousands of files a second on all cores), run on the three platforms.
+- **Merge fixtures** for §8.1 (WP10 builds the feature; the model must already support it): real XMP files
+  from Lightroom and darktable with develop settings, and a test that **a merge keeps every `crs:`
+  property byte for byte** while updating rating, label, title, caption and keywords.
 - The schema is written as a short **public page** (in `docs/`, later on auroraw.org) so that other tools
   can read what is in a sidecar.
 
@@ -309,7 +363,7 @@ over. Three boundaries have their own mapping, made by the code that crosses the
 | --- | --- |
 | The hash and the fingerprint in `aur:Files`, relinking, "original changed" | Note 004 |
 | The development chain, the history, the snapshots | M2 |
-| The merge of an external XMP change field by field (D-047) | WP10 |
+| The interface of the three-way merge and of conflicts (§8.1), and the same merge for external changes noticed outside an export (D-047) | WP10 |
 | Whether a foreign tool that rewrites a workspace sidecar (it should not) is detected | WP10 |
 | The exact property order and the full schema page | WP1 |
 
@@ -319,7 +373,7 @@ Approval of: the choice of writing and reading XMP with our own code (§3); the 
 namespace (§4.2); the content of the photo sidecar (§4.3) and the treatment of rating and flag (§4.5);
 the content of the version sidecar and the rule that **the photo plus the version's overrides is the
 truth and the copy is derived** (§5.1 to §5.3); the room reserved for the development (§5.4); the
-treatment of keywords (§6), where **names in sidecars are a snapshot** and a rename writes no sidecar; the field list of M1 (§7); and the boundaries (§8), as **D-087**.
+treatment of keywords (§6), where **names in sidecars are a snapshot** and a rename writes no sidecar; the field list of M1 (§7); and the boundaries (§8), including **the merge into an existing XMP file (§8.1)**, as **D-087**.
 The point most worth a second look is §5.3: **version copies are refreshed in the background**, which
 is faster than writing them with every action, and slightly relaxes the letter of D-027 ("the copies
 follow") into "the copies follow, shortly, and are repaired if a crash interrupts them".
