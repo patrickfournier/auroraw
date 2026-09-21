@@ -1,14 +1,14 @@
 # Design note 003: the photo sidecar and the version sidecar
 
-> **Status: proposal, awaiting approval.** Third design note of work package WP1
+> **Status: adopted (D-087).** Third design note of work package WP1
 > ([M1 plan](../m1-plan.md) §5 and §6, items 4 and 8). It answers questions 4 and 26 of the
 > specification (§10): what is written in a **photo sidecar** and a **version sidecar**, in which
 > XMP properties, how keywords are referred to, how the version's copy of the photo's metadata
 > stays consistent (D-027), and which metadata fields M1 supports. It builds on
 > [note 001](001-workspace-layout.md) (where the files are and how they are written) and
 > [note 002](002-state-files.md) (the state files). The content fingerprint and the relinking
-> of files are note 004; the development chain and history are M2's. Items are **[proposed]**
-> until approved; the approval becomes decision D-087.
+> of files are note 004; the development chain and history are M2's. Items are **[decided]**
+> since D-087.
 
 ## 1. The question
 
@@ -97,7 +97,7 @@ schema can be published there. The version of this part of the file is `aur:Sche
 | **Other metadata** | The list of §7 | Creator, rights, credit, location, and so on. |
 | **The original's data**, as read | `exif:DateTimeOriginal` (with `exif:OffsetTimeOriginal` and the sub-seconds), `tiff:Make`, `tiff:Model`, `aux:SerialNumber`, `aux:Lens`, `exif:ExposureTime`, `exif:FNumber`, `exif:ISOSpeedRatings`, `exif:FocalLength`, `exif:FocalLengthIn35mmFilm`, `exif:PixelXDimension` and `exif:PixelYDimension`, `tiff:Orientation`, `exif:GPSLatitude`, `exif:GPSLongitude`, `exif:GPSAltitude` | The standard properties, **holding the original's values**, as XMP sidecars conventionally do (D-074). |
 | **EXIF overlays** | `aur:Overlay` | A structure with the fields corrected: `CaptureTime`, `Gps` (latitude, longitude, altitude), `Camera`, `Lens`, `Orientation`. The effective value is the overlay's if present, otherwise the original's. |
-| **The files of the photo** | `aur:Files` | A sequence, one entry per file: `Role` (`original` or `companion`, the JPEG of a RAW+JPEG pair, D-032), `Name`, `Format`, `Size`, `Hash`, and `Locations` (source identifier, path relative to the source, last seen). The content of `Hash` and the relinking are note 004. |
+| **The files of the photo** | `aur:Files` | A sequence, one entry per file: `Role` (`original` or `companion`, the JPEG of a RAW+JPEG pair, D-032), `Name`, `Format`, `Size`, `Fingerprint`, `Hash` (when known), and `Locations` (source identifier, path relative to the source, last seen). The definition of `Fingerprint` and `Hash`, and the relinking, are note 004. |
 | **The main version** | `aur:MainVersion` | The identifier of the version the grid shows (D-063). |
 | **Imported** | `aur:Imported` | UTC time of the first add. |
 
@@ -125,7 +125,8 @@ photo sidecar, and a version created on another machine is found by the scan).
       <exif:DateTimeOriginal>2026-05-14T06:41:09.250</exif:DateTimeOriginal>
       <aur:Files><rdf:Seq><rdf:li rdf:parseType="Resource">
         <aur:Role>original</aur:Role><aur:Name>DSC00396.ARW</aur:Name>
-        <aur:Size>61865984</aur:Size><aur:Hash>blake3:…</aur:Hash>
+        <aur:Size>61865984</aur:Size><aur:Fingerprint>sampled-v1:…</aur:Fingerprint>
+        <aur:Hash>blake3:…</aur:Hash>
         <aur:Locations><rdf:Seq><rdf:li rdf:parseType="Resource">
           <aur:Source>b83e1f52a09c47d6</aur:Source><aur:Path>2026/2026-05-14/DSC00396.ARW</aur:Path>
         </rdf:li></rdf:Seq></aur:Locations>
