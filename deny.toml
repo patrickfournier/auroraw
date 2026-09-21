@@ -15,7 +15,6 @@ yanked = "deny"
 # Compatible with the GPL-3.0-or-later. No AGPL, no proprietary or non-commercial licence.
 allow = [
     "GPL-3.0-or-later",
-    "MIT OR Apache-2.0",
     "MIT",
     "MIT-0",
     "Apache-2.0",
