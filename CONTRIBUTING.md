@@ -46,6 +46,7 @@ substantial part of a change, say so in the pull request; you remain responsible
   `SPDX-License-Identifier: GPL-3.0-or-later`.
 - The plugin API, the plugin SDK, the declaration schema and the example plugins are
   **MIT OR Apache-2.0**, and say so in their headers.
+- The documentation in `docs/` is **CC BY-SA 4.0**.
 - Plugins that use only the plugin API may have any licence ([PLUGIN-EXCEPTION](PLUGIN-EXCEPTION)).
 - A new dependency must have a licence compatible with the GPL-3.0 (no AGPL, proprietary or
   non-commercial licences) and must be justified in the pull request.

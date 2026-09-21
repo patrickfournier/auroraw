@@ -41,7 +41,7 @@ How decisions are made:
 | --- | --- | --- |
 | The application: every crate except those below | **GPL-3.0-or-later** (D-013, D-080, D-082) | LGPL was considered and dropped (D-080). |
 | The plugin API, the plugin SDK, the declaration schema and the example plugins | **MIT OR Apache-2.0** (D-080) | So that a plugin, free or not, can include them without any obligation. |
-| Documentation | **CC BY-SA 4.0** [proposed] | Or the GPL, if a single licence is preferred [open]. |
+| Documentation (`docs/`) | **CC BY-SA 4.0** (D-083) | Text in `docs/LICENSE`. Code samples inside the documents are GPL-3.0-or-later. |
 | Translations | Same as the application (GPL-3.0) | Translators agree to this when they contribute. |
 | Sample photos and golden images in the repository | CC0 or a licence that allows redistribution, recorded next to the file | Nothing without a recorded licence enters. |
 | The name and logo | Not licensed under the GPL | See §8. |
@@ -212,10 +212,11 @@ each release notes API changes. Until M5 the API is experimental and says so (ar
 - The fuzzing, the hostile-plugin tests and `cargo audit` (testing strategy §8, CI §5) are the
   routine defence; a security fix always gets a regression test.
 
-## 8. The name and the project's assets [open]
+## 8. The name and the project's assets [decided in part, D-083]
 
-- **The name.** "Auroraw" should be checked for conflicts (a trademark search, the domain, the
-  package names on the Flathub and other stores) before the first public release. Owner's task.
+- **The name.** "Auroraw" was checked briefly by the owner, who also **registered the domain
+  auroraw.org**. A thorough trademark search and a check of the package names on Flathub and
+  other stores are still to do before the first public release.
 - **The logo** and other artwork: licence recorded; a permissive licence for the artwork used in
   the application, with the **name and logo reserved** so that a fork can be honest about being one.
 - **Domains, accounts and signing keys** belong to the owner (CI §6.3), or to a legal entity if one
@@ -243,5 +244,5 @@ header check comes with the first product code. Next: **the plan of milestone M1
 | # | Item | Needed before |
 | --- | --- | --- |
 | 1 | A qualified review of the `PLUGIN-EXCEPTION` wording | The first release |
-| 2 | Documentation licence: CC BY-SA 4.0 or the GPL | Publishing the docs |
-| 3 | Name and trademark check | The first public release |
+| 2 | Trademark search and store package names for "Auroraw" | The first public release |
+| 3 | What auroraw.org hosts (the project page, the documentation, the plugin index) | The first public release |

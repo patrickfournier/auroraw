@@ -15,4 +15,4 @@ negative scans, non-destructively), convert, edit metadata and deliver galleries
 
 ## License
 
-GPL-3.0-or-later, see [LICENSE](LICENSE). The plugin API and SDK will be MIT OR Apache-2.0, and plugins that use only that API may have any licence ([PLUGIN-EXCEPTION](PLUGIN-EXCEPTION)). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
+GPL-3.0-or-later, see [LICENSE](LICENSE). The plugin API and SDK will be MIT OR Apache-2.0, and plugins that use only that API may have any licence ([PLUGIN-EXCEPTION](PLUGIN-EXCEPTION)). The documentation is CC BY-SA 4.0 ([docs/LICENSE](docs/LICENSE)). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
