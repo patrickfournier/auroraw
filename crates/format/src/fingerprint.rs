@@ -5,6 +5,14 @@
 //! then 64 KB from the start, 64 KB from the middle (at `size / 2` rounded down to a multiple of
 //! 4,096) and 64 KB from the end. A file of 192 KB or less is read whole. The hash is BLAKE3 of the
 //! whole file.
+//!
+//! Both functions take a generic reader, not a path: neither knows what underlies it (a real
+//! file, a network share, a buffer in a test), so neither can name it in an error. They return a
+//! bare `std::io::Error` and let it propagate; the caller, who opened the reader and knows its
+//! path, is the one place that can usefully attach that context, exactly as `WorkspaceError::Io`
+//! and `CatalogueError::Io` already do for the files those crates open themselves. A short read
+//! (the file truncated while being read, for instance) surfaces the same way, as an
+//! `UnexpectedEof` from the failing `read_exact` or `seek`, never as a wrong fingerprint.
 
 use std::io::{self, Read, Seek, SeekFrom};
 
@@ -28,7 +36,10 @@ fn read_chunk<R: Read + Seek>(
     Ok(())
 }
 
-/// The size and the sampled fingerprint of a file.
+/// The size and the sampled fingerprint of a file. On success, `r` is left positioned at the
+/// start: calling [`content_hash`] on the same reader right afterwards hashes the whole file, not
+/// whatever the last sampled chunk happened to leave behind. On error, its position is
+/// unspecified, matching `Read`'s own convention for a failed read.
 pub fn fingerprint<R: Read + Seek>(r: &mut R) -> io::Result<(u64, Fingerprint)> {
     let size = r.seek(SeekFrom::End(0))?;
     let mut h = blake3::Hasher::new();
@@ -41,10 +52,13 @@ pub fn fingerprint<R: Read + Seek>(r: &mut R) -> io::Result<(u64, Fingerprint)> 
         read_chunk(r, (size / 2) & !4095, SAMPLE, &mut h)?;
         read_chunk(r, size - SAMPLE, SAMPLE, &mut h)?;
     }
+    r.seek(SeekFrom::Start(0))?;
     Ok((size, Fingerprint::from_bytes(*h.finalize().as_bytes())))
 }
 
-/// The size and the whole-file hash of a file, read from the current position to the end.
+/// The size and the whole-file hash of a file, read from the current position to the end (so
+/// calling it right after [`fingerprint`], which rewinds first, hashes the whole file). Leaves
+/// `r` positioned at the end on success.
 pub fn content_hash<R: Read>(r: &mut R) -> io::Result<(u64, ContentHash)> {
     let mut h = blake3::Hasher::new();
     let mut buf = vec![0u8; 1 << 20];
@@ -107,6 +121,28 @@ mod tests {
             assert_eq!(size, len as u64);
             assert_eq!(fp, expected(&data), "length {len}");
         }
+    }
+
+    #[test]
+    fn fingerprint_rewinds_so_content_hash_can_follow_it_on_the_same_reader() {
+        let data = pattern(1_000_000);
+        let mut cursor = Cursor::new(&data);
+        let (size, _fp) = fingerprint(&mut cursor).unwrap();
+        assert_eq!(
+            cursor.position(),
+            0,
+            "left at the start, not wherever the last sample ended"
+        );
+        let (hashed_size, hash) = content_hash(&mut cursor).unwrap();
+        assert_eq!(
+            hashed_size, size,
+            "the whole file, not the tail left by fingerprint"
+        );
+        assert_eq!(
+            hash,
+            content_hash(&mut Cursor::new(&data)).unwrap().1,
+            "same hash as a fresh reader"
+        );
     }
 
     #[test]
