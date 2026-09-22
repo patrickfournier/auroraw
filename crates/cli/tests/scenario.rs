@@ -112,7 +112,10 @@ fn the_wp3_engine_scenario_runs_end_to_end_through_the_cli() {
     );
 
     // An edit made outside the engine (as if by another machine sharing the workspace): the
-    // sidecar's rating changes on disk without going through the CLI at all.
+    // sidecar's rating changes on disk without going through the CLI at all. Reconcile detects
+    // this from the sidecar's stored size and modification time (seconds resolution, catalogue
+    // §"SidecarStat"), so the edit also touches the caption to guarantee a size change even if
+    // it lands in the same clock second as the CLI's own last write.
     {
         let ws_handle = Workspace::open(&workspace).unwrap();
         let mut photo = ws_handle
@@ -122,6 +125,7 @@ fn the_wp3_engine_scenario_runs_end_to_end_through_the_cli() {
             .current()
             .unwrap();
         photo.meta.rating = Some(2);
+        photo.meta.caption = Some("edited outside the engine".to_string());
         ws_handle.write_photo(&photo).unwrap();
     }
 
