@@ -1,8 +1,9 @@
 name: Nightly
 
 # Long runs that do not belong in the per-change workflow (docs/continuous-integration.md §3.2):
-# the property tests with many cases, and the large-workspace measurement on each file system.
-# Runs every night, on demand, and when this file or the measurement changes.
+# the property tests with many cases, fuzzing, and the large-workspace and large-catalogue
+# measurements on each platform. Runs every night, on demand, and when this file or a measurement
+# changes.
 
 on:
   schedule:
@@ -13,6 +14,7 @@ on:
       - .github/workflows/nightly.yml
       - crates/workspace/tests/large.rs
       - crates/workspace/tests/write_costs.rs
+      - crates/catalogue/tests/large.rs
       - fuzz/**
 
 permissions:
@@ -78,3 +80,23 @@ jobs:
           AUR_LARGE: "100000"
       - name: What each step of an atomic write costs
         run: cargo test -p auroraw-workspace --release --locked --test write_costs -- --ignored --nocapture
+
+  large-catalogue:
+    name: large catalogue (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x64, os: ubuntu-24.04 }
+          - { name: windows-x64, os: windows-2025 }
+          - { name: macos-arm64, os: macos-15 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Rebuild and query a catalogue of 100,000 photos
+        run: cargo test -p auroraw-catalogue --release --locked --test large -- --ignored --nocapture
+        env:
+          AUR_LARGE: "100000"

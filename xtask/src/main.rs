@@ -3,7 +3,9 @@
 //!
 //! - `spdx`: every source file starts with its SPDX licence identifier.
 //! - `layers`: the crates depend on each other only as the architecture allows (§3.2), and a
-//!   permissively licensed crate depends on nothing under the GPL (decision D-080).
+//!   permissively licensed crate depends on nothing under the GPL (decision D-080). A
+//!   dev-dependency (test-only, never linked into a shipped artifact) is unrestricted: a crate's
+//!   tests may set up fixtures with any sibling crate.
 //! - `check`: both of the above.
 
 use std::path::{Path, PathBuf};
@@ -12,8 +14,9 @@ use std::process::{Command, ExitCode};
 const GPL: &str = "// SPDX-License-Identifier: GPL-3.0-or-later";
 const PERMISSIVE: &str = "// SPDX-License-Identifier: MIT OR Apache-2.0";
 
-/// The crates of the workspace and the workspace crates each one may depend on
-/// (architecture §3.1). `testkit` may additionally be a development dependency of any crate.
+/// The crates of the workspace and the workspace crates each one may depend on **as a normal or
+/// build dependency** (architecture §3.1). Dev-dependencies are not restricted by this table
+/// (see `layers` below).
 const ALLOWED: &[(&str, &[&str])] = &[
     ("auroraw-types", &[]),
     ("auroraw-format", &["auroraw-types"]),
@@ -156,8 +159,11 @@ fn layers() -> bool {
             if !names.contains(&dep_name) {
                 continue; // an external crate: `cargo deny` checks those
             }
+            // A dev-dependency is test-only: cargo never links it into a shipped library or
+            // binary, so it cannot leak a GPL crate into a permissive one or blur the runtime
+            // layering. Tests may freely set up fixtures with any sibling crate.
             let dev = dep["kind"].as_str() == Some("dev");
-            if !allowed.contains(&dep_name) && !(dev && dep_name == "auroraw-testkit") {
+            if !dev && !allowed.contains(&dep_name) {
                 eprintln!("{name} must not depend on {dep_name} (architecture §3.2)");
                 ok = false;
             }

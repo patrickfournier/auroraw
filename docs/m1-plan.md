@@ -162,6 +162,37 @@ Done when: the queries of spike 3 give the same times through the product API; t
 rebuild test and the crash-consistency tests pass on three platforms; the query results agree
 with a slow reference implementation on generated data.
 
+**Status: done, pending the nightly run on Windows and macOS.** Built: `catalogue` with the schema
+of spike 3 (text identifiers as primary keys instead of spike 3's integers, since the catalogue is
+an index over the workspace's own identifiers, note 001 §5.2), `user_version` migrations (one
+version so far, a `NewerSchema` refusal for a future one), keyset queries (`list_recent`,
+`list_by_min_rating`, `list_by_camera`, `list_by_keyword`, `search` over FTS5, counts), atomic
+rebuild to a temporary file with a Windows-safe rename (note 001 §5.4), reconcile against stored
+sidecar stats, and the local registry of catalogues (note 001 §5.7). The dataset generator of
+spike 3 moved here, reproducible from a seed (including every identifier, needed to replay a
+failing test). `cargo xtask layers` was relaxed to leave dev-dependencies unrestricted, so this
+crate's tests can build a real `Workspace` (a normal dependency would have broken the crate
+layering of architecture §3.2) and exercise the whole write-scan-rebuild path end to end.
+
+That end-to-end test caught a real bug on its first run: a vocabulary read back from its state
+file is sorted by identifier (note 002), not parent-before-child, and the naive insert order
+violated the `keyword.parent_id` foreign key. Fixed by deferring foreign-key checks to the
+transaction's commit (`PRAGMA defer_foreign_keys`) rather than topologically sorting every entity
+type — the general fix, since any table's insertion order can end up this way. A regression test
+holds the case (the in-memory tests that fed data straight from the generator never had, since the
+generator itself produces parent-before-child order).
+
+A first 100,000-photo run (developer machine, NVMe) generated the dataset in 13.4 s, rebuilt the
+catalogue in 17.3 s, and answered every query in under a millisecond except two: a "rating 4 or
+more" page at 42 ms and a full-text search at 24 ms, both still comfortably inside the 200 ms
+budget (spec §9) but higher than spike 3's own figures for similarly named queries. `EXPLAIN QUERY
+PLAN` shows why: both use the right index to filter, then sort the results in a temporary
+b-tree, which costs more here because this dataset's uniform 0–5 ratings and repeated placeholder
+title make both conditions match a much larger, less realistic share of the photos than spike 3's
+dataset did. Not a defect, and not chased further in WP2; a more realistic generator is a cheap
+improvement for whichever milestone next needs tighter numbers. **Left**: the same measurement on
+Windows and macOS, which runs nightly from this commit onward.
+
 ### WP3 Engine, job system and CLI (M). Needs WP1; grows with WP2
 
 `engine`: commands and events, the single writer, the worker pool sized to physical cores,
