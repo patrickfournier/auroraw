@@ -182,16 +182,25 @@ type — the general fix, since any table's insertion order can end up this way.
 holds the case (the in-memory tests that fed data straight from the generator never had, since the
 generator itself produces parent-before-child order).
 
-A first 100,000-photo run (developer machine, NVMe) generated the dataset in 13.4 s, rebuilt the
-catalogue in 17.3 s, and answered every query in under a millisecond except two: a "rating 4 or
-more" page at 42 ms and a full-text search at 24 ms, both still comfortably inside the 200 ms
-budget (spec §9) but higher than spike 3's own figures for similarly named queries. `EXPLAIN QUERY
-PLAN` shows why: both use the right index to filter, then sort the results in a temporary
-b-tree, which costs more here because this dataset's uniform 0–5 ratings and repeated placeholder
-title make both conditions match a much larger, less realistic share of the photos than spike 3's
-dataset did. Not a defect, and not chased further in WP2; a more realistic generator is a cheap
-improvement for whichever milestone next needs tighter numbers. **Left**: the same measurement on
-Windows and macOS, which runs nightly from this commit onward.
+A 100,000-photo run, on the developer machine and (the same night) on all three CI runners:
+
+| | Developer (Linux, NVMe) | CI Linux | CI Windows | CI macOS |
+| --- | --- | --- | --- | --- |
+| Generate | 13.4 s | 8.7 s | 6.5 s | 11.4 s |
+| Rebuild | 17.3 s | 11.1 s | 20.6 s | 14.6 s |
+| A page of 200, most recent | 0.3 ms | 0.3 ms | 0.2 ms | 0.2 ms |
+| "Rating 4 or more", a page | 42 ms | 41 ms | 49 ms | 52 ms |
+| Full-text search | 24 ms | 23 ms | 27 ms | 24 ms |
+| One photo by identifier | 0.02 ms | 0.02 ms | 0.01 ms | 0.01 ms |
+
+Every query is comfortably inside the 200 ms budget (spec §9), consistently across platforms.
+The two slower ones (rating and search) are still higher than spike 3's own figures for similarly
+named queries. `EXPLAIN QUERY PLAN` shows why: both use the right index to filter, then sort the
+results in a temporary b-tree, which costs more here because this dataset's uniform 0–5 ratings
+and repeated placeholder title make both conditions match a much larger, less realistic share of
+the photos than spike 3's dataset did. Not a defect, and not chased further in WP2; a more
+realistic generator is a cheap improvement for whichever milestone next needs tighter numbers.
+The measurement now runs nightly on all three platforms alongside the workspace one.
 
 ### WP3 Engine, job system and CLI (M). Needs WP1; grows with WP2
 
