@@ -425,6 +425,10 @@ impl Coordinator {
         let workspace_id = self.workspace.workspace_id();
         let photo_count = photos.len();
         let version_count = versions.len();
+        // Windows refuses to replace a file that is still open (unlike POSIX, where renaming
+        // over an open file just works): close our own connection to `path` before
+        // `rebuild_to_file` renames the freshly built catalogue over it.
+        self.catalogue = Catalogue::open_in_memory(workspace_id)?;
         self.catalogue = auroraw_catalogue::rebuild_to_file(&path, workspace_id, &input)?;
         let _ = self.events.send(Event::RebuildFinished {
             photos: photo_count,
