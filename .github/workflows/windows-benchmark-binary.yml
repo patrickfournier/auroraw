@@ -1,0 +1,67 @@
+name: Windows benchmark binary
+
+# Builds a standalone Windows executable of the large-workspace measurement
+# (docs/design/001-workspace-layout.md §4.2), so it can be run on a real machine without
+# installing a Rust toolchain there. Temporary: delete once the on-machine run is done.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/windows-benchmark-binary.yml
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build (windows-x64)
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup show
+      - name: Build the test binary without running it
+        id: build
+        shell: bash
+        run: |
+          cargo test -p auroraw-workspace --release --locked --test large --no-run --message-format=json \
+            | jq -r 'select(.reason == "compiler-artifact" and .target.name == "large" and .executable != null) | .executable' \
+            > exe_path.txt
+          echo "path=$(cat exe_path.txt)" >> "$GITHUB_OUTPUT"
+      - name: Assemble the package
+        shell: bash
+        run: |
+          mkdir -p package
+          cp "${{ steps.build.outputs.path }}" package/auroraw-workspace-benchmark.exe
+          cat > package/run.bat <<'BAT'
+          @echo off
+          rem Writes, walks and reads a workspace of 100,000 photos and their versions
+          rem (design note 001, docs/design/001-workspace-layout.md, section 4.2).
+          rem Takes a few minutes. The result is one line of JSON, printed below.
+          set AUR_LARGE=100000
+          auroraw-workspace-benchmark.exe --ignored --nocapture
+          echo.
+          echo Done. Copy the {"photos": ...} line above and send it back.
+          pause
+          BAT
+          cat > package/README.txt <<'TXT'
+          Auroraw: large-workspace benchmark (Windows)
+
+          This measures how fast a workspace of 100,000 photos (about 225,000 sidecar files)
+          is written, walked and read on this machine and this disk. No installation needed.
+
+          Run: double-click run.bat (or open a terminal in this folder and run it).
+          It writes a temporary workspace (removed automatically), takes a few minutes, and
+          prints one line of JSON such as:
+            {"photos": 100000, "versions": 125000, ..., "write_s": 12.3, ...}
+
+          Send that line back. See docs/design/001-workspace-layout.md in the repository for
+          what each number means.
+          TXT
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-benchmark
+          path: package
