@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-use auroraw_types::{KeywordId, PhotoId};
+use auroraw_types::{KeywordId, PhotoId, SourceId};
 
 use crate::command::Command;
 use crate::job::JobId;
@@ -64,4 +64,33 @@ pub enum Event {
     JobCancelled(JobId),
     /// The engine has stopped: no more events follow.
     Stopped,
+    /// A source was registered.
+    SourceAdded(SourceId),
+    /// A source's scan finished (or the source was not reachable, in which case every count is
+    /// zero and `reachable` is `false`).
+    SourceScanned {
+        /// The source scanned.
+        source_id: SourceId,
+        /// Whether the source could be reached at all.
+        reachable: bool,
+        /// How many files matched exactly what the catalogue expected.
+        confirmed: usize,
+        /// How many files changed at their known path (design note 004 §6.5).
+        changed: usize,
+        /// How many files were relinked silently (D-019).
+        relinked: usize,
+        /// How many known files were found nowhere.
+        missing: usize,
+        /// Paths that matched nothing known: offered for [`crate::Command::AddNewPhotos`].
+        new: Vec<String>,
+        /// How many found files were ambiguous (ambiguity is never resolved automatically).
+        ambiguous: usize,
+    },
+    /// Confirmed new files became photos.
+    PhotosAdded {
+        /// The source they were found in.
+        source_id: SourceId,
+        /// How many.
+        count: usize,
+    },
 }

@@ -12,3 +12,4 @@ description = "The plugin API: declaration schema and interfaces (MIT OR Apache-
 workspace = true
 
 [dependencies]
+thiserror.workspace = true

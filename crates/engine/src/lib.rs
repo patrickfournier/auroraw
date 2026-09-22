@@ -512,4 +512,295 @@ mod tests {
         let concurrent_rating = catalogue.photo(&photo_id).unwrap().unwrap().rating;
         assert_eq!(concurrent_rating, *applied.last().unwrap());
     }
+
+    fn add_source(engine: &Engine, root: &std::path::Path) -> auroraw_types::SourceId {
+        let Outcome::SourceAdded(id) = engine
+            .submit_and_wait(Command::AddSource {
+                name: "Test source".into(),
+                root: root.to_path_buf(),
+                kind: auroraw_sources::filesystem::LOCAL_FOLDER.into(),
+            })
+            .unwrap()
+        else {
+            panic!("expected SourceAdded");
+        };
+        id
+    }
+
+    #[test]
+    fn add_source_registers_it_in_the_workspace_and_the_catalogue() {
+        let (engine, _events, dir) = new_engine();
+        let source_root = dir.path().join("Card");
+        std::fs::create_dir_all(&source_root).unwrap();
+
+        let id = add_source(&engine, &source_root);
+
+        let sources = engine
+            .workspace()
+            .read_sources()
+            .unwrap()
+            .unwrap()
+            .current()
+            .unwrap();
+        assert_eq!(sources.sources.len(), 1);
+        assert_eq!(sources.sources[0].id, id);
+
+        let row = engine
+            .read_catalogue()
+            .unwrap()
+            .source(&id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.name, "Test source");
+        assert_eq!(row.kind, auroraw_sources::filesystem::LOCAL_FOLDER);
+    }
+
+    #[test]
+    fn scanning_a_source_offers_a_new_file_and_confirming_it_adds_a_photo() {
+        let (engine, events, dir) = new_engine();
+        let source_root = dir.path().join("Card");
+        std::fs::create_dir_all(&source_root).unwrap();
+        std::fs::write(source_root.join("a.raw"), b"first photo").unwrap();
+        let source_id = add_source(&engine, &source_root);
+        events.drain();
+
+        let Outcome::Scanned {
+            reachable,
+            new,
+            confirmed,
+            ..
+        } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!("expected Scanned");
+        };
+        assert!(reachable);
+        assert_eq!(new, vec!["a.raw".to_string()]);
+        assert_eq!(confirmed, 0);
+
+        let Outcome::PhotosAdded(added) = engine
+            .submit_and_wait(Command::AddNewPhotos {
+                source_id,
+                paths: new,
+            })
+            .unwrap()
+        else {
+            panic!("expected PhotosAdded");
+        };
+        assert_eq!(added.len(), 1);
+        let row = engine
+            .read_catalogue()
+            .unwrap()
+            .photo(&added[0])
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.path.as_deref(), Some("a.raw"));
+        assert_eq!(row.source_id, Some(source_id));
+
+        // Rescanning now confirms the photo instead of offering it again.
+        let Outcome::Scanned { confirmed, new, .. } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!("expected Scanned");
+        };
+        assert_eq!(confirmed, 1);
+        assert!(new.is_empty());
+    }
+
+    #[test]
+    fn scanning_detects_an_original_changed_at_its_known_path() {
+        let (engine, _events, dir) = new_engine();
+        let source_root = dir.path().join("Card");
+        std::fs::create_dir_all(&source_root).unwrap();
+        std::fs::write(source_root.join("a.raw"), b"original bytes").unwrap();
+        let source_id = add_source(&engine, &source_root);
+        let Outcome::Scanned { new, .. } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!()
+        };
+        let Outcome::PhotosAdded(added) = engine
+            .submit_and_wait(Command::AddNewPhotos {
+                source_id,
+                paths: new,
+            })
+            .unwrap()
+        else {
+            panic!()
+        };
+
+        std::fs::write(source_root.join("a.raw"), b"edited outside auroraw, still").unwrap();
+        let Outcome::Scanned { changed, .. } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!()
+        };
+        assert_eq!(changed, 1);
+        assert!(
+            engine
+                .read_catalogue()
+                .unwrap()
+                .photo(&added[0])
+                .unwrap()
+                .unwrap()
+                .original_changed
+        );
+    }
+
+    #[test]
+    fn scanning_relinks_a_renamed_file_silently() {
+        let (engine, _events, dir) = new_engine();
+        let source_root = dir.path().join("Card");
+        std::fs::create_dir_all(&source_root).unwrap();
+        std::fs::write(source_root.join("old.raw"), b"same bytes").unwrap();
+        let source_id = add_source(&engine, &source_root);
+        let Outcome::Scanned { new, .. } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!()
+        };
+        let Outcome::PhotosAdded(added) = engine
+            .submit_and_wait(Command::AddNewPhotos {
+                source_id,
+                paths: new,
+            })
+            .unwrap()
+        else {
+            panic!()
+        };
+
+        std::fs::rename(source_root.join("old.raw"), source_root.join("new.raw")).unwrap();
+        let Outcome::Scanned { relinked, new, .. } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!()
+        };
+        assert_eq!(relinked, 1);
+        assert!(
+            new.is_empty(),
+            "the renamed file is a relink, not a new file"
+        );
+
+        let row = engine
+            .read_catalogue()
+            .unwrap()
+            .photo(&added[0])
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.path.as_deref(), Some("new.raw"));
+    }
+
+    #[test]
+    fn a_deleted_file_is_reported_missing_and_the_photo_is_kept() {
+        let (engine, _events, dir) = new_engine();
+        let source_root = dir.path().join("Card");
+        std::fs::create_dir_all(&source_root).unwrap();
+        std::fs::write(source_root.join("a.raw"), b"bytes").unwrap();
+        let source_id = add_source(&engine, &source_root);
+        let Outcome::Scanned { new, .. } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!()
+        };
+        let Outcome::PhotosAdded(added) = engine
+            .submit_and_wait(Command::AddNewPhotos {
+                source_id,
+                paths: new,
+            })
+            .unwrap()
+        else {
+            panic!()
+        };
+
+        std::fs::remove_file(source_root.join("a.raw")).unwrap();
+        let Outcome::Scanned { missing, .. } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!()
+        };
+        assert_eq!(missing, 1);
+
+        let row = engine
+            .read_catalogue()
+            .unwrap()
+            .photo(&added[0])
+            .unwrap()
+            .unwrap();
+        assert!(row.original_missing, "kept, not removed (D-019, D-031)");
+    }
+
+    #[test]
+    fn an_unplugged_source_scans_as_unreachable_and_replugging_finds_everything_intact() {
+        let (engine, _events, dir) = new_engine();
+        let source_root = dir.path().join("Card");
+        std::fs::create_dir_all(&source_root).unwrap();
+        std::fs::write(source_root.join("a.raw"), b"bytes").unwrap();
+        let source_id = add_source(&engine, &source_root);
+        let Outcome::Scanned { new, .. } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!()
+        };
+        let Outcome::PhotosAdded(added) = engine
+            .submit_and_wait(Command::AddNewPhotos {
+                source_id,
+                paths: new,
+            })
+            .unwrap()
+        else {
+            panic!()
+        };
+
+        // Unplugged: the mount point itself is gone.
+        let elsewhere = dir.path().join("Card-unplugged");
+        std::fs::rename(&source_root, &elsewhere).unwrap();
+        let Outcome::Scanned {
+            reachable, missing, ..
+        } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!()
+        };
+        assert!(
+            !reachable,
+            "an unreachable source is not the same as every file in it going missing"
+        );
+        assert_eq!(missing, 0);
+        assert!(
+            !engine
+                .read_catalogue()
+                .unwrap()
+                .photo(&added[0])
+                .unwrap()
+                .unwrap()
+                .original_missing
+        );
+
+        // Replugged: back exactly as it was.
+        std::fs::rename(&elsewhere, &source_root).unwrap();
+        let Outcome::Scanned {
+            reachable,
+            confirmed,
+            missing,
+            ..
+        } = engine
+            .submit_and_wait(Command::ScanSource { source_id })
+            .unwrap()
+        else {
+            panic!()
+        };
+        assert!(reachable);
+        assert_eq!(confirmed, 1);
+        assert_eq!(missing, 0);
+    }
 }

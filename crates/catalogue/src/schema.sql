@@ -98,8 +98,20 @@ CREATE TABLE photo(
   rating_overridden INTEGER NOT NULL DEFAULT 0,
   imported INTEGER,
   sidecar_size INTEGER NOT NULL,
-  sidecar_modified INTEGER
+  sidecar_modified INTEGER,
+  -- Set by a source reconcile (design note 004 §6.3, §6.5), never by a rebuild (which only has
+  -- the workspace, not a fresh scan): "original changed" means the file at `path` no longer
+  -- matches `fingerprint`; "original missing" means no file matching this photo was found in its
+  -- source at all. Cleared by the next reconcile that confirms or relinks the file.
+  original_changed INTEGER NOT NULL DEFAULT 0,
+  original_missing INTEGER NOT NULL DEFAULT 0
 );
+
+-- A reconcile looks a found file up by fingerprint (design note 004 §6.4) and a scan pages
+-- through one source's known files; the plain b-tree index built on `photo(id)`'s own primary
+-- key does not help either.
+CREATE INDEX idx_photo_fingerprint ON photo(fingerprint);
+CREATE INDEX idx_photo_source ON photo(source_id);
 
 CREATE TABLE version(
   id TEXT PRIMARY KEY,

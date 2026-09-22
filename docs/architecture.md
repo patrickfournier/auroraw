@@ -81,6 +81,7 @@ flowchart TD
   engine --> sources["sources (interface, monitoring)"]
   engine --> host["plugin-host (wasmtime, permissions)"]
   engine --> format
+  engine --> api
   develop --> pipeline["pipeline (wgpu image engine)"]
   export --> pipeline
   import --> imaging["imaging (decoders, thumbnails, colour)"]

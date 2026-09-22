@@ -2,8 +2,8 @@
 //! The WP3 slice of the engine scenario (testing strategy §3): rate, keyword, edit a sidecar
 //! from outside and confirm the change is picked up, rebuild, and compare - scripted entirely
 //! through the real `auroraw-cli` binary, with no window. Import and versions are not built yet
-//! (WP4, M2), so the fixture photo is seeded directly on disk, the way a future `add-folder`
-//! command will.
+//! (WP7, M2), so the fixture photo is seeded directly on disk rather than through `source add`
+//! (see `source_scenario.rs` for that command).
 
 use std::path::Path;
 use std::process::{Command, Output};

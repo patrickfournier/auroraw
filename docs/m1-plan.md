@@ -265,6 +265,54 @@ a source against the catalogue (moved, renamed and deleted files).
 Done when: a folder is added, edited outside the application, unplugged and replugged, and the
 catalogue follows without loss; a card is recognised as a volume on all three platforms.
 
+**Status: done for local folders and removable volumes; duplicates, PTP/MTP and online storage
+deferred (below).** Built: the `Source` trait in `plugin-api` (`state`, `writable`, `list`,
+`stat`, `read_range`, `watch`) — native code, not yet a sandboxed plugin, since `plugin-host`
+(WP6) needs WP4 and WP5 first, not the other way around. `sources::filesystem::FilesystemSource`
+implements it over a plain folder, used both for a folder the photographer points at and for a
+removable volume's mount point (mounted, the two need no different reading); watching uses
+`notify`. `sources::volumes::list_removable_volumes` recognises a mounted removable volume per
+platform (see the deviation below). `sources::relink::reconcile` compares a fresh scan against
+what the catalogue knows for one source (design note 004 §6.3-§6.4): a file unchanged at its
+known path is confirmed; a different fingerprint there is "original changed"; a unique
+fingerprint match at a new path is relinked silently (D-019); a known file found nowhere is
+"missing", never removed (D-019, D-031); a file matching nothing is offered as new, never added
+without confirmation. `catalogue` gained `apply_source`, `apply_new_photo`, `apply_relink`,
+`mark_original_changed`/`mark_missing`, `known_files_in_source`, an index on `fingerprint` (design
+note 004 §6.2 asked WP2 for this and it was missed), and two reconcile-only columns
+(`original_changed`, `original_missing`) that a rebuild never sets and only reconcile does.
+`engine` gained `AddSource`, `ScanSource` and `AddNewPhotos`; `cli` wires `source add[--removable]
+/list/scan/add-new`.
+
+Three deviations, each documented where it matters more than here: **duplicates** (D-036, one
+photo at several simultaneous locations) are not built — the catalogue's `photo` row still holds
+one location, and a scan that finds a unique fingerprint match whose old location is *also* still
+there reports it `Ambiguous` rather than silently creating a second location the schema cannot
+express; duplicates are §5.3's job (WP9), not this one's, and `relink`'s own doc comment says so.
+**Volume detection** does not use the platform mechanisms architecture.md names (udisks2 over
+D-Bus, `DiskArbitration`, `SetupAPI`/device notifications): each is a bigger surface than one work
+package should add for a first cut, and none of the three runs reliably in a container or a CI
+runner anyway. `sources::volumes` instead asks the operating system directly for the one fact
+needed (sysfs plus `/proc/mounts` on Linux, `GetDriveTypeW` on Windows, `diskutil info -plist`
+plus `/Volumes` on macOS), tested against fixture trees and a fixture plist rather than a real
+card; a real card on each platform is confirmed on the pre-release checklist (testing strategy
+§11, item 7), the same way WP1's Windows result was (GitHub issue #1). **"Accept"ing an original
+change** (design note 004 §6.5: replacing the recorded size, fingerprint and hash once a person
+confirms a file was legitimately edited elsewhere) is not built: nothing before WP8 has an
+interface to ask a person, so reconcile only marks `original_changed` and leaves it; a file
+that is both edited and renamed before being accepted is correctly reported `New`/`Missing`
+rather than a wrong relink on a now-stale fingerprint (covered by
+`crates/cli/tests/source_scenario.rs`).
+
+The CLI-scripted scenario (`crates/cli/tests/source_scenario.rs`) runs the whole "done when" in
+one script: add a folder, list it, scan it, confirm the one new file, rescan (confirmed, not
+new), rename the file outside Auroraw (relinked silently), edit it outside Auroraw (original
+changed, since it was already relinked and never accepted), unplug (the mount point renamed
+away: reported unreachable, nothing marked missing), and replug at the same path (found again,
+nothing lost). `sources`' own 20 unit tests cover the reconcile table directly with fake sources
+and fixture file trees (testing strategy §3), including the ambiguous and several-candidates
+cases a CLI script cannot easily stage.
+
 ### WP5 Imaging: previews and thumbnails (L). Needs WP2
 
 `imaging`: metadata and **embedded preview** extraction for the common RAW formats, JPEG, TIFF,

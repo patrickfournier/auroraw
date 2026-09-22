@@ -8,8 +8,8 @@
 //! [`crate::rebuild_to_file`] does for a whole catalogue.
 
 use auroraw_format::sidecar::{PhotoSidecar, VersionSidecar};
-use auroraw_format::state::KeywordEntry;
-use auroraw_types::PhotoId;
+use auroraw_format::state::{KeywordEntry, SourceEntry};
+use auroraw_types::{Fingerprint, PhotoId, SourceId};
 use rusqlite::{OptionalExtension, params};
 
 use crate::SidecarStat;
@@ -109,6 +109,92 @@ impl Catalogue {
                 parent_id = excluded.parent_id, name = excluded.name, path = excluded.path, export = excluded.export",
             params![entry.id.to_string(), entry.parent.map(|p| p.to_string()), entry.name, path, entry.export as i64],
         )?;
+        Ok(())
+    }
+
+    /// Inserts or updates a registered source's `kind` and `name` (WP4). The real path on this
+    /// machine is never stored here (design note 002 §6.6): it lives in the workspace's
+    /// `SourceEntry.hint`, read fresh by whoever needs to open the source.
+    pub fn apply_source(&mut self, entry: &SourceEntry) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO source(id, kind, name) VALUES (?1, ?2, ?3)
+             ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, name = excluded.name",
+            params![entry.id.to_string(), entry.kind, entry.name],
+        )?;
+        Ok(())
+    }
+
+    /// Adds a photo discovered by a source scan (design note 004 §6.3, item 4's "in place"
+    /// case: no import, so no whole-file hash yet, only the sampled fingerprint) that a person
+    /// confirmed. Its metadata is empty: nothing here has read the file's EXIF yet (WP5's job).
+    /// Fails if a photo with this identifier already exists.
+    pub fn apply_new_photo(&mut self, photo: &PhotoSidecar, stat: SidecarStat) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        crate::populate::insert_photo(&tx, photo, stat, &[])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Updates an existing photo's file location after a reconcile relinks it (design note 004
+    /// §6.4): the file moved or was renamed within its source, silently, since the match was
+    /// unique. Nothing about the photo's metadata changes.
+    pub fn apply_relink(
+        &mut self,
+        photo_id: &PhotoId,
+        source_id: &SourceId,
+        path: &str,
+        filename: &str,
+        fingerprint: &Fingerprint,
+    ) -> Result<()> {
+        let changed = self.conn.execute(
+            "UPDATE photo SET source_id = ?1, path = ?2, filename = ?3, fingerprint = ?4,
+                original_changed = 0, original_missing = 0
+             WHERE id = ?5",
+            params![
+                source_id.to_string(),
+                path,
+                filename,
+                fingerprint.to_string(),
+                photo_id.to_string()
+            ],
+        )?;
+        if changed == 0 {
+            return Err(CatalogueError::NotFound {
+                kind: "photo",
+                id: photo_id.to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Marks or clears a photo's "original changed" state (design note 004 §6.5): the file at
+    /// its known path no longer matches the recorded fingerprint.
+    pub fn mark_original_changed(&mut self, photo_id: &PhotoId, changed: bool) -> Result<()> {
+        self.set_reconcile_flag("original_changed", photo_id, changed)
+    }
+
+    /// Marks or clears a photo's "missing" state: the last reconcile of its source found no file
+    /// matching it at all. Never removes the photo (D-019, D-031).
+    pub fn mark_missing(&mut self, photo_id: &PhotoId, missing: bool) -> Result<()> {
+        self.set_reconcile_flag("original_missing", photo_id, missing)
+    }
+
+    fn set_reconcile_flag(
+        &mut self,
+        column: &'static str,
+        photo_id: &PhotoId,
+        value: bool,
+    ) -> Result<()> {
+        let sql = format!("UPDATE photo SET {column} = ?1 WHERE id = ?2");
+        let changed = self
+            .conn
+            .execute(&sql, params![value as i64, photo_id.to_string()])?;
+        if changed == 0 {
+            return Err(CatalogueError::NotFound {
+                kind: "photo",
+                id: photo_id.to_string(),
+            });
+        }
         Ok(())
     }
 }
@@ -267,5 +353,143 @@ mod tests {
             )
             .unwrap();
         assert_eq!(name, "Wildlife");
+    }
+
+    fn photo_with_file(source_id: SourceId, path: &str, fingerprint: Fingerprint) -> PhotoSidecar {
+        use auroraw_format::sidecar::{FileEntry, FileRole, Location};
+        let mut p = PhotoSidecar::new(PhotoId::random());
+        p.files.push(FileEntry {
+            role: FileRole::Original,
+            name: path.rsplit('/').next().unwrap_or(path).to_string(),
+            format: None,
+            size: 10,
+            fingerprint,
+            hash: None,
+            locations: vec![Location {
+                source: source_id,
+                path: path.to_string(),
+                seen: None,
+                extra: vec![],
+            }],
+            extra: vec![],
+        });
+        p
+    }
+
+    #[test]
+    fn apply_source_inserts_then_updates() {
+        let mut cat = Catalogue::open_in_memory(WorkspaceId::random()).unwrap();
+        let id = SourceId::random();
+        cat.apply_source(&SourceEntry {
+            id,
+            kind: "local-folder".into(),
+            name: "Working disk".into(),
+            hint: Default::default(),
+            ignore: vec![],
+            config: Default::default(),
+            extra: Default::default(),
+        })
+        .unwrap();
+        cat.apply_source(&SourceEntry {
+            id,
+            kind: "local-folder".into(),
+            name: "Renamed disk".into(),
+            hint: Default::default(),
+            ignore: vec![],
+            config: Default::default(),
+            extra: Default::default(),
+        })
+        .unwrap();
+        let row = cat.source(&id).unwrap().unwrap();
+        assert_eq!(row.name, "Renamed disk");
+        assert_eq!(cat.list_sources().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn apply_new_photo_and_known_files_in_source_agree() {
+        let mut cat = Catalogue::open_in_memory(WorkspaceId::random()).unwrap();
+        let source_id = SourceId::random();
+        let fp = Fingerprint::from_bytes([7; 32]);
+        let photo = photo_with_file(source_id, "a.jpg", fp);
+        cat.apply_new_photo(
+            &photo,
+            SidecarStat {
+                size: 1,
+                modified: Some(1),
+            },
+        )
+        .unwrap();
+
+        let row = cat.photo(&photo.photo_id).unwrap().unwrap();
+        assert_eq!(row.source_id, Some(source_id));
+        assert_eq!(row.path.as_deref(), Some("a.jpg"));
+        assert!(!row.original_changed);
+        assert!(!row.original_missing);
+
+        let known = cat.known_files_in_source(&source_id).unwrap();
+        assert_eq!(known, vec![(photo.photo_id, "a.jpg".to_string(), fp)]);
+    }
+
+    #[test]
+    fn apply_relink_moves_the_location_and_clears_reconcile_flags() {
+        let mut cat = Catalogue::open_in_memory(WorkspaceId::random()).unwrap();
+        let source_id = SourceId::random();
+        let fp = Fingerprint::from_bytes([1; 32]);
+        let photo = photo_with_file(source_id, "old.jpg", fp);
+        cat.apply_new_photo(
+            &photo,
+            SidecarStat {
+                size: 1,
+                modified: Some(1),
+            },
+        )
+        .unwrap();
+        cat.mark_missing(&photo.photo_id, true).unwrap();
+
+        cat.apply_relink(&photo.photo_id, &source_id, "new.jpg", "new.jpg", &fp)
+            .unwrap();
+
+        let row = cat.photo(&photo.photo_id).unwrap().unwrap();
+        assert_eq!(row.path.as_deref(), Some("new.jpg"));
+        assert!(
+            !row.original_missing,
+            "relinking clears a stale missing mark"
+        );
+    }
+
+    #[test]
+    fn mark_original_changed_and_mark_missing_round_trip() {
+        let mut cat = Catalogue::open_in_memory(WorkspaceId::random()).unwrap();
+        let (photo, stat) = one_photo();
+        let vocab = vocabulary();
+        build(
+            &mut cat,
+            &RebuildInput {
+                photos: &[(photo.clone(), stat)],
+                vocabulary: &vocab,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        cat.mark_original_changed(&photo.photo_id, true).unwrap();
+        assert!(
+            cat.photo(&photo.photo_id)
+                .unwrap()
+                .unwrap()
+                .original_changed
+        );
+        cat.mark_original_changed(&photo.photo_id, false).unwrap();
+        assert!(
+            !cat.photo(&photo.photo_id)
+                .unwrap()
+                .unwrap()
+                .original_changed
+        );
+
+        assert!(matches!(
+            cat.mark_missing(&PhotoId::random(), true),
+            Err(CatalogueError::NotFound { kind: "photo", .. })
+        ));
     }
 }

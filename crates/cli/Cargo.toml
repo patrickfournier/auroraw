@@ -16,6 +16,7 @@ auroraw-engine = { path = "../engine" }
 auroraw-catalogue = { path = "../catalogue" }
 auroraw-format = { path = "../format" }
 auroraw-types = { path = "../types" }
+auroraw-sources = { path = "../sources" }
 
 [[bin]]
 name = "auroraw-cli"

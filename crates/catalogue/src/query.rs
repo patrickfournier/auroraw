@@ -3,7 +3,7 @@
 //! the same at the start or the end of a 100,000-photo catalogue, spike 3), counts, a full-text
 //! search, and a lookup by keyword. See `docs/spikes/03-catalogue-and-grid.md` for the budgets.
 
-use auroraw_types::{KeywordId, PhotoId, SeriesId};
+use auroraw_types::{Fingerprint, KeywordId, PhotoId, SeriesId, SourceId};
 use rusqlite::{OptionalExtension, Row, params};
 
 use crate::error::Result;
@@ -42,12 +42,21 @@ pub struct PhotoRow {
     pub series_id: Option<SeriesId>,
     /// How many versions this photo has.
     pub version_count: u32,
+    /// The source this photo's file was last found in, if any.
+    pub source_id: Option<SourceId>,
+    /// Its path inside that source.
+    pub path: Option<String>,
+    /// Whether the last reconcile found the file at `path` with a different fingerprint (design
+    /// note 004 §6.5).
+    pub original_changed: bool,
+    /// Whether the last reconcile found no file at all matching this photo in its source.
+    pub original_missing: bool,
 }
 
 const COLUMNS: &str = "
     p.id, p.capture_time, p.rating, p.effective_rating, p.rating_overridden, p.flag,
     p.effective_flag, p.label, p.title, p.caption, p.filename, c.name, l.name, p.series_id,
-    p.version_count
+    p.version_count, p.source_id, p.path, p.original_changed, p.original_missing
 ";
 const FROM: &str =
     "FROM photo p LEFT JOIN camera c ON c.id = p.camera_id LEFT JOIN lens l ON l.id = p.lens_id";
@@ -55,6 +64,7 @@ const FROM: &str =
 fn photo_row(row: &Row) -> rusqlite::Result<PhotoRow> {
     let id: String = row.get(0)?;
     let series_id: Option<String> = row.get(13)?;
+    let source_id: Option<String> = row.get(15)?;
     Ok(PhotoRow {
         id: id.parse().map_err(|_| {
             rusqlite::Error::InvalidColumnType(0, "id".into(), rusqlite::types::Type::Text)
@@ -73,6 +83,10 @@ fn photo_row(row: &Row) -> rusqlite::Result<PhotoRow> {
         lens: row.get(12)?,
         series_id: series_id.and_then(|s| s.parse().ok()),
         version_count: row.get(14)?,
+        source_id: source_id.and_then(|s| s.parse().ok()),
+        path: row.get(16)?,
+        original_changed: row.get::<_, i64>(17)? != 0,
+        original_missing: row.get::<_, i64>(18)? != 0,
     })
 }
 
@@ -280,4 +294,82 @@ impl Catalogue {
         }
         Ok(ids)
     }
+
+    /// A registered source by identifier.
+    pub fn source(&self, id: &SourceId) -> Result<Option<SourceRow>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT id, kind, name FROM source WHERE id = ?1",
+                [id.to_string()],
+                source_row,
+            )
+            .optional()?)
+    }
+
+    /// Every registered source.
+    pub fn list_sources(&self) -> Result<Vec<SourceRow>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, kind, name FROM source ORDER BY name")?;
+        let rows = stmt.query_map([], source_row)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Every photo the catalogue has on record for `source_id`: its identifier, path and
+    /// fingerprint, for a reconcile scan (design note 004 §6.4) to compare against a fresh
+    /// listing. `catalogue` does not depend on `sources` (both sit beside each other under
+    /// `engine`, architecture §3.2), so the caller wraps each tuple into a
+    /// `sources::relink::KnownFile` itself. A photo with no fingerprint or path yet is left out:
+    /// nothing to match it against.
+    pub fn known_files_in_source(
+        &self,
+        source_id: &SourceId,
+    ) -> Result<Vec<(PhotoId, String, Fingerprint)>> {
+        let mut stmt = self.conn.prepare("SELECT id, path, fingerprint FROM photo WHERE source_id = ?1 AND fingerprint IS NOT NULL AND path IS NOT NULL")?;
+        let rows = stmt.query_map([source_id.to_string()], |r| {
+            let id: String = r.get(0)?;
+            let path: String = r.get(1)?;
+            let fingerprint: String = r.get(2)?;
+            Ok((id, path, fingerprint))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (id, path, fingerprint) = row?;
+            let photo_id = id.parse().map_err(|_| {
+                rusqlite::Error::InvalidColumnType(0, "id".into(), rusqlite::types::Type::Text)
+            })?;
+            let fingerprint = fingerprint.parse().map_err(|_| {
+                rusqlite::Error::InvalidColumnType(
+                    2,
+                    "fingerprint".into(),
+                    rusqlite::types::Type::Text,
+                )
+            })?;
+            out.push((photo_id, path, fingerprint));
+        }
+        Ok(out)
+    }
+}
+
+/// One row of the `source` table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceRow {
+    /// Its identifier.
+    pub id: SourceId,
+    /// The source plugin's identifier (`"local-folder"`, `"removable-volume"`).
+    pub kind: String,
+    /// Its display name.
+    pub name: String,
+}
+
+fn source_row(row: &Row) -> rusqlite::Result<SourceRow> {
+    let id: String = row.get(0)?;
+    Ok(SourceRow {
+        id: id.parse().map_err(|_| {
+            rusqlite::Error::InvalidColumnType(0, "id".into(), rusqlite::types::Type::Text)
+        })?,
+        kind: row.get(1)?,
+        name: row.get(2)?,
+    })
 }

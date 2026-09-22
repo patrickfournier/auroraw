@@ -24,7 +24,10 @@ const ALLOWED: &[(&str, &[&str])] = &[
     ("auroraw-workspace", &["auroraw-format", "auroraw-types"]),
     ("auroraw-plugin-api", &[]),
     ("auroraw-plugin-host", &["auroraw-plugin-api"]),
-    ("auroraw-sources", &["auroraw-plugin-api", "auroraw-types"]),
+    (
+        "auroraw-sources",
+        &["auroraw-plugin-api", "auroraw-types", "auroraw-format"],
+    ),
     ("auroraw-imaging", &["auroraw-plugin-api", "auroraw-types"]),
     (
         "auroraw-import",
@@ -37,6 +40,7 @@ const ALLOWED: &[(&str, &[&str])] = &[
             "auroraw-workspace",
             "auroraw-format",
             "auroraw-sources",
+            "auroraw-plugin-api",
             "auroraw-import",
             "auroraw-imaging",
             "auroraw-plugin-host",
@@ -51,6 +55,7 @@ const ALLOWED: &[(&str, &[&str])] = &[
             "auroraw-catalogue",
             "auroraw-format",
             "auroraw-types",
+            "auroraw-sources",
         ],
     ),
     (

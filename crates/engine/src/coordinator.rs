@@ -4,14 +4,18 @@
 //! the catalogue goes through here, whichever thread asked for it.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::SystemTime;
 
 use auroraw_catalogue::{Catalogue, SidecarStat};
-use auroraw_format::sidecar::{PhotoSidecar, VersionSidecar};
-use auroraw_format::state::KeywordEntry;
-use auroraw_types::{KeywordId, PhotoId, Timestamp};
+use auroraw_format::sidecar::{FileEntry, FileRole, Location, PhotoSidecar, VersionSidecar};
+use auroraw_format::state::{KeywordEntry, SourceEntry};
+use auroraw_plugin_api::source::{Source, SourceState};
+use auroraw_sources::filesystem::FilesystemSource;
+use auroraw_sources::relink::{self, FoundFile, KnownFile, ScanOutcome};
+use auroraw_types::{KeywordId, PhotoId, SourceId, Timestamp};
 use auroraw_workspace::{FileStat, Workspace};
 
 use crate::command::Command;
@@ -33,6 +37,28 @@ pub enum Outcome {
         /// How many sidecars it will touch.
         affected: usize,
     },
+    /// `AddSource`'s new identifier.
+    SourceAdded(SourceId),
+    /// `ScanSource`'s report: what the reconcile applied, and what it left for a person or
+    /// `AddNewPhotos`.
+    Scanned {
+        /// Whether the source could be reached at all.
+        reachable: bool,
+        /// How many files matched exactly what the catalogue expected.
+        confirmed: usize,
+        /// How many files changed at their known path.
+        changed: usize,
+        /// How many files were relinked silently.
+        relinked: usize,
+        /// How many known files were found nowhere.
+        missing: usize,
+        /// Paths that matched nothing known: offer these to `AddNewPhotos`.
+        new: Vec<String>,
+        /// How many found files were ambiguous.
+        ambiguous: usize,
+    },
+    /// `AddNewPhotos`'s new identifiers, in the order their paths were given.
+    PhotosAdded(Vec<PhotoId>),
 }
 
 pub(crate) type Reply = mpsc::Sender<Result<Outcome>>;
@@ -146,6 +172,9 @@ impl Coordinator {
                 new_name,
             } => self.rename_keyword(keyword_id, new_name),
             Command::CancelJob { job_id } => self.cancel_job(job_id),
+            Command::AddSource { name, root, kind } => self.add_source(name, root, kind),
+            Command::ScanSource { source_id } => self.scan_source(source_id),
+            Command::AddNewPhotos { source_id, paths } => self.add_new_photos(source_id, paths),
         }
     }
 
@@ -464,6 +493,205 @@ impl Coordinator {
             removed_photos: report.removed.len(),
         });
         Ok(Outcome::Applied)
+    }
+
+    fn read_sources(&self) -> Result<auroraw_format::state::Sources> {
+        match self.workspace.read_sources()? {
+            Some(loaded) => loaded.current().ok_or_else(|| EngineError::NotFound {
+                kind: "sources (newer schema)",
+                id: String::new(),
+            }),
+            None => Ok(auroraw_format::state::Sources {
+                updated: Timestamp::now(),
+                sources: Vec::new(),
+                extra: Default::default(),
+            }),
+        }
+    }
+
+    fn source_entry(&self, source_id: &SourceId) -> Result<SourceEntry> {
+        self.read_sources()?
+            .sources
+            .into_iter()
+            .find(|s| s.id == *source_id)
+            .ok_or_else(|| EngineError::NotFound {
+                kind: "source",
+                id: source_id.to_string(),
+            })
+    }
+
+    /// The real path on this machine (design note 002 §6.6: never stored anywhere but the
+    /// workspace's `hint` and, once registered, the catalogue). Every M1 source is a folder here
+    /// or a removable volume's mount point, read the same way (`sources::filesystem`).
+    fn open_source(entry: &SourceEntry) -> Result<FilesystemSource> {
+        let path = entry
+            .hint
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| EngineError::NotFound {
+                kind: "source path (hint)",
+                id: entry.id.to_string(),
+            })?;
+        Ok(FilesystemSource::new(path))
+    }
+
+    fn add_source(&mut self, name: String, root: PathBuf, kind: String) -> Result<Outcome> {
+        let mut sources = self.read_sources()?;
+        let id = SourceId::random();
+        let mut hint = serde_json::Map::new();
+        hint.insert(
+            "path".to_string(),
+            serde_json::Value::String(root.to_string_lossy().into_owned()),
+        );
+        let entry = SourceEntry {
+            id,
+            kind,
+            name,
+            hint,
+            ignore: Vec::new(),
+            config: Default::default(),
+            extra: Default::default(),
+        };
+        sources.sources.push(entry.clone());
+        sources.updated = Timestamp::now();
+        self.workspace.write_sources(&sources)?;
+        self.catalogue.apply_source(&entry)?;
+        let _ = self.events.send(Event::SourceAdded(id));
+        Ok(Outcome::SourceAdded(id))
+    }
+
+    fn scan_source(&mut self, source_id: SourceId) -> Result<Outcome> {
+        let entry = self.source_entry(&source_id)?;
+        let source = Self::open_source(&entry)?;
+        if source.state() != SourceState::Online {
+            let _ = self.events.send(Event::SourceScanned {
+                source_id,
+                reachable: false,
+                confirmed: 0,
+                changed: 0,
+                relinked: 0,
+                missing: 0,
+                new: Vec::new(),
+                ambiguous: 0,
+            });
+            return Ok(Outcome::Scanned {
+                reachable: false,
+                confirmed: 0,
+                changed: 0,
+                relinked: 0,
+                missing: 0,
+                new: Vec::new(),
+                ambiguous: 0,
+            });
+        }
+        let found: Vec<FoundFile> = source.scan()?;
+        let known: Vec<KnownFile> = self
+            .catalogue
+            .known_files_in_source(&source_id)?
+            .into_iter()
+            .map(|(photo_id, path, fingerprint)| KnownFile {
+                photo_id,
+                path,
+                fingerprint,
+            })
+            .collect();
+        let outcomes = relink::reconcile(&found, &known);
+
+        let (mut confirmed, mut changed, mut relinked, mut missing, mut ambiguous) =
+            (0, 0, 0, 0, 0);
+        let mut new = Vec::new();
+        for outcome in outcomes {
+            match outcome {
+                ScanOutcome::Confirmed { photo_id } => {
+                    self.catalogue.mark_original_changed(&photo_id, false)?;
+                    self.catalogue.mark_missing(&photo_id, false)?;
+                    confirmed += 1;
+                }
+                ScanOutcome::OriginalChanged { photo_id, .. } => {
+                    self.catalogue.mark_original_changed(&photo_id, true)?;
+                    changed += 1;
+                }
+                ScanOutcome::Relinked { photo_id, to, .. } => {
+                    let filename = to.rsplit('/').next().unwrap_or(&to).to_string();
+                    let fingerprint = found
+                        .iter()
+                        .find(|f| f.path == to)
+                        .map(|f| f.fingerprint)
+                        .expect("the relink target was just found");
+                    self.catalogue.apply_relink(
+                        &photo_id,
+                        &source_id,
+                        &to,
+                        &filename,
+                        &fingerprint,
+                    )?;
+                    relinked += 1;
+                }
+                ScanOutcome::Missing { photo_id, .. } => {
+                    self.catalogue.mark_missing(&photo_id, true)?;
+                    missing += 1;
+                }
+                ScanOutcome::New { path } => new.push(path),
+                ScanOutcome::Ambiguous { .. } => ambiguous += 1,
+            }
+        }
+        let _ = self.events.send(Event::SourceScanned {
+            source_id,
+            reachable: true,
+            confirmed,
+            changed,
+            relinked,
+            missing,
+            new: new.clone(),
+            ambiguous,
+        });
+        Ok(Outcome::Scanned {
+            reachable: true,
+            confirmed,
+            changed,
+            relinked,
+            missing,
+            new,
+            ambiguous,
+        })
+    }
+
+    fn add_new_photos(&mut self, source_id: SourceId, paths: Vec<String>) -> Result<Outcome> {
+        let entry = self.source_entry(&source_id)?;
+        let source = Self::open_source(&entry)?;
+        let mut added = Vec::new();
+        for path in paths {
+            let fingerprint = source.fingerprint_of(&path)?;
+            let stat = source.stat(&path)?;
+            let filename = path.rsplit('/').next().unwrap_or(&path).to_string();
+            let photo_id = PhotoId::random();
+            let mut photo = PhotoSidecar::new(photo_id);
+            photo.imported = Some(Timestamp::now());
+            photo.files.push(FileEntry {
+                role: FileRole::Original,
+                name: filename,
+                format: None,
+                size: stat.size,
+                fingerprint,
+                hash: None,
+                locations: vec![Location {
+                    source: source_id,
+                    path: path.clone(),
+                    seen: Some(Timestamp::now()),
+                    extra: Vec::new(),
+                }],
+                extra: Vec::new(),
+            });
+            self.workspace.write_photo(&photo)?;
+            let (photo, stat) = self.read_photo(&photo_id)?;
+            self.catalogue.apply_new_photo(&photo, stat)?;
+            added.push(photo_id);
+        }
+        let _ = self.events.send(Event::PhotosAdded {
+            source_id,
+            count: added.len(),
+        });
+        Ok(Outcome::PhotosAdded(added))
     }
 }
 

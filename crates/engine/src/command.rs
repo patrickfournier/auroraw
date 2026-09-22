@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+use std::path::PathBuf;
+
 use auroraw_format::sidecar::Flag;
-use auroraw_types::{KeywordId, PhotoId};
+use auroraw_types::{KeywordId, PhotoId, SourceId};
 
 /// A change the engine's single writer applies, in the order it receives them (architecture
 /// §4.3). Sent with [`crate::Engine::submit`] (fire and forget) or
@@ -63,5 +65,33 @@ pub enum Command {
     CancelJob {
         /// The job to cancel.
         job_id: crate::job::JobId,
+    },
+    /// Registers a folder or a removable volume's mount point as a source, "in place": nothing
+    /// is copied (spec §5.1). `root` is this machine's real path to it, kept only in the
+    /// workspace's `hint` and the catalogue (design note 002 §6.6), never synced.
+    AddSource {
+        /// Its display name.
+        name: String,
+        /// Where it is on this machine.
+        root: PathBuf,
+        /// `sources::filesystem::LOCAL_FOLDER` or `sources::filesystem::REMOVABLE_VOLUME`.
+        kind: String,
+    },
+    /// Scans a source and reconciles what it finds against the catalogue (design note 004
+    /// §6.3-§6.4): confirms unchanged files, marks a changed or missing one, relinks a moved or
+    /// renamed one silently, and reports new and ambiguous files for
+    /// [`Command::AddNewPhotos`] or a person to resolve. Does nothing if the source is not
+    /// reachable right now.
+    ScanSource {
+        /// The source to scan.
+        source_id: SourceId,
+    },
+    /// Adds photos for files a [`Command::ScanSource`] reported as new, once confirmed (D-019):
+    /// never on its own. Each photo's metadata starts empty; reading it is WP5's job.
+    AddNewPhotos {
+        /// The source the files were found in.
+        source_id: SourceId,
+        /// Their paths inside the source, as `Event::SourceScanned` (or a fresh scan) reported.
+        paths: Vec<String>,
     },
 }

@@ -22,6 +22,7 @@ time = { version = "0.3", features = ["formatting", "parsing"] }
 blake3 = "1"
 quick-xml = "0.42"
 rusqlite = { version = "0.40", default-features = false, features = ["bundled", "cache"] }
+notify = "8"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

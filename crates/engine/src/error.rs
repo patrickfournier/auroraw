@@ -31,6 +31,9 @@ pub enum EngineError {
     /// the workspace read and the stat, for instance).
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    /// A source refused an operation (WP4): unreachable, or no file at the path asked for.
+    #[error(transparent)]
+    Source(#[from] auroraw_plugin_api::source::SourceError),
 }
 
 /// The result type this crate uses throughout.

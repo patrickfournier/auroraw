@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! The headless command line: script the engine with no window (architecture §3.1). WP3 wires up
-//! the commands that do not need sources or develop yet: `create`, `list`, `rebuild`, `verify`,
-//! `rate`, `flag` and `keyword`. `add-folder` (a source) and `export` follow in later work
-//! packages.
+//! The headless command line: script the engine with no window (architecture §3.1). `create`,
+//! `list`, `rebuild`, `verify`, `rate`, `flag`, `keyword` (WP3) and `source` (WP4: add a folder or
+//! a removable volume in place, scan it, confirm new files). `export` and develop follow later.
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -11,7 +10,7 @@ use std::time::Duration;
 use auroraw_catalogue::CatalogueError;
 use auroraw_engine::{Command, Engine, EngineError, Event, EventReceiver, JobId, Outcome};
 use auroraw_format::sidecar::Flag;
-use auroraw_types::{KeywordId, PhotoId};
+use auroraw_types::{KeywordId, PhotoId, SourceId};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -39,7 +38,12 @@ usage: auroraw-cli --version
        auroraw-cli keyword create <workspace-dir> <catalogue-file> <name> [--parent <id>]
        auroraw-cli keyword rename <workspace-dir> <catalogue-file> <keyword-id> <new-name>
        auroraw-cli keyword add <workspace-dir> <catalogue-file> <photo-id> <keyword-id>
-       auroraw-cli keyword remove <workspace-dir> <catalogue-file> <photo-id> <keyword-id>";
+       auroraw-cli keyword remove <workspace-dir> <catalogue-file> <photo-id> <keyword-id>
+       auroraw-cli source add <workspace-dir> <catalogue-file> <path> <name> [--removable]
+       auroraw-cli source list <workspace-dir> <catalogue-file>
+       auroraw-cli source scan <workspace-dir> <catalogue-file> <source-id>
+       auroraw-cli source add-new <workspace-dir> <catalogue-file> <source-id> --all
+       auroraw-cli source add-new <workspace-dir> <catalogue-file> <source-id> <path>...";
 
 enum CliError {
     Usage,
@@ -80,6 +84,7 @@ fn run(args: &[String]) -> Result<(), CliError> {
         Some("rate") => cmd_rate(&args[1..]),
         Some("flag") => cmd_flag(&args[1..]),
         Some("keyword") => cmd_keyword(&args[1..]),
+        Some("source") => cmd_source(&args[1..]),
         _ => Err(CliError::Usage),
     }
 }
@@ -301,5 +306,118 @@ fn cmd_keyword_edit(args: &[String], add: bool) -> Result<(), CliError> {
         if add { "added" } else { "removed" },
         if add { "to" } else { "from" }
     );
+    Ok(())
+}
+
+fn cmd_source(args: &[String]) -> Result<(), CliError> {
+    match args.first().map(String::as_str) {
+        Some("add") => cmd_source_add(&args[1..]),
+        Some("list") => cmd_source_list(&args[1..]),
+        Some("scan") => cmd_source_scan(&args[1..]),
+        Some("add-new") => cmd_source_add_new(&args[1..]),
+        _ => Err(CliError::Usage),
+    }
+}
+
+fn cmd_source_add(args: &[String]) -> Result<(), CliError> {
+    let (removable, rest) = match args {
+        [rest @ .., flag] if flag == "--removable" => (true, rest),
+        rest => (false, rest),
+    };
+    let [workspace, catalogue, path, name] = rest else {
+        return Err(CliError::Usage);
+    };
+    let kind = if removable {
+        auroraw_sources::filesystem::REMOVABLE_VOLUME
+    } else {
+        auroraw_sources::filesystem::LOCAL_FOLDER
+    };
+    let (engine, _events) = open(Path::new(workspace), Path::new(catalogue))?;
+    let Outcome::SourceAdded(id) = engine.submit_and_wait(Command::AddSource {
+        name: name.clone(),
+        root: PathBuf::from(path),
+        kind: kind.into(),
+    })?
+    else {
+        unreachable!("AddSource always returns SourceAdded");
+    };
+    println!("added source {id} ({kind}) at {path}");
+    Ok(())
+}
+
+fn cmd_source_list(args: &[String]) -> Result<(), CliError> {
+    let (workspace, catalogue) = paths2(args)?;
+    let (engine, _events) = open(&workspace, &catalogue)?;
+    let sources = engine.read_catalogue()?.list_sources()?;
+    for s in &sources {
+        println!("{}  {}  {}", s.id, s.kind, s.name);
+    }
+    println!("{} source(s)", sources.len());
+    Ok(())
+}
+
+fn cmd_source_scan(args: &[String]) -> Result<(), CliError> {
+    let [workspace, catalogue, source_id] = args else {
+        return Err(CliError::Usage);
+    };
+    let source_id: SourceId = source_id.parse().map_err(|_| CliError::Usage)?;
+    let (engine, _events) = open(Path::new(workspace), Path::new(catalogue))?;
+    print_scan_report(&engine, source_id)
+}
+
+fn print_scan_report(engine: &Engine, source_id: SourceId) -> Result<(), CliError> {
+    let Outcome::Scanned {
+        reachable,
+        confirmed,
+        changed,
+        relinked,
+        missing,
+        new,
+        ambiguous,
+    } = engine.submit_and_wait(Command::ScanSource { source_id })?
+    else {
+        unreachable!("ScanSource always returns Scanned");
+    };
+    if !reachable {
+        println!("source {source_id} is not reachable right now; nothing scanned");
+        return Ok(());
+    }
+    println!(
+        "confirmed={confirmed} changed={changed} relinked={relinked} missing={missing} ambiguous={ambiguous}"
+    );
+    for path in &new {
+        println!("  new: {path}");
+    }
+    Ok(())
+}
+
+fn cmd_source_add_new(args: &[String]) -> Result<(), CliError> {
+    let [workspace, catalogue, source_id, rest @ ..] = args else {
+        return Err(CliError::Usage);
+    };
+    let source_id: SourceId = source_id.parse().map_err(|_| CliError::Usage)?;
+    let (engine, _events) = open(Path::new(workspace), Path::new(catalogue))?;
+    let paths = match rest {
+        [flag] if flag == "--all" => {
+            let Outcome::Scanned { new, .. } =
+                engine.submit_and_wait(Command::ScanSource { source_id })?
+            else {
+                unreachable!("ScanSource always returns Scanned");
+            };
+            new
+        }
+        [] => return Err(CliError::Usage),
+        paths => paths.to_vec(),
+    };
+    let count = paths.len();
+    let Outcome::PhotosAdded(added) =
+        engine.submit_and_wait(Command::AddNewPhotos { source_id, paths })?
+    else {
+        unreachable!("AddNewPhotos always returns PhotosAdded");
+    };
+    for id in &added {
+        println!("added photo {id}");
+    }
+    println!("{}/{count} added", added.len());
     Ok(())
 }
