@@ -157,8 +157,11 @@ at the start, so the later parts are partly warm.
 - [ ] **Windows.** File creation and reading on NTFS, with an antivirus scanning, is the classic
   weak spot of a design with 243,000 small files and 100,000 thumbnails. `run-spike3.sh` runs the
   whole spike there. Cold-cache figures are not available on Windows.
-- [ ] **A slower disk**: a hard disk or a network share for the workspace (D-022 allows a share).
-  The design tolerates it (the sidecar cache), but it was not measured.
+- [x] **A slower disk** (issue #1, 2026-09-22, and docs/design/001-workspace-layout.md §4.2): measured on
+  Patrick's real machine, a 2 TB 7200 rpm HDD as the system disk. The design tolerates it (writing 225,074
+  sidecars took 25 minutes there, reading them 54 s), but "a rebuild takes seconds" no longer holds
+  unconditionally: on a spinning disk it is tens of seconds to read, tens of minutes to write a first
+  workspace. A network share is still unmeasured.
 - [ ] **Real data.** The catalogue is generated; real shoots are less regular. The thumbnails come
   from six images.
 - [ ] **Several catalogues, several writers.** One writer at a time was measured; the interaction

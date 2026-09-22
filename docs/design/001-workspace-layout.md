@@ -146,11 +146,11 @@ The first `workspace` and `format` crates, with real sidecars (about 3 KB each),
 photos and 125,074 versions (225,074 files)** by `crates/workspace/tests/large.rs`, nightly on the
 three platforms. Sixteen threads on the developer machine (warm), four on the runners.
 
-| | Developer machine (Linux, 16 threads) | CI Linux (4 vCPU) | CI macOS (3 vCPU) | CI Windows (4 vCPU, Defender on) |
-| --- | --- | --- | --- | --- |
-| Write every sidecar (atomic) | 4.1 s | 7.6 to 10 s | 47 to 59 s | **500 to 700 s** |
-| Walk the whole tree | 0.43 s | 0.5 to 0.8 s | 10 to 17 s | 0.5 to 0.6 s |
-| Read and parse every sidecar | **1.9 s** (119,000 files a second) | 11 to 18 s (12,000 to 20,000 a second) | 43 s (5,200 a second) | 9.6 to 14 s (16,000 to 23,000 a second) |
+| | Developer machine (Linux, 16 threads) | CI Linux (4 vCPU) | CI macOS (3 vCPU) | CI Windows (4 vCPU, Defender on) | Patrick's Windows machine (16 threads, HDD system disk) |
+| --- | --- | --- | --- | --- | --- |
+| Write every sidecar (atomic) | 4.1 s | 7.6 to 10 s | 47 to 59 s | 500 to 700 s | **1,513 s (25 minutes)** |
+| Walk the whole tree | 0.43 s | 0.5 to 0.8 s | 10 to 17 s | 0.5 to 0.6 s | 2.9 s |
+| Read and parse every sidecar | **1.9 s** (119,000 files a second) | 11 to 18 s (12,000 to 20,000 a second) | 43 s (5,200 a second) | 9.6 to 14 s (16,000 to 23,000 a second) | 54.3 s (4,150 a second) |
 
 One atomic write, step by step, one thread (milliseconds per file): Linux 0.02; macOS 0.16;
 **Windows about 1.0** (writing the temporary file 0.29, the rename **0.55**, checking that the shard
@@ -164,9 +164,25 @@ What it says:
 - **A rebuild of 100,000 photos reads 225,000 files in 2 s on a fast machine and 10 to 45 s on the slowest
   runners.** Seconds to tens of seconds, as the plan expected.
 - **Writing is where Windows hurts**, and it is the rename and the antivirus scan of every new file, in every layout
-  (note 001 §4.1). About 1 to 2 ms per file on the runner, so a batch that rewrites 10,000 photo sidecars and
-  their version copies takes **20 to 45 seconds** there, and must be a background job with progress (note 003 §5.3).
-  These runners are shared and scanned; the figures are to be repeated on Patrick's own Windows machine.
+  (note 001 §4.1). About 1 to 2 ms per file on the CI runner (an SSD), so a batch that rewrites 10,000 photo
+  sidecars and their version copies takes 20 to 45 seconds there, and must be a background job with progress
+  (note 003 §5.3).
+- **On a real Windows machine with a spinning hard disk, it is far worse** (issue #1, 2026-09-22): Patrick's
+  system disk is a 2 TB Seagate ST2000DM008 (a 7200 rpm HDD, also carrying the page file, the worst realistic
+  case). Writing 225,074 files there took **1,513 s, about 6.7 ms per file, 25 minutes for the whole 100,000-photo
+  workspace** — 2 to 3 times slower than the CI Windows runner's SSD, and about 375 times slower than the
+  developer's NVMe. Reading was 4,150 files a second, 4 to 5 times slower than the CI Windows runner and 28
+  times slower than the developer machine, but **the walk stayed fast (2.9 s)**: metadata reads hit the file
+  table, not the platters, on every system tried.
+- **This changes what "a rebuild takes seconds" means.** On the fast machines it holds; on a spinning system
+  disk, reading and parsing 225,000 sidecars alone takes about a minute, and writing a first workspace of that
+  size (an initial import, or converting an existing library) takes tens of minutes, not seconds. The design
+  itself does not change (a rebuild is still the only way to recover, and it is still correct, D-026): the
+  consequence is for the **interface**, which must show progress and let a rebuild run in the background rather
+  than imply "a few seconds" unconditionally, and possibly warn when the disk under a workspace looks like a
+  spinning drive. Left open for WP1 or WP8 to decide.
+- These CI runners are shared and scanned; their figures stay useful for the ratios between file systems, not
+  as absolute numbers, now that a real machine's are in hand.
 
 ## 5. The proposal
 

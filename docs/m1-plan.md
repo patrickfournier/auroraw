@@ -140,10 +140,15 @@ generated round trips, Lightroom and darktable style files, an ExifTool interope
 platforms, fuzz targets run nightly, and the large-workspace measurement (design note 001 §4.2). The fuzzer
 found four real bugs in its first runs (namespace addresses with entities, names that cannot be written,
 control characters, and floats that did not round trip exactly), all fixed with a regression test and a seed in
-the corpus; `cargo deny` found two advisories in the XML library the same day, fixed by upgrading. Reading 225,000 sidecars takes 1.9 s on the
-developer machine and 10 to 45 s on the slowest CI runners; writing them takes 500 to 700 s on the Windows
-runner. **Left: the same measurement on Patrick's Windows machine**, the number that decides whether batch
-writing needs more than a background job.
+the corpus; `cargo deny` found two advisories in the XML library the same day, fixed by upgrading. Reading
+225,000 sidecars takes 1.9 s on the developer machine and 10 to 45 s on the slowest CI runners; writing them
+takes 500 to 700 s on the Windows CI runner (an SSD). **Done: the same measurement on Patrick's Windows
+machine** (issue #1, 2026-09-22), on a real spinning system disk: 1,513 s (25 minutes) to write, 54 s to read
+(design note 001 §4.2). Real Windows GPU results also came in the same issue: DirectX 12 on the GTX 1650 SUPER
+and the Intel UHD 630 both pass the smoke test of spike 1, closing that risk (architecture §14, item 2).
+WP1 is now fully done. **What the HDD number changes: batch writing needs a background job with progress on
+any disk, and on a spinning one a first import or a rebuild is tens of minutes, not seconds; the interface must
+not promise "a few seconds" unconditionally** (design note 001 §4.2, and risk item 2 below).
 
 ### WP2 Catalogue (L). Needs WP1
 
@@ -339,7 +344,7 @@ The sizes above are re-estimated at the end of A, when the actual pace is known.
 | # | Item | Risk | Mitigation or decision |
 | --- | --- | --- | --- |
 | 1 | **Colour of previews** | Embedded previews are sRGB, Adobe RGB or something else, and a wide-gamut screen shows wrong colours without the display profile (a task per platform, architecture §6.5). | Decided (D-084): M1 converts previews to sRGB and displays them as sRGB; the display profile and full colour management come with the pipeline in M2. |
-| 2 | **NTFS and antivirus** | D-075 is provisional; 243,000 small files on Windows. | WP1 measures on NTFS first; the thumbnail files fallback exists. |
+| 2 | **A spinning disk is slow, not just NTFS** | Measured (design note 001 §4.2, issue #1): 25 minutes to write a 100,000-photo workspace on a real HDD, against 4 s on the developer's NVMe. D-075 (the thumbnail database) is still provisional. | Batch writes and rebuilds run as a background job with progress on every platform (already planned, note 003 §5.3); consider detecting a slow disk and adjusting the wording of "a few seconds" in the interface (WP1 or WP8); the thumbnail database still needs its own NTFS measurement. |
 | 3 | **A map view** | It needs map tiles, hence a network request (D-061 says not without consent). | Decided (D-084): the map is left to a later milestone; GPS reading, GPX and place names stay in M1. |
 | 4 | **Slint on macOS** | OpenGL is deprecated; a keyword tree and a big grid are heavier than spike 2's tests. | The first increment runs on macOS; Skia or Metal renderer evaluated in WP8 if needed. |
 | 5 | **Card detection per platform** | Three sets of system calls; a Mac and a card reader are not always to hand. | Detect mounted volumes with a DCIM folder in a small platform module; test with a disk image; the manual folder import always works. |

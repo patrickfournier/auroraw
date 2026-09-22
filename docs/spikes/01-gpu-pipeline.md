@@ -3,9 +3,9 @@
 > **Status: interim.** Measured on Linux with a real GPU, on real RAW files from six cameras,
 > and on Linux, Windows and macOS through continuous integration (no discrete GPU there, and
 > synthetic data), and with a heavier pipeline (denoising, sharpening, local contrast, a mask).
-> A real Windows GPU (Vulkan) has been measured on the same machine. DirectX 12 on a real GPU,
-> a Mac, and the sRAW entry point are still to come (see "What remains").
-> Nothing here is a final decision.
+> A real Windows GPU has been measured on the same machine, on **Vulkan and DirectX 12**, and on
+> the **Intel UHD 630** as well as the NVIDIA card. A Mac and the sRAW entry point are still to
+> come (see "What remains"). Nothing here is a final decision.
 
 ## Question
 
@@ -217,9 +217,12 @@ The 4K view fitted this time because the Windows desktop leaves more GPU memory 
 these numbers changes the conclusions above.
 
 The Windows machine reports six adapters: the GTX 1650 SUPER on Vulkan, DirectX 12 and OpenGL,
-the **Intel UHD 630 on Vulkan and DirectX 12** (it was invisible under Linux), and WARP.
-The benchmarks ran on the NVIDIA card through Vulkan. **DirectX 12 on a real GPU, and the Intel
-iGPU, are not measured yet**; DirectX 12 is what wgpu picks by default on Windows.
+the **Intel UHD 630 on Vulkan and DirectX 12** (it was invisible under Linux), and WARP. The
+benchmarks ran on the NVIDIA card through Vulkan. **DirectX 12 on both real adapters** (issue #1,
+2026-09-22) passed the smoke test: the NVIDIA card and the Intel iGPU each agree with the
+reference within one 8-bit level, on 0% of pixels beyond one level, on every check (Bayer,
+X-Trans, tiled Bayer, the fuller chain, the fit-to-screen pass). DirectX 12, what wgpu picks by
+default on Windows, is confirmed on real hardware, discrete and integrated.
 
 ## What it means
 
@@ -256,11 +259,16 @@ iGPU, are not measured yet**; DirectX 12 is what wgpu picks by default on Window
 5. **The four adapters agree.** NVIDIA and llvmpipe on Vulkan, Metal, and DirectX 12 all give
    the same image within one 8-bit level, on 0% of pixels beyond one level. This is the
    cross-platform result the spike was after, on the three graphics APIs.
+6. **DirectX 12 holds on real Windows hardware, discrete and integrated.** The GTX 1650 SUPER and
+   the Intel UHD 630, both on DirectX 12, pass the same smoke test as Vulkan and Metal did: this
+   closes the item that mattered most for Windows, since DirectX 12 is wgpu's default there.
 
 ## What remains
 
 - [x] **A real GPU on Windows** (Vulkan, same PC): matches Linux.
-- [ ] **DirectX 12 on a real GPU and the Intel iGPU**, then **a Mac** with a real display.
+- [x] **DirectX 12 on a real GPU and the Intel iGPU** (issue #1, 2026-09-22): both pass the smoke
+  test, agreeing with the reference within one level on 0% of pixels beyond it.
+- [ ] **A Mac** with a real display.
 - [x] **Real RAW files** from six cameras (done). Still open: the linear entry point (sRAW).
 - [ ] **Better inputs.** The automatic exposure of the benchmark is crude and over-exposes
   bright scenes (the Canon R5 II preview clips its highlights). Black levels are averaged over

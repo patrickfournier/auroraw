@@ -564,8 +564,8 @@ deprecates OpenGL; Slint's Skia or Metal renderer may be needed there. To check 
 | # | Item | Why it matters | To settle |
 | --- | --- | --- | --- |
 | 1 | Slint on macOS | OpenGL is deprecated there | M1: run on a Mac; evaluate Skia or Metal |
-| 2 | DirectX 12 on a real GPU, and the Intel iGPU | Windows' default graphics API is untested on hardware | Windows run of the spikes |
-| 3 | NTFS and antivirus with 243,000 sidecars and 100,000 thumbnails | The classic weak spot; D-075 is provisional | Windows run of spike 3 |
+| 2 | ~~DirectX 12 on a real GPU, and the Intel iGPU~~ | Closed (issue #1, 2026-09-22): both pass the smoke test on Patrick's machine | Done |
+| 3 | NTFS and antivirus with 243,000 sidecars, **including a real spinning disk** | Sidecars measured in WP1 (design note 001 §4.2): correct, but slow on a hard disk (25 minutes to write 225,000 files). D-075 (the thumbnail database) is still provisional. | The thumbnail database on NTFS |
 | 4 | Identity of a file edited elsewhere | The fingerprint changes with the content | Design in M1 (spec §10, 6) |
 | 5 | CPU fallback on Windows | WARP is slower than a Rust CPU path | Decide before M2 |
 | 6 | Host-to-plugin interface: C interface or component model | Typed interfaces against unmeasured cost | Before M5; experimental until then |
