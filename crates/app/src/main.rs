@@ -5,10 +5,13 @@
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    let engine = auroraw_engine::Engine::new();
     match std::env::args().nth(1).as_deref() {
         Some("--version") => {
-            println!("{} {}", auroraw_types::APP_NAME, engine.version());
+            println!(
+                "{} {}",
+                auroraw_types::APP_NAME,
+                auroraw_engine::Engine::version()
+            );
             ExitCode::SUCCESS
         }
         Some("--self-test") => {
@@ -16,7 +19,7 @@ fn main() -> ExitCode {
             println!(
                 "self-test ok: {} {}",
                 auroraw_types::APP_NAME,
-                engine.version()
+                auroraw_engine::Engine::version()
             );
             ExitCode::SUCCESS
         }

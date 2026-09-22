@@ -33,6 +33,15 @@ pub enum CatalogueError {
         /// The error.
         source: serde_json::Error,
     },
+    /// An incremental update named an entity that is not in the catalogue (a rebuild is needed
+    /// first, or the caller has the wrong identifier).
+    #[error("{kind} {id} is not in the catalogue")]
+    NotFound {
+        /// What kind of entity (`"photo"`, `"keyword"`).
+        kind: &'static str,
+        /// Its identifier, as text.
+        id: String,
+    },
 }
 
 impl CatalogueError {

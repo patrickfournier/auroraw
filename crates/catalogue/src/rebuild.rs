@@ -38,8 +38,9 @@ pub struct RebuildInput<'a> {
 
 /// The full hierarchical path of every keyword (`"Fauna|Birds|Heron"`), resolved once by walking
 /// the tree. A keyword whose parent chain is broken or cyclic (a corrupted vocabulary) still gets
-/// a path: its own name, so the rebuild never drops a keyword for this reason alone.
-fn keyword_paths(vocabulary: &[KeywordEntry]) -> HashMap<KeywordId, String> {
+/// a path: its own name, so the rebuild never drops a keyword for this reason alone. Public: the
+/// engine reuses this after a rename touches more than one keyword's path (note 003 §6).
+pub fn keyword_paths(vocabulary: &[KeywordEntry]) -> HashMap<KeywordId, String> {
     let by_id: HashMap<KeywordId, &KeywordEntry> = vocabulary.iter().map(|k| (k.id, k)).collect();
     let mut paths = HashMap::with_capacity(vocabulary.len());
     for entry in vocabulary {

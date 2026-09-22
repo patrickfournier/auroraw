@@ -260,3 +260,22 @@ fn list_by_camera_matches_the_generated_make_and_model() {
     }
     assert_eq!(got, expected);
 }
+
+#[test]
+fn photos_with_keywords_matches_direct_membership_only() {
+    let (data, cat, _dir) = built(500, 17);
+    let keyword = &data.vocabulary[data.vocabulary.len() / 3].id;
+    let expected: HashSet<_> = data
+        .photos
+        .iter()
+        .filter(|(p, _)| p.meta.keyword_ids.contains(keyword))
+        .map(|(p, _)| p.photo_id)
+        .collect();
+    let got: HashSet<_> = cat
+        .photos_with_keywords(&[*keyword])
+        .unwrap()
+        .into_iter()
+        .collect();
+    assert_eq!(got, expected);
+    assert!(cat.photos_with_keywords(&[]).unwrap().is_empty());
+}

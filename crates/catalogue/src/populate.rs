@@ -214,10 +214,11 @@ pub(crate) fn insert_photo(
             stat.modified,
         ],
     )?;
-    // `photo_fts` is a `content=''` (external content) table: it needs an integer rowid. `photo`
-    // has no `INTEGER PRIMARY KEY` (its key is the text identifier), so SQLite still gave the row
-    // just inserted an implicit rowid of its own; reuse it (taken immediately, before any other
-    // insert), which is the usual way to pair an external-content FTS5 table with a table whose
+    // `photo_fts` is a self-contained FTS5 table (schema.sql) that still needs an integer rowid
+    // to line up with a photo. `photo` has no `INTEGER PRIMARY KEY` (its key is the text
+    // identifier), so SQLite still gave the row just inserted an implicit rowid of its own; reuse
+    // it (taken immediately, before any other insert), which is the usual way to pair an FTS5
+    // table with a table whose
     // declared primary key is not the rowid.
     let rowid = tx.last_insert_rowid();
 

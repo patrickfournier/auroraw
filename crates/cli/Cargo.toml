@@ -13,7 +13,14 @@ workspace = true
 
 [dependencies]
 auroraw-engine = { path = "../engine" }
+auroraw-catalogue = { path = "../catalogue" }
+auroraw-format = { path = "../format" }
+auroraw-types = { path = "../types" }
 
 [[bin]]
 name = "auroraw-cli"
 path = "src/main.rs"
+
+[dev-dependencies]
+auroraw-testkit = { path = "../testkit" }
+auroraw-workspace = { path = "../workspace" }

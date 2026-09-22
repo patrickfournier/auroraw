@@ -14,8 +14,13 @@ workspace = true
 [dependencies]
 auroraw-catalogue = { path = "../catalogue" }
 auroraw-workspace = { path = "../workspace" }
+auroraw-format = { path = "../format" }
 auroraw-sources = { path = "../sources" }
 auroraw-import = { path = "../import" }
 auroraw-imaging = { path = "../imaging" }
 auroraw-plugin-host = { path = "../plugin-host" }
 auroraw-types = { path = "../types" }
+thiserror.workspace = true
+
+[dev-dependencies]
+auroraw-testkit = { path = "../testkit" }

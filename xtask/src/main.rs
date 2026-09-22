@@ -35,6 +35,7 @@ const ALLOWED: &[(&str, &[&str])] = &[
         &[
             "auroraw-catalogue",
             "auroraw-workspace",
+            "auroraw-format",
             "auroraw-sources",
             "auroraw-import",
             "auroraw-imaging",
@@ -43,7 +44,15 @@ const ALLOWED: &[(&str, &[&str])] = &[
         ],
     ),
     ("auroraw-ui", &["auroraw-engine"]),
-    ("auroraw-cli", &["auroraw-engine"]),
+    (
+        "auroraw-cli",
+        &[
+            "auroraw-engine",
+            "auroraw-catalogue",
+            "auroraw-format",
+            "auroraw-types",
+        ],
+    ),
     (
         "auroraw-app",
         &["auroraw-ui", "auroraw-engine", "auroraw-types"],

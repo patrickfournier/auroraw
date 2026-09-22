@@ -125,7 +125,11 @@ CREATE TABLE version_keyword(
   PRIMARY KEY(version_id, keyword_id)
 ) WITHOUT ROWID;
 
+-- Self-contained, not `content=''`: a contentless FTS5 index supports INSERT but not the plain
+-- UPDATE/DELETE that keeping it in step with an edited photo needs (its own 'delete' command
+-- requires the old column values, which a contentless table cannot give back). The duplicated
+-- text costs little next to a photo's row and buys a normal SQL update path (crate::write).
 CREATE VIRTUAL TABLE photo_fts USING fts5(
   filename, caption, title, keywords,
-  content='', tokenize='unicode61 remove_diacritics 2'
+  tokenize='unicode61 remove_diacritics 2'
 );

@@ -3,10 +3,12 @@
 //! §5, D-026, D-073). This crate depends only on `format` and `types` (architecture §3.2): it
 //! knows nothing about the workspace on disk. Its caller (the `workspace` crate's scan, later
 //! the `engine`) reads sidecars and state files and hands them to [`rebuild_to_file`], or applies
-//! incremental changes through [`Catalogue::transaction`].
+//! incremental changes through [`Catalogue::apply_photo_metadata`] and
+//! [`Catalogue::apply_keyword`].
 //!
 //! - [`open`] creates and opens a catalogue, with its migrations (`PRAGMA user_version`).
 //! - [`rebuild`] builds a fresh catalogue file from a workspace's content, atomically.
+//! - [`write`] applies a change to one photo's or one keyword's existing row (WP3's engine).
 //! - [`query`] answers the questions the grid and the search panel ask, with keyset paging.
 //! - [`reconcile`] says which sidecars the catalogue's copy no longer matches.
 //! - [`effective`] computes the effective rating and flag a version's overrides give a photo
@@ -24,6 +26,7 @@ mod query;
 mod rebuild;
 mod reconcile;
 mod registry;
+mod write;
 
 pub mod dataset;
 
@@ -31,7 +34,8 @@ pub use effective::{effective_flag, effective_rating};
 pub use error::CatalogueError;
 pub use open::{CURRENT_SCHEMA, Catalogue};
 pub use query::{Cursor, PhotoRow};
-pub use rebuild::{RebuildInput, rebuild_to_file};
+pub use rebuild::{RebuildInput, keyword_paths, rebuild_to_file};
+pub use reconcile::ReconcileReport;
 pub use registry::{Registry, RegistryEntry};
 
 /// A file's size and modification time, as the catalogue last saw them (design note 004 §6.2).

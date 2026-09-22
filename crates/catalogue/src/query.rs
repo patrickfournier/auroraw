@@ -250,4 +250,34 @@ impl Catalogue {
             .query_row(&sql, [id.to_string()], photo_row)
             .optional()?)
     }
+
+    /// Every photo that carries any of `keywords` directly (no descendants), unordered, without
+    /// paging: for finding the small set of sidecars a keyword rename must refresh (note 003
+    /// §6), not for display.
+    pub fn photos_with_keywords(&self, keywords: &[KeywordId]) -> Result<Vec<PhotoId>> {
+        if keywords.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders = keywords.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT DISTINCT photo_id FROM photo_keyword WHERE keyword_id IN ({placeholders})"
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let texts: Vec<String> = keywords.iter().map(ToString::to_string).collect();
+        let rows = stmt.query_map(rusqlite::params_from_iter(&texts), |r| {
+            r.get::<_, String>(0)
+        })?;
+        let mut ids = Vec::new();
+        for id in rows {
+            let id = id?;
+            ids.push(id.parse().map_err(|_| {
+                rusqlite::Error::InvalidColumnType(
+                    0,
+                    "photo_id".into(),
+                    rusqlite::types::Type::Text,
+                )
+            })?);
+        }
+        Ok(ids)
+    }
 }

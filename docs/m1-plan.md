@@ -212,6 +212,48 @@ Done when: the engine scenarios of the testing strategy §3 can be scripted thro
 no window, and a stress test with commands from several threads ends in the state a sequential
 replay gives.
 
+**Status: done for the slice of `engine` that WP1 and WP2 already support.** Built: `engine`, a
+single coordinator thread (architecture §4.2) that owns the workspace and the catalogue's only
+writable connection, applying `Command`s from an `mpsc` channel one at a time and echoing each as
+`Event::Applied` in the order it actually processed them; `Engine::submit` (fire and forget) and
+`Engine::submit_and_wait` (blocks for the outcome), both safe to call from several threads at
+once; `EventReceiver` with a batch `drain` (§4.3). The commands built are the ones WP1's workspace
+and WP2's catalogue can already serve without sources or develop: `Rebuild`, `Reconcile`,
+`SetRating`, `SetFlag`, `AddKeyword`, `RemoveKeyword`, `CreateKeyword` and `RenameKeyword`.
+`catalogue` gained the incremental write API (`apply_photo_metadata`, `apply_keyword`) that WP2
+had left for whichever milestone first needed a single-row update instead of a full rebuild; that
+milestone turned out to be this one. `cli` wires `create`, `list`, `rebuild`, `verify`, `rate`,
+`flag` and `keyword create/rename/add/remove` to the engine.
+
+A keyword rename is the one case WP3 already needs a background job for: it updates the
+vocabulary and every affected catalogue row immediately, then refreshes the stale name snapshot
+(note 003 §6) in every affected sidecar on its own thread, reporting progress and honouring
+`Command::CancelJob` through a cooperative `CancelToken`, and feeding its results back to the
+catalogue through the coordinator (never touching the database from the job thread itself, so the
+single-writer guarantee holds even for work done in the background).
+
+Three deviations from the plan text, all because their reason to exist does not yet: **"add a
+folder"** is a source, and sources are WP4, which depends on this work package, not the other way
+around — the CLI-scripted scenario seeds its fixture photos directly through `Workspace::write_photo`
+the way a future `add-folder` command will. A **worker pool sized to physical cores, with
+priorities** (the plan's own example is the thumbnail queue serving the latest request first) is
+not built: with exactly one kind of background job and no thumbnails yet to contend for it (WP5),
+a pool has nothing to size or prioritize between; a rename spawns its own thread and the shape
+(`crate::job`) is generic enough for a second job kind to plug into a real pool without a
+redesign. **Deadlines** are not built for the same reason — nothing in this work package yet
+produces work that needs one.
+
+Done when, checked: the WP3 slice of the engine scenario (testing strategy §3 lists rate, keyword,
+"edit a sidecar from outside and confirm the change is signalled and applied on confirmation",
+rebuild, and compare — import, versions and export are WP4 and M2) runs end to end through the
+real `auroraw-cli` binary (`crates/cli/tests/scenario.rs`), including the outside edit followed by
+`verify` and a `rebuild` that lands on the same state. The concurrency stress test
+(`crates/engine/tests/concurrency.rs`) runs six threads submitting 180 `SetRating`/`SetFlag`/
+`AddKeyword`/`RemoveKeyword` commands against a shared pool of 20 photos and 5 keywords, records
+the order `Event::Applied` actually reports, replays that exact order sequentially against a
+second, identically seeded engine, and compares every photo's rating and flag and every keyword's
+membership between the two: they always agree.
+
 ### WP4 Sources (L). Needs WP2, WP3
 
 The `Source` interface in `plugin-api` (list, stat, read by range, watch, writable or not);

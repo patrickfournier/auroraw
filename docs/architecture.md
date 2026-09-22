@@ -69,6 +69,8 @@ and the packaging of each platform.
 flowchart TD
   app["app (binary)"] --> ui["ui (Slint views and models)"]
   cli["cli (headless)"] --> engine
+  cli --> catalogue
+  cli --> format
   ui --> engine["engine (application core, commands and events)"]
   engine --> develop["develop (versions, history, styles)"]
   engine --> import["import (profiles, copy, series, geotag)"]
@@ -78,6 +80,7 @@ flowchart TD
   engine --> workspace["workspace (sidecars, state, rebuild, previews)"]
   engine --> sources["sources (interface, monitoring)"]
   engine --> host["plugin-host (wasmtime, permissions)"]
+  engine --> format
   develop --> pipeline["pipeline (wgpu image engine)"]
   export --> pipeline
   import --> imaging["imaging (decoders, thumbnails, colour)"]
