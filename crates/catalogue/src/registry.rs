@@ -7,7 +7,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use auroraw_types::WorkspaceId;
+use auroraw_types::{Timestamp, WorkspaceId};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{CatalogueError, Result};
@@ -23,12 +23,18 @@ pub struct RegistryEntry {
     pub workspace_path: PathBuf,
     /// Where this catalogue's database file lives.
     pub catalogue_path: PathBuf,
+    /// When this catalogue was last opened on this machine (the welcome list's order).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opened: Option<Timestamp>,
 }
 
 /// The list of catalogues this machine knows about.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Registry {
     entries: Vec<RegistryEntry>,
+    /// The catalogue to reopen at the next launch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_opened: Option<WorkspaceId>,
 }
 
 impl Registry {
@@ -88,6 +94,38 @@ impl Registry {
     /// Removes a catalogue from the list (it is not deleted from disk).
     pub fn remove(&mut self, workspace_id: WorkspaceId) {
         self.entries.retain(|e| e.workspace_id != workspace_id);
+        if self.last_opened == Some(workspace_id) {
+            self.last_opened = None;
+        }
+    }
+
+    /// Records that `workspace_id` was opened at `when`: it becomes the one to reopen at the next
+    /// launch and moves to the top of [`Registry::recent`]. Does nothing if it is not registered.
+    pub fn touch(&mut self, workspace_id: WorkspaceId, when: Timestamp) {
+        if let Some(entry) = self
+            .entries
+            .iter_mut()
+            .find(|e| e.workspace_id == workspace_id)
+        {
+            entry.opened = Some(when);
+            self.last_opened = Some(workspace_id);
+        }
+    }
+
+    /// The catalogue opened last, if it is still registered.
+    pub fn last_opened(&self) -> Option<&RegistryEntry> {
+        self.last_opened.and_then(|id| self.find(id))
+    }
+
+    /// Every entry, most recently opened first; those never opened come last, by name.
+    pub fn recent(&self) -> Vec<&RegistryEntry> {
+        let mut entries: Vec<&RegistryEntry> = self.entries.iter().collect();
+        entries.sort_by(|a, b| {
+            b.opened
+                .cmp(&a.opened)
+                .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+        });
+        entries
     }
 }
 
@@ -101,6 +139,7 @@ mod tests {
             name: name.to_string(),
             workspace_path: PathBuf::from("/photos/Main"),
             catalogue_path: PathBuf::from("/data/catalogue.db"),
+            opened: None,
         }
     }
 
@@ -147,5 +186,55 @@ mod tests {
         registry.upsert(a.clone());
         registry.remove(a.workspace_id);
         assert!(registry.entries().is_empty());
+    }
+
+    #[test]
+    fn the_last_opened_catalogue_leads_the_recent_list_and_is_the_one_to_reopen() {
+        let mut registry = Registry::new();
+        let (a, b, c) = (entry("Alpha"), entry("Beta"), entry("Charlie"));
+        for e in [&a, &b, &c] {
+            registry.upsert(e.clone());
+        }
+        assert!(registry.last_opened().is_none(), "nothing opened yet");
+        let names = |r: &Registry| {
+            r.recent()
+                .iter()
+                .map(|e| e.name.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            names(&registry),
+            ["Alpha", "Beta", "Charlie"],
+            "never opened: by name"
+        );
+
+        registry.touch(b.workspace_id, Timestamp::from_unix(100));
+        registry.touch(c.workspace_id, Timestamp::from_unix(200));
+        assert_eq!(names(&registry), ["Charlie", "Beta", "Alpha"]);
+        assert_eq!(registry.last_opened().unwrap().name, "Charlie");
+
+        registry.remove(c.workspace_id);
+        assert!(
+            registry.last_opened().is_none(),
+            "a removed catalogue is not reopened"
+        );
+    }
+
+    #[test]
+    fn a_registry_written_before_last_opened_existed_still_loads() {
+        let dir = auroraw_testkit::temp_dir();
+        let path = dir.path().join("registry.json");
+        let a = entry("Main");
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"entries": [{{"workspace_id": "{}", "name": "Main", "workspace_path": "/p", "catalogue_path": "/c"}}]}}"#,
+                a.workspace_id
+            ),
+        )
+        .unwrap();
+        let registry = Registry::load(&path).unwrap();
+        assert_eq!(registry.entries().len(), 1);
+        assert!(registry.last_opened().is_none());
     }
 }

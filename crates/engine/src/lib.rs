@@ -21,8 +21,10 @@ mod event;
 mod import_flow;
 mod import_job;
 mod job;
+pub mod paths;
 mod refresh;
 mod thumbnails;
+mod workspaces;
 
 pub use auroraw_import::{ItemOutcome, MetadataTemplate, PairRule, Profile};
 pub use command::Command;
@@ -32,6 +34,7 @@ pub use event::Event;
 pub use import_flow::{ImportRequest, VolumeInfo};
 pub use job::JobId;
 pub use thumbnails::ThumbnailService;
+pub use workspaces::{KnownWorkspace, LocalDirs, OpenedWorkspace};
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
