@@ -94,6 +94,46 @@ pub struct LocalPaths {
     pub import_state: PathBuf,
 }
 
+/// Asks a person for a folder: called with a dialog title, the folder to open the dialog at, and
+/// what to do with the answer (`None` when the dialog was cancelled). Returns whether a dialog was
+/// started. The answer is delivered on the interface thread. Tests without a display pass a
+/// picker of their own: a native dialog cannot be opened without one.
+pub type FolderPicker = Rc<dyn Fn(&str, Option<PathBuf>, Box<dyn FnOnce(Option<PathBuf>)>) -> bool>;
+
+/// The system's own folder dialog (Windows and macOS: the native ones; Linux: the desktop portal),
+/// run as a task of the event loop so the window stays alive and the dialog cannot freeze it.
+fn native_folder_picker() -> FolderPicker {
+    Rc::new(|title, start, done| {
+        let title = title.to_string();
+        slint::spawn_local(async move {
+            let mut dialog = rfd::AsyncFileDialog::new().set_title(title);
+            if let Some(start) = start {
+                dialog = dialog.set_directory(start);
+            }
+            done(
+                dialog
+                    .pick_folder()
+                    .await
+                    .map(|folder| folder.path().to_path_buf()),
+            );
+        })
+        .is_ok()
+    })
+}
+
+/// Where a folder dialog should open for what is typed in a field: the folder itself when it
+/// exists, else the closest folder above it that does, else the system's default (`None`).
+fn start_directory(typed: &str) -> Option<PathBuf> {
+    let typed = typed.trim();
+    if typed.is_empty() {
+        return None;
+    }
+    std::path::Path::new(typed)
+        .ancestors()
+        .find(|candidate| !candidate.as_os_str().is_empty() && candidate.is_dir())
+        .map(std::path::Path::to_path_buf)
+}
+
 /// The import in progress, if any: which job, so its events are told apart from anything else.
 #[derive(Default)]
 struct ImportRun {
@@ -158,7 +198,9 @@ pub fn run(
     events: EventReceiver,
     paths: &LocalPaths,
 ) -> Result<(), slint::PlatformError> {
-    build(engine, events, paths)?.ui.run()
+    build(engine, events, paths, native_folder_picker())?
+        .ui
+        .run()
 }
 
 /// Builds the window and connects it to the engine, without showing it: what `run` does, and what
@@ -167,6 +209,7 @@ fn build(
     engine: Engine,
     events: EventReceiver,
     paths: &LocalPaths,
+    pick_folder: FolderPicker,
 ) -> Result<Shell, slint::PlatformError> {
     let ui = MainWindow::new()?;
 
@@ -361,6 +404,43 @@ fn build(
             let Some(ui) = weak.upgrade() else { return };
             reload(&engine, &state, &ui);
             ui.set_current_task("cull".into());
+        });
+    }
+
+    {
+        let (picking, weak) = (Rc::new(StdCell::new(false)), ui.as_weak());
+        ui.on_browse_folder(move |which| {
+            let Some(ui) = weak.upgrade() else { return };
+            if picking.get() {
+                return;
+            }
+            let current = match which.as_str() {
+                "source" => ui.get_import_source(),
+                "archive" => ui.get_import_archive(),
+                _ => ui.get_import_backup(),
+            };
+            let title = ui.global::<Texts>().invoke_pick_title(which.clone());
+            picking.set(true);
+            ui.set_picking(true);
+            let answer = {
+                let (picking, weak) = (picking.clone(), weak.clone());
+                Box::new(move |chosen: Option<PathBuf>| {
+                    picking.set(false);
+                    let Some(ui) = weak.upgrade() else { return };
+                    ui.set_picking(false);
+                    let Some(folder) = chosen else { return };
+                    let text: SharedString = folder.to_string_lossy().as_ref().into();
+                    match which.as_str() {
+                        "source" => ui.set_import_source(text),
+                        "archive" => ui.set_import_archive(text),
+                        _ => ui.set_import_backup(text),
+                    }
+                })
+            };
+            if !pick_folder(&title, start_directory(current.as_str()), answer) {
+                picking.set(false);
+                ui.set_picking(false);
+            }
         });
     }
 

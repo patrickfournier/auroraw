@@ -8,7 +8,9 @@
 //! What this cannot cover, and is checked on a real machine before a release instead: GPU
 //! rendering, the platform's input methods, real fonts and scaling, frame rate.
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::time::Duration;
 
 use auroraw_engine::{Command, Engine};
@@ -21,7 +23,7 @@ use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, Model};
 
 use crate::generated::Texts;
-use crate::{LocalPaths, Shell, build};
+use crate::{FolderPicker, LocalPaths, Shell, build, start_directory};
 
 /// A workspace, a folder of photos standing in for a card, and where everything local goes.
 struct Fixture {
@@ -72,6 +74,16 @@ fn open(fixture: &Fixture) -> (Shell, Engine) {
 /// As [`open`], in `language`. The bundled translations only exist once a window has been built,
 /// so the language is chosen after it.
 fn open_in(fixture: &Fixture, language: &str) -> (Shell, Engine) {
+    open_with(fixture, language, no_dialog())
+}
+
+/// A folder picker that must never be reached: a test that does not browse.
+fn no_dialog() -> FolderPicker {
+    Rc::new(|_, _, _| panic!("no folder dialog was expected"))
+}
+
+/// As [`open_in`], with `pick_folder` standing in for the system's folder dialog.
+fn open_with(fixture: &Fixture, language: &str, pick_folder: FolderPicker) -> (Shell, Engine) {
     let catalogue = fixture.workspace.join(".auroraw/catalogue.sqlite");
     std::fs::create_dir_all(catalogue.parent().unwrap()).unwrap();
     let (engine, events) = if catalogue.exists() {
@@ -79,7 +91,7 @@ fn open_in(fixture: &Fixture, language: &str) -> (Shell, Engine) {
     } else {
         Engine::create(&fixture.workspace, &catalogue, "Test").unwrap()
     };
-    let shell = build(engine.clone(), events, &fixture.paths).unwrap();
+    let shell = build(engine.clone(), events, &fixture.paths, pick_folder).unwrap();
     slint::select_bundled_translation(language).unwrap();
     // Elements under a condition only exist once the window has been laid out.
     shell.ui.show().unwrap();
@@ -442,4 +454,128 @@ fn the_views_render_and_can_be_written_out_as_pictures() {
         (0..8).all(|i| row.cells.row_data(i).unwrap().ready)
     });
     snapshot(&shell, "grid");
+}
+
+/// What a stand-in folder dialog was asked, and the answers it will give.
+#[derive(Default)]
+struct Dialogs {
+    asked: Vec<(String, Option<PathBuf>)>,
+    answer: Option<PathBuf>,
+    /// Holds the answer back until the test delivers it, like a dialog that is still open.
+    held: Option<Box<dyn FnOnce(Option<PathBuf>)>>,
+    hold: bool,
+}
+
+fn stand_in(dialogs: &Rc<RefCell<Dialogs>>) -> FolderPicker {
+    let dialogs = dialogs.clone();
+    Rc::new(move |title, start, done| {
+        let mut state = dialogs.borrow_mut();
+        state.asked.push((title.to_string(), start));
+        if state.hold {
+            state.held = Some(done);
+        } else {
+            let answer = state.answer.clone();
+            drop(state);
+            done(answer);
+        }
+        true
+    })
+}
+
+#[test]
+fn browsing_fills_the_field_and_opens_the_dialog_where_the_field_points() {
+    init();
+    let f = fixture(0);
+    let dialogs = Rc::new(RefCell::new(Dialogs::default()));
+    let (shell, _engine) = open_with(&f, "en", stand_in(&dialogs));
+
+    // An empty field opens the system's default place; the answer fills the field.
+    dialogs.borrow_mut().answer = Some(f.archive.clone());
+    click(&shell, "Browse for: Archive folder");
+    assert_eq!(shell.ui.get_import_archive(), f.archive.to_string_lossy());
+    assert_eq!(
+        dialogs.borrow().asked[0],
+        ("Choose the archive folder".to_string(), None)
+    );
+
+    // A field that already names a folder opens the dialog there; each field has its own title.
+    dialogs.borrow_mut().answer = Some(f.card.clone());
+    type_into(
+        &shell,
+        "Import from (card or folder)",
+        &f.workspace.to_string_lossy(),
+    );
+    std::fs::create_dir_all(&f.workspace).unwrap();
+    click(&shell, "Browse for: Import from (card or folder)");
+    assert_eq!(shell.ui.get_import_source(), f.card.to_string_lossy());
+    assert_eq!(
+        dialogs.borrow().asked[1],
+        (
+            "Choose the card or folder to import from".to_string(),
+            Some(f.workspace.clone())
+        )
+    );
+
+    dialogs.borrow_mut().answer = Some(f.workspace.clone());
+    click(&shell, "Browse for: Backup folder (optional)");
+    assert_eq!(shell.ui.get_import_backup(), f.workspace.to_string_lossy());
+    assert_eq!(dialogs.borrow().asked[2].0, "Choose the backup folder");
+}
+
+#[test]
+fn cancelling_the_dialog_leaves_the_field_alone() {
+    init();
+    let f = fixture(0);
+    let dialogs = Rc::new(RefCell::new(Dialogs::default()));
+    let (shell, _engine) = open_with(&f, "en", stand_in(&dialogs));
+    type_into(&shell, "Archive folder", "/kept/as/typed");
+
+    dialogs.borrow_mut().answer = None;
+    click(&shell, "Browse for: Archive folder");
+    assert_eq!(shell.ui.get_import_archive(), "/kept/as/typed");
+    assert!(!shell.ui.get_picking(), "the buttons are usable again");
+}
+
+#[test]
+fn while_a_dialog_is_open_another_one_cannot_be_started() {
+    init();
+    let f = fixture(0);
+    let dialogs = Rc::new(RefCell::new(Dialogs {
+        hold: true,
+        ..Dialogs::default()
+    }));
+    let (shell, _engine) = open_with(&f, "en", stand_in(&dialogs));
+
+    click(&shell, "Browse for: Archive folder");
+    assert!(shell.ui.get_picking());
+    click(&shell, "Browse for: Import from (card or folder)");
+    assert_eq!(
+        dialogs.borrow().asked.len(),
+        1,
+        "the second click did nothing"
+    );
+
+    let done = dialogs.borrow_mut().held.take().unwrap();
+    done(Some(f.archive.clone()));
+    assert!(!shell.ui.get_picking());
+    assert_eq!(shell.ui.get_import_archive(), f.archive.to_string_lossy());
+}
+
+#[test]
+fn the_dialog_opens_at_the_closest_folder_that_exists() {
+    let dir = auroraw_testkit::temp_dir();
+    let existing = dir.path().join("Photos");
+    std::fs::create_dir_all(&existing).unwrap();
+
+    assert_eq!(start_directory(""), None);
+    assert_eq!(start_directory("   "), None);
+    assert_eq!(
+        start_directory(&existing.to_string_lossy()),
+        Some(existing.clone())
+    );
+    assert_eq!(
+        start_directory(&existing.join("2026/September/half-typed").to_string_lossy()),
+        Some(existing),
+        "the folders that do not exist yet are skipped"
+    );
 }

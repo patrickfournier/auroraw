@@ -40,6 +40,16 @@ export global Texts {
     public pure function reading-card() -> string {
         return @tr("Reading the card…");
     }
+    // The title of the folder dialog: `which` is "source", "archive" or "backup".
+    public pure function pick-title(which: string) -> string {
+        if (which == "source") {
+            return @tr("Choose the card or folder to import from");
+        }
+        if (which == "archive") {
+            return @tr("Choose the archive folder");
+        }
+        return @tr("Choose the backup folder");
+    }
 }
 
 component Task inherits Rectangle {
@@ -68,7 +78,11 @@ component Task inherits Rectangle {
 component Field inherits HorizontalLayout {
     in property <string> label;
     in property <string> placeholder;
+    // A folder field offers a button that opens the system's folder dialog.
+    in property <bool> browsable: false;
+    in property <bool> browse-enabled: true;
     in-out property <string> text;
+    callback browse();
     spacing: 8px;
     Text {
         text: root.label;
@@ -81,6 +95,15 @@ component Field inherits HorizontalLayout {
         placeholder-text: root.placeholder;
         accessible-label: root.label;
     }
+    // Every field ends at the same place, with or without a button.
+    if !root.browsable : Rectangle { width: 100px; }
+    if root.browsable : Button {
+        width: 100px;
+        text: @tr("Browse…");
+        enabled: root.browse-enabled;
+        accessible-label: @tr("Browse for: {}", root.label);
+        clicked => { root.browse(); }
+    }
 }
 
 component ImportView inherits Rectangle {
@@ -89,6 +112,7 @@ component ImportView inherits Rectangle {
     in property <float> progress;
     in property <bool> importing;
     in property <bool> finished;
+    in property <bool> picking;
     in-out property <string> source;
     in-out property <string> archive;
     in-out property <string> backup;
@@ -101,6 +125,7 @@ component ImportView inherits Rectangle {
     callback cancel-import();
     callback refresh-volumes();
     callback show-photos();
+    callback browse-folder(string);
 
     background: #1e1e1e;
     VerticalLayout {
@@ -130,9 +155,28 @@ component ImportView inherits Rectangle {
                 clicked => { root.refresh-volumes(); }
             }
         }
-        Field { label: @tr("Import from (card or folder)"); text <=> root.source; }
-        Field { label: @tr("Archive folder"); placeholder: @tr("Where the photos are copied to"); text <=> root.archive; }
-        Field { label: @tr("Backup folder (optional)"); text <=> root.backup; }
+        Field {
+            label: @tr("Import from (card or folder)");
+            text <=> root.source;
+            browsable: true;
+            browse-enabled: !root.picking;
+            browse => { root.browse-folder("source"); }
+        }
+        Field {
+            label: @tr("Archive folder");
+            placeholder: @tr("Where the photos are copied to");
+            text <=> root.archive;
+            browsable: true;
+            browse-enabled: !root.picking;
+            browse => { root.browse-folder("archive"); }
+        }
+        Field {
+            label: @tr("Backup folder (optional)");
+            text <=> root.backup;
+            browsable: true;
+            browse-enabled: !root.picking;
+            browse => { root.browse-folder("backup"); }
+        }
         Field { label: @tr("Folders and file names"); placeholder: "{year}/{date}/{original}.{ext}"; text <=> root.template; }
         Field { label: @tr("Shoot name (optional)"); text <=> root.shoot; }
         Field { label: @tr("Creator"); text <=> root.creator; }
@@ -187,6 +231,8 @@ export component MainWindow inherits Window {
     in property <float> import-progress;
     in property <bool> importing;
     in property <bool> import-finished;
+    // A folder dialog is open: the browse buttons wait for it.
+    in property <bool> picking;
     in-out property <string> import-source;
     in-out property <string> import-archive;
     in-out property <string> import-backup;
@@ -203,6 +249,7 @@ export component MainWindow inherits Window {
     callback cancel-import();
     callback refresh-volumes();
     callback show-photos();
+    callback browse-folder(string);
 
     VerticalLayout {
         // The task bar (spec §3: "workflows, not panels"): every task is present; Import and Cull
@@ -225,6 +272,7 @@ export component MainWindow inherits Window {
             progress: root.import-progress;
             importing: root.importing;
             finished: root.import-finished;
+            picking: root.picking;
             source <=> root.import-source;
             archive <=> root.import-archive;
             backup <=> root.import-backup;
@@ -236,6 +284,7 @@ export component MainWindow inherits Window {
             cancel-import => { root.cancel-import(); }
             refresh-volumes => { root.refresh-volumes(); }
             show-photos => { root.show-photos(); }
+            browse-folder(which) => { root.browse-folder(which); }
         }
 
         if root.current-task == "cull" : VerticalLayout {

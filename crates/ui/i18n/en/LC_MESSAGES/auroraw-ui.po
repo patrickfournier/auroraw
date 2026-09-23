@@ -112,3 +112,18 @@ msgstr[1] "All {n} files copied and verified."
 
 msgid "Where the photos are copied to"
 msgstr "Where the photos are copied to"
+
+msgid "Browse…"
+msgstr "Browse…"
+
+msgid "Browse for: {}"
+msgstr "Browse for: {}"
+
+msgid "Choose the card or folder to import from"
+msgstr "Choose the card or folder to import from"
+
+msgid "Choose the archive folder"
+msgstr "Choose the archive folder"
+
+msgid "Choose the backup folder"
+msgstr "Choose the backup folder"

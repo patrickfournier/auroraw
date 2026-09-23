@@ -644,9 +644,7 @@ backup root has its own namespace, and a job that ends without a failure removes
 resumed import's final report now also counts the files an earlier run settled.
 
 **Not done in this pass, still WP8's or a later package's:** the keywords, collections and metadata
-panels, undo, general settings, the 4K/laptop layout check, the pseudo-locale, a native folder
-picker (Slint has none: adding one, `rfd` for instance, is a dependency decision to take with
-Patrick), thumbnails generated during the import rather than on first display, GPX wiring, and a
+panels, undo, general settings, the 4K/laptop layout check, the pseudo-locale, thumbnails generated during the import rather than on first display, GPX wiring, and a
 CLI `import`. **Verified on a real display** (Patrick's local session, X11), before the freezes
 below: the shell renders, French is applied, clicking selects, `0`-`5` rate, arrows move, Tab moves
 between the fields, the Import view renders in the dark scheme and its labels fit in French. Filling the form
@@ -654,6 +652,18 @@ with synthetic typing then froze that display twice (`xdotool type`, a known haz
 field with ibus was not ruled out) and each time the machine had to be restarted: **no further
 synthetic input is sent to a person's desktop** (testing strategy §6). The typed path of the
 first field is left to Patrick, by hand.
+
+**Folder picker** (Import view, third pass): a "Browse..." button beside the source, archive and
+backup folders opens the system's own folder dialog (`rfd` 0.17, MIT: the native dialogs on Windows
+and macOS, the desktop portal on Linux, no GTK). It runs as a task of Slint's event loop
+(`AsyncFileDialog` through `slint::spawn_local`), so the window is never blocked while it is open;
+the buttons wait while one is open; it opens at the folder the field already names, or the closest
+one that exists; a cancelled dialog changes nothing. The dialog sits behind a `FolderPicker`
+function handed to `ui::build`, so the tests without a display stand in for it (a native dialog
+cannot be opened there). **Not verified on a real machine**: the dialog itself on each platform
+(a Linux desktop without the portal service returns no answer, silently), a pre-release item.
+Importing individual files rather than a folder needs the engine to accept a list of files,
+which `Command::Import` does not yet.
 
 **Tested without a display instead** (`ui/src/headless_tests.rs`, Slint's testing backend, on every
 CI platform): filling the form and clicking Import copies, verifies and registers the photos, the
