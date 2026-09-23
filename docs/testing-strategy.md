@@ -200,6 +200,16 @@ translation can fail unnoticed. What is checked:
 - **How.** The harness writes the JSON files that the spikes already produce, with the machine,
   the adapter and the commit. A script compares a run with a **stored baseline for that machine**
   and reports any budget exceeded or any stage more than 20 % slower.
+- **Interface work packages are verified on a real display, and that step has an owner.** An
+  agent-driven session cannot see a screen unless a person's own desktop session is active for it.
+  Each interface work package therefore ends with a short visual pass (launch, capture the window,
+  drive it with synthetic keys and clicks) done **while Patrick has that session open**, and
+  says in its status paragraph which parts were and were not verified that way. Capture one window,
+  never the whole screen (a root capture also records whatever else is on the display). The
+  session found this way (M1 WP8): visible clipping of a long French label, a light widget style
+  on a dark shell, focus not on the grid at start. It also ended with a frozen display and a
+  restart that has no established cause: run the application under test sparingly, and stop it by
+  its process id when done.
 - **When.** Before each release, and on demand for a change that touches the pipeline or the
   catalogue. A run takes minutes, not hours (the spikes' full run did).
 - **Counts before times.** Where a performance property can be stated as a count (the number of

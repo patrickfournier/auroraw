@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use crate::discover::stem_and_extension;
 use crate::pair::PhotoGroup;
-use crate::template::{TemplateContext, render};
+use crate::template::{TemplateContext, render, safe_relative};
 
 /// One file of a planned photo: where it is now, and where it goes.
 #[derive(Debug, Clone, PartialEq)]
@@ -35,14 +35,30 @@ pub struct PlannedPhoto {
     pub companion: Option<PlannedFile>,
 }
 
-/// A path this run already assigned, so the next collision (two cameras' same-numbered shots
-/// rendering to the same destination) gets a suffix instead of silently landing on top of it.
-/// The caller may pre-seed this with paths that already exist on disk from an earlier import, so
-/// a fresh run does not collide with one already there either.
+/// A path this run already assigned in the destination, so the next collision (two cameras'
+/// same-numbered shots rendering to the same destination) gets a suffix instead of silently
+/// landing on top of it. The caller may pre-seed this too; files already on disk are the job of
+/// [`Exists`], which is asked about every candidate.
 pub type UsedPaths = HashSet<PathBuf>;
 
-fn unique(mut path: PathBuf, used: &mut UsedPaths) -> PathBuf {
-    if used.insert(path.clone()) {
+/// Which folder a planned path is relative to, for asking whether something is already there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Root {
+    /// The archive the photos are imported into.
+    Destination,
+    /// The n-th backup folder, in the profile's own order.
+    Backup(usize),
+}
+
+/// Whether a file already exists at a planned path (relative to `Root`). An import never
+/// overwrites one: a file left by an earlier import, or by anything else, gets the newcomer a
+/// suffix instead (spec §5.2, D-031's spirit: an import must not destroy what is already kept).
+pub type Exists<'a> = &'a dyn Fn(Root, &Path) -> bool;
+
+fn unique(mut path: PathBuf, used: &mut UsedPaths, root: Root, exists: Exists) -> PathBuf {
+    let taken = |p: &Path, used: &UsedPaths| used.contains(p) || exists(root, p);
+    if !taken(&path, used) {
+        used.insert(path.clone());
         return path;
     }
     let stem = path
@@ -58,7 +74,8 @@ fn unique(mut path: PathBuf, used: &mut UsedPaths) -> PathBuf {
             None => format!("{stem}_{n}"),
         };
         let candidate = parent.join(name);
-        if used.insert(candidate.clone()) {
+        if !taken(&candidate, used) {
+            used.insert(candidate.clone());
             path = candidate;
             break;
         }
@@ -67,37 +84,64 @@ fn unique(mut path: PathBuf, used: &mut UsedPaths) -> PathBuf {
     path
 }
 
-fn planned_file(
-    source_path: &str,
-    size: u64,
-    ctx: &TemplateContext,
-    destination_template: &str,
-    backup_templates: &[String],
-    used: &mut UsedPaths,
-) -> PlannedFile {
-    let destination = unique(PathBuf::from(render(destination_template, ctx)), used);
-    let backup_destinations = backup_templates
-        .iter()
-        .map(|t| unique(PathBuf::from(render(t, ctx)), used))
-        .collect();
-    PlannedFile {
-        source_path: source_path.to_string(),
-        size,
-        destination,
-        backup_destinations,
+/// The templates and the names already taken, for planning one file at a time.
+struct Namer<'a> {
+    destination_template: &'a str,
+    backup_templates: &'a [String],
+    used: &'a mut UsedPaths,
+    backup_used: Vec<UsedPaths>,
+    exists: Exists<'a>,
+}
+
+impl Namer<'_> {
+    fn planned_file(&mut self, source_path: &str, size: u64, ctx: &TemplateContext) -> PlannedFile {
+        let fallback = render("{original}.{ext}", ctx);
+        let destination = unique(
+            safe_relative(&render(self.destination_template, ctx), &fallback),
+            self.used,
+            Root::Destination,
+            self.exists,
+        );
+        let exists = self.exists;
+        let backup_destinations = self
+            .backup_templates
+            .iter()
+            .zip(self.backup_used.iter_mut())
+            .enumerate()
+            .map(|(i, (t, used))| {
+                let relative = safe_relative(&render(t, ctx), &fallback);
+                unique(relative, used, Root::Backup(i), exists)
+            })
+            .collect();
+        PlannedFile {
+            source_path: source_path.to_string(),
+            size,
+            destination,
+            backup_destinations,
+        }
     }
 }
 
 /// Plans every group: sorted by capture time (ties broken by source path, so the order is
 /// deterministic even when two cameras agree to the second), numbered from 1, each file's
-/// destination rendered from the templates and made unique against `used`.
+/// destination rendered from the templates and made unique against `used` and against what
+/// `exists` says is already on disk. Each backup root has its own namespace: a backup laid out
+/// like the archive must land on the same relative path, not be pushed to a suffix by it.
 pub fn plan(
     mut groups: Vec<PhotoGroup>,
     destination_template: &str,
     backup_templates: &[String],
     shoot: Option<&str>,
     used: &mut UsedPaths,
+    exists: Exists,
 ) -> Vec<PlannedPhoto> {
+    let mut namer = Namer {
+        destination_template,
+        backup_templates,
+        used,
+        backup_used: vec![UsedPaths::new(); backup_templates.len()],
+        exists,
+    };
     groups.sort_by(|a, b| {
         a.original
             .capture_time
@@ -117,14 +161,7 @@ pub fn plan(
             extension: ext,
             shoot,
         };
-        let original = planned_file(
-            &group.original.path,
-            group.original.size,
-            &ctx,
-            destination_template,
-            backup_templates,
-            used,
-        );
+        let original = namer.planned_file(&group.original.path, group.original.size, &ctx);
         let companion = group.companion.map(|c| {
             let (stem, ext) = stem_and_extension(&c.path);
             let ctx = TemplateContext {
@@ -132,14 +169,7 @@ pub fn plan(
                 extension: ext,
                 ..ctx
             };
-            planned_file(
-                &c.path,
-                c.size,
-                &ctx,
-                destination_template,
-                backup_templates,
-                used,
-            )
+            namer.planned_file(&c.path, c.size, &ctx)
         });
         out.push(PlannedPhoto {
             original,
@@ -186,6 +216,7 @@ mod tests {
             &[],
             None,
             &mut used,
+            &|_, _| false,
         );
         // B was captured first, despite sorting after A alphabetically and having a lower own
         // camera-assigned number.
@@ -212,6 +243,7 @@ mod tests {
             &[],
             None,
             &mut used,
+            &|_, _| false,
         );
         assert_eq!(
             planned[0].original.destination,
@@ -229,7 +261,14 @@ mod tests {
         let a = file("A/IMG_0001.CR3", "Camera A", datetime!(2026-01-01 9:00 UTC));
         let mut used = UsedPaths::new();
         used.insert(PathBuf::from("IMG_0001.cr3"));
-        let planned = plan(vec![group(a)], "{original}.{ext}", &[], None, &mut used);
+        let planned = plan(
+            vec![group(a)],
+            "{original}.{ext}",
+            &[],
+            None,
+            &mut used,
+            &|_, _| false,
+        );
         assert_eq!(
             planned[0].original.destination,
             PathBuf::from("IMG_0001_2.cr3")
@@ -246,7 +285,14 @@ mod tests {
             companion: Some(jpeg),
         };
         let mut used = UsedPaths::new();
-        let planned = plan(vec![g], "{seq:02}_{original}.{ext}", &[], None, &mut used);
+        let planned = plan(
+            vec![g],
+            "{seq:02}_{original}.{ext}",
+            &[],
+            None,
+            &mut used,
+            &|_, _| false,
+        );
         assert_eq!(
             planned[0].companion.as_ref().unwrap().destination,
             PathBuf::from("01_IMG_0001.jpg")
@@ -264,6 +310,7 @@ mod tests {
             &["backup/{original}.{ext}".to_string()],
             None,
             &mut used,
+            &|_, _| false,
         );
         assert_eq!(
             planned[0].original.backup_destinations,
@@ -272,6 +319,49 @@ mod tests {
         assert_eq!(
             planned[1].original.backup_destinations,
             vec![PathBuf::from("backup/IMG_0002.cr3")]
+        );
+    }
+
+    #[test]
+    fn a_file_already_on_disk_is_never_overwritten_the_newcomer_gets_a_suffix() {
+        let a = file("IMG_0001.CR3", "Camera A", datetime!(2026-01-01 9:00 UTC));
+        let on_disk = |root: Root, p: &Path| {
+            root == Root::Destination
+                && (p == Path::new("IMG_0001.cr3") || p == Path::new("IMG_0001_2.cr3"))
+        };
+        let planned = plan(
+            vec![group(a)],
+            "{original}.{ext}",
+            &[],
+            None,
+            &mut UsedPaths::new(),
+            &on_disk,
+        );
+        assert_eq!(
+            planned[0].original.destination,
+            PathBuf::from("IMG_0001_3.cr3")
+        );
+    }
+
+    #[test]
+    fn a_backup_laid_out_like_the_archive_lands_on_the_same_relative_path() {
+        let a = file("IMG_0001.CR3", "Camera A", datetime!(2026-01-01 9:00 UTC));
+        let planned = plan(
+            vec![group(a)],
+            "{original}.{ext}",
+            &["{original}.{ext}".to_string()],
+            None,
+            &mut UsedPaths::new(),
+            &|_, _| false,
+        );
+        assert_eq!(
+            planned[0].original.destination,
+            PathBuf::from("IMG_0001.cr3")
+        );
+        assert_eq!(
+            planned[0].original.backup_destinations,
+            vec![PathBuf::from("IMG_0001.cr3")],
+            "a different root, its own namespace"
         );
     }
 }

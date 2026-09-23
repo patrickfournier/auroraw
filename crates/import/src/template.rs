@@ -82,6 +82,25 @@ fn field(name: &str, spec: Option<&str>, ctx: &TemplateContext) -> String {
     }
 }
 
+/// Turns rendered template text into a relative path that can only ever stay inside the folder it
+/// is joined to: a template is text a person types, and a value it renders can be empty (a photo
+/// with no capture time renders `{year}` as nothing, so `{year}/{original}` would become
+/// `/IMG.cr3`, an absolute path that `join` would let replace the whole destination). Empty, `.`
+/// and `..` components are dropped, every remaining component is sanitised (which also removes a
+/// Windows drive prefix's `:`), and if nothing is left `fallback` is used.
+pub fn safe_relative(rendered: &str, fallback: &str) -> std::path::PathBuf {
+    let path: std::path::PathBuf = rendered
+        .split(['/', '\\'])
+        .map(|component| sanitize(component).trim_end_matches('.').trim().to_string())
+        .filter(|component| !component.is_empty() && component != "." && component != "..")
+        .collect();
+    if path.as_os_str().is_empty() {
+        std::path::PathBuf::from(fallback)
+    } else {
+        path
+    }
+}
+
 /// Renders `template` against `ctx`. `{name}` and `{name:spec}` tokens are replaced; text outside
 /// braces, including `/` path separators, passes through unchanged.
 pub fn render(template: &str, ctx: &TemplateContext) -> String {
@@ -169,5 +188,47 @@ mod tests {
     fn an_unclosed_brace_passes_through() {
         let c = ctx(None);
         assert_eq!(render("weird{oops", &c), "weird{oops");
+    }
+
+    #[test]
+    fn a_rendered_path_can_never_leave_the_folder_it_is_joined_to() {
+        let root = std::path::Path::new("/archive");
+        for hostile in [
+            "/etc/passwd",
+            "//IMG.cr3",
+            "../../outside/IMG.cr3",
+            "a/../../IMG.cr3",
+            "C:\\Windows\\IMG.cr3",
+            "C:/IMG.cr3",
+            "\\\\server\\share\\IMG.cr3",
+            "./IMG.cr3",
+        ] {
+            let relative = safe_relative(hostile, "fallback.cr3");
+            assert!(relative.is_relative(), "{hostile}: {relative:?}");
+            assert!(
+                relative
+                    .components()
+                    .all(|c| matches!(c, std::path::Component::Normal(_))),
+                "{hostile}: {relative:?}"
+            );
+            assert!(root.join(&relative).starts_with(root), "{hostile}");
+        }
+    }
+
+    #[test]
+    fn a_photo_with_no_capture_time_lands_in_the_folder_above_instead_of_the_filesystem_root() {
+        let c = ctx(None);
+        assert_eq!(
+            safe_relative(&render("{year}/{date}/{original}.{ext}", &c), "x"),
+            std::path::PathBuf::from("IMG_0042.cr3")
+        );
+    }
+
+    #[test]
+    fn nothing_left_after_cleaning_falls_back() {
+        assert_eq!(
+            safe_relative("../..//", "IMG.cr3"),
+            std::path::PathBuf::from("IMG.cr3")
+        );
     }
 }

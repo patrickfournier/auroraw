@@ -613,6 +613,46 @@ could have added regardless of the display problem above. `accessible-role`/`acc
 set on the grid's interactive elements and the task tabs in `shell.slint` on the strength of
 Slint's own AccessKit integration, unverified by a script for the reasons above.
 
+**Second pass (the Import view), and what it corrected.** Patrick's own expectation at this stage
+was to be able to *import*, to fill a workspace from the interface; the first slice could only
+display what the CLI had already added. This pass adds the **Import task** (`ui/shell.slint`
+`ImportView`): the removable volumes detected (`Engine::removable_volumes`, one click when a single
+camera card is present), the source, archive and optional backup folders, the folders-and-names
+template, shoot name, creator and copyright, then a progress bar, the closing "All N files copied
+and verified", cancel (an interrupted or cancelled import resumes when run again) and "Show
+photos". The fields are remembered per workspace (`.auroraw/settings.json`). `engine` gained
+`Engine::import(ImportRequest)`: registers the source and archive once (found again by path, not
+added twice), decides where the job's resumable state lives, and submits `Command::Import`; the
+same steps a future CLI `import` will reuse. `ImportAborted` is a new event so a source that cannot
+be read no longer looks like a finished import of zero files. A library that is empty opens on the
+Import task. A photo no thumbnail can be made for (Canon CRAW, Olympus ORF: known gaps, WP5) now
+says "No preview" instead of staying an empty cell forever (`ThumbnailService::poll_failed`).
+Sentences the Rust side builds go through a Slint `Texts` global so they are translated (the
+photo count was English-only before), with plural forms.
+
+Preparing it found **three real bugs in WP7, none caught by its tests because they all used a
+template with no date folders and a fresh archive**, each now fixed with a test: (1) a destination
+that already existed was **overwritten** (planning only avoided collisions within one run; an
+import of a second card reusing `IMG_0001` replaced the first shoot's file): the planner now asks
+whether each candidate path exists on disk and suffixes it; (2) a template with date folders
+(`{year}/{date}/...`, the default) rendered an **absolute path for a photo with no capture time**,
+which `join` lets replace the whole destination (`/IMG.cr3`): every rendered path now goes through
+`safe_relative` (empty, `.`, `..`, separators, drive prefixes removed); (3) a backup laid out like
+the archive was pushed to a `_2` suffix by the archive's own entry, and a job's leftover state
+file would have made a **reformatted card reusing file names skip files it had never seen**: each
+backup root has its own namespace, and a job that ends without a failure removes its state. A
+resumed import's final report now also counts the files an earlier run settled.
+
+**Not done in this pass, still WP8's or a later package's:** the keywords, collections and metadata
+panels, undo, general settings, the 4K/laptop layout check, the pseudo-locale, a native folder
+picker (Slint has none: adding one, `rfd` for instance, is a dependency decision to take with
+Patrick), thumbnails generated during the import rather than on first display, GPX wiring, and a
+CLI `import`. **Verified on a real display** (Patrick's local session, X11): the shell renders,
+French is applied, clicking selects, `0`-`5` rate, arrows move; the Import view renders in the dark
+scheme and its labels fit in French. The typed-import path itself (filling the fields and running
+one) was **not** visually completed: the display froze during the session (cause not established,
+see the testing strategy note) and the machine was restarted.
+
 ### WP9 Culling (XL). Needs WP5, WP8
 
 Single-image view (zoom and pan on the preview, the 100 % view of the preview), **cull mode**

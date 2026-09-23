@@ -16,11 +16,15 @@ fn open_or_create(
 ) -> auroraw_engine::Result<(
     auroraw_engine::Engine,
     auroraw_engine::EventReceiver,
-    std::path::PathBuf,
+    auroraw_ui::LocalPaths,
 )> {
     let local = workspace_path.join(".auroraw");
     let catalogue_path = local.join("catalogue.sqlite");
-    let previews_path = local.join("previews.db");
+    let paths = auroraw_ui::LocalPaths {
+        previews: local.join("previews.db"),
+        settings: local.join("settings.json"),
+        import_state: local.join("import"),
+    };
     let name = workspace_path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -30,7 +34,7 @@ fn open_or_create(
     } else {
         auroraw_engine::Engine::create(workspace_path, &catalogue_path, &name)?
     };
-    Ok((engine, events, previews_path))
+    Ok((engine, events, paths))
 }
 
 fn main() -> ExitCode {
@@ -54,14 +58,14 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some(path) if !path.starts_with("--") => {
-            let (engine, events, previews_path) = match open_or_create(Path::new(path)) {
+            let (engine, events, paths) = match open_or_create(Path::new(path)) {
                 Ok(v) => v,
                 Err(e) => {
                     eprintln!("cannot open {path}: {e}");
                     return ExitCode::FAILURE;
                 }
             };
-            match auroraw_ui::run(engine, events, &previews_path) {
+            match auroraw_ui::run(engine, events, &paths) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
                     eprintln!("cannot start the interface: {e}");

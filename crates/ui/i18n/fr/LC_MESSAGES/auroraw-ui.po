@@ -2,6 +2,7 @@ msgid ""
 msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: fr\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
 msgid "Auroraw"
 msgstr "Auroraw"
@@ -41,3 +42,73 @@ msgstr "Photo, {} étoiles"
 
 msgid "Photo"
 msgstr "Photo"
+
+msgid "Cards and drives"
+msgstr "Cartes et disques"
+
+msgid "No card detected"
+msgstr "Aucune carte détectée"
+
+msgid "Refresh"
+msgstr "Actualiser"
+
+msgid "Import from (card or folder)"
+msgstr "Importer depuis (carte ou dossier)"
+
+msgid "Archive folder"
+msgstr "Dossier d'archive"
+
+msgid "Backup folder (optional)"
+msgstr "Dossier de sauvegarde (facultatif)"
+
+msgid "Folders and file names"
+msgstr "Dossiers et noms de fichiers"
+
+msgid "Shoot name (optional)"
+msgstr "Nom de la séance (facultatif)"
+
+msgid "Creator"
+msgstr "Auteur"
+
+msgid "Copyright"
+msgstr "Droit d'auteur"
+
+msgid "Cancel"
+msgstr "Annuler"
+
+msgid "Show photos"
+msgstr "Voir les photos"
+
+msgid "No preview"
+msgstr "Aucun aperçu"
+
+msgid "Importing {} of {}…"
+msgstr "Import de {} sur {}…"
+
+msgid "{} copied, {} already in the library, {} failed. Run it again to retry."
+msgstr "{} copiés, {} déjà dans la bibliothèque, {} en échec. Relancez l'import pour réessayer."
+
+msgid "The import stopped: {}"
+msgstr "L'import s'est arrêté : {}"
+
+msgid "Cannot start the import: {}"
+msgstr "Impossible de lancer l'import : {}"
+
+msgid "Import cancelled. Running it again resumes where it stopped."
+msgstr "Import annulé. Le relancer reprend là où il s'était arrêté."
+
+msgid "Reading the card…"
+msgstr "Lecture de la carte…"
+
+msgid "{n} photo"
+msgid_plural "{n} photos"
+msgstr[0] "{n} photo"
+msgstr[1] "{n} photos"
+
+msgid "All {n} file copied and verified."
+msgid_plural "All {n} files copied and verified."
+msgstr[0] "Le fichier a été copié et vérifié."
+msgstr[1] "Les {n} fichiers ont été copiés et vérifiés."
+
+msgid "Where the photos are copied to"
+msgstr "Là où les photos sont copiées"

@@ -1,13 +1,46 @@
-import { ListView, Button } from "std-widgets.slint";
+import { ListView, Button, LineEdit, ProgressIndicator, Palette } from "std-widgets.slint";
 
 export struct Cell {
     photo-id: string,
     thumb: image,
     rating: int,
     ready: bool,
+    unavailable: bool,
     selected: bool,
 }
 export struct GridRow { cells: [Cell] }
+
+// A removable volume offered on the import view (a card or a drive).
+export struct VolumeEntry { label: string, path: string }
+
+// Every sentence the Rust side builds at run time goes through here, so it is translated like the
+// rest (`@tr()` only works in a .slint file).
+export global Texts {
+    public pure function photos(n: int) -> string {
+        return @tr("{n} photo" | "{n} photos" % n);
+    }
+    public pure function importing(done: int, total: int) -> string {
+        return @tr("Importing {} of {}…", done, total);
+    }
+    public pure function all-copied(n: int) -> string {
+        return @tr("All {n} file copied and verified." | "All {n} files copied and verified." % n);
+    }
+    public pure function import-summary(copied: int, skipped: int, failed: int) -> string {
+        return @tr("{} copied, {} already in the library, {} failed. Run it again to retry.", copied, skipped, failed);
+    }
+    public pure function import-stopped(reason: string) -> string {
+        return @tr("The import stopped: {}", reason);
+    }
+    public pure function import-refused(reason: string) -> string {
+        return @tr("Cannot start the import: {}", reason);
+    }
+    public pure function import-cancelled() -> string {
+        return @tr("Import cancelled. Running it again resumes where it stopped.");
+    }
+    public pure function reading-card() -> string {
+        return @tr("Reading the card…");
+    }
+}
 
 component Task inherits Rectangle {
     in property <string> label;
@@ -32,125 +65,275 @@ component Task inherits Rectangle {
     }
 }
 
+component Field inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> placeholder;
+    in-out property <string> text;
+    spacing: 8px;
+    Text {
+        text: root.label;
+        width: 300px;
+        color: #cccccc;
+        vertical-alignment: center;
+    }
+    LineEdit {
+        text <=> root.text;
+        placeholder-text: root.placeholder;
+        accessible-label: root.label;
+    }
+}
+
+component ImportView inherits Rectangle {
+    in property <[VolumeEntry]> volumes;
+    in property <string> status;
+    in property <float> progress;
+    in property <bool> importing;
+    in property <bool> finished;
+    in-out property <string> source;
+    in-out property <string> archive;
+    in-out property <string> backup;
+    in-out property <string> template;
+    in-out property <string> shoot;
+    in-out property <string> creator;
+    in-out property <string> rights;
+
+    callback start-import();
+    callback cancel-import();
+    callback refresh-volumes();
+    callback show-photos();
+
+    background: #1e1e1e;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+        alignment: start;
+
+        Text {
+            text: @tr("Cards and drives");
+            color: #cccccc;
+            font-weight: 700;
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            for v in root.volumes : Button {
+                text: v.label;
+                clicked => { root.source = v.path; }
+            }
+            if root.volumes.length == 0 : Text {
+                text: @tr("No card detected");
+                color: #888888;
+                vertical-alignment: center;
+            }
+            Button {
+                text: @tr("Refresh");
+                clicked => { root.refresh-volumes(); }
+            }
+        }
+        Field { label: @tr("Import from (card or folder)"); text <=> root.source; }
+        Field { label: @tr("Archive folder"); placeholder: @tr("Where the photos are copied to"); text <=> root.archive; }
+        Field { label: @tr("Backup folder (optional)"); text <=> root.backup; }
+        Field { label: @tr("Folders and file names"); placeholder: "{year}/{date}/{original}.{ext}"; text <=> root.template; }
+        Field { label: @tr("Shoot name (optional)"); text <=> root.shoot; }
+        Field { label: @tr("Creator"); text <=> root.creator; }
+        Field { label: @tr("Copyright"); text <=> root.rights; }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            Button {
+                text: @tr("Import");
+                enabled: !root.importing;
+                primary: true;
+                clicked => { root.start-import(); }
+            }
+            Button {
+                text: @tr("Cancel");
+                enabled: root.importing;
+                clicked => { root.cancel-import(); }
+            }
+            if root.finished : Button {
+                text: @tr("Show photos");
+                clicked => { root.show-photos(); }
+            }
+        }
+        if root.importing : ProgressIndicator {
+            progress: root.progress;
+        }
+        Text {
+            text: root.status;
+            color: #99cc99;
+            wrap: word-wrap;
+            accessible-role: text;
+        }
+    }
+}
+
 export component MainWindow inherits Window {
     title: @tr("Auroraw");
     background: #1e1e1e;
     width: 1400px;
     height: 900px;
+    init => { Palette.color-scheme = ColorScheme.dark; }
 
     in property <[GridRow]> rows;
     in property <string> status;
     in property <int> min-rating-filter: 0;
     in property <string> selected-summary;
     in-out property <length> grid-scroll: 0px;
+    in-out property <string> current-task: "cull";
+
+    in property <[VolumeEntry]> volumes;
+    in property <string> import-status;
+    in property <float> import-progress;
+    in property <bool> importing;
+    in property <bool> import-finished;
+    in-out property <string> import-source;
+    in-out property <string> import-archive;
+    in-out property <string> import-backup;
+    in-out property <string> import-template;
+    in-out property <string> import-shoot;
+    in-out property <string> import-creator;
+    in-out property <string> import-rights;
 
     callback cell-clicked(int);
     callback rate-selected(string);
     callback move-selection(int, int);
     callback set-filter(int);
-
-    property <string> current-task: "cull";
+    callback start-import();
+    callback cancel-import();
+    callback refresh-volumes();
+    callback show-photos();
 
     VerticalLayout {
-        // The task bar (spec §3: "workflows, not panels"): every task is present, only Cull has
-        // a working view in M1 (WP9 builds cull mode itself; this crate only has the grid so
-        // far, WP8's own scope).
+        // The task bar (spec §3: "workflows, not panels"): every task is present; Import and Cull
+        // have a view so far, Develop and Publish come with later milestones.
         Rectangle {
             height: 36px;
             background: #262626;
             HorizontalLayout {
                 alignment: start;
-                Task { label: @tr("Import"); enabled: false; }
-                Task { label: @tr("Cull"); active: root.current-task == "cull"; activate => { root.current-task = "cull"; } }
+                Task { label: @tr("Import"); active: root.current-task == "import"; activate => { root.current-task = "import"; } }
+                Task { label: @tr("Cull"); active: root.current-task == "cull"; activate => { root.show-photos(); } }
                 Task { label: @tr("Develop"); enabled: false; }
                 Task { label: @tr("Publish"); enabled: false; }
             }
         }
 
-        // The filter bar and status line.
-        Rectangle {
-            height: 36px;
-            background: #2b2b2b;
-            HorizontalLayout {
-                padding: 6px;
-                spacing: 6px;
-                alignment: start;
-                Button { text: @tr("All"); clicked => { root.set-filter(0); } }
-                Button { text: @tr("1+"); clicked => { root.set-filter(1); } }
-                Button { text: @tr("2+"); clicked => { root.set-filter(2); } }
-                Button { text: @tr("3+"); clicked => { root.set-filter(3); } }
-                Button { text: @tr("4+"); clicked => { root.set-filter(4); } }
-                Button { text: @tr("5"); clicked => { root.set-filter(5); } }
-                Text {
-                    text: root.status;
-                    color: #99cc99;
-                    vertical-alignment: center;
-                }
-            }
+        if root.current-task == "import" : ImportView {
+            volumes: root.volumes;
+            status: root.import-status;
+            progress: root.import-progress;
+            importing: root.importing;
+            finished: root.import-finished;
+            source <=> root.import-source;
+            archive <=> root.import-archive;
+            backup <=> root.import-backup;
+            template <=> root.import-template;
+            shoot <=> root.import-shoot;
+            creator <=> root.import-creator;
+            rights <=> root.import-rights;
+            start-import => { root.start-import(); }
+            cancel-import => { root.cancel-import(); }
+            refresh-volumes => { root.refresh-volumes(); }
+            show-photos => { root.show-photos(); }
         }
 
-        // The library grid.
-        grid-focus := FocusScope {
-            key-pressed(event) => {
-                if (event.text == "0" || event.text == "1" || event.text == "2" || event.text == "3" || event.text == "4" || event.text == "5") {
-                    root.rate-selected(event.text);
-                    return accept;
-                }
-                if (event.text == Key.UpArrow) { root.move-selection(0, -1); return accept; }
-                if (event.text == Key.DownArrow) { root.move-selection(0, 1); return accept; }
-                if (event.text == Key.LeftArrow) { root.move-selection(-1, 0); return accept; }
-                if (event.text == Key.RightArrow) { root.move-selection(1, 0); return accept; }
-                reject
-            }
-            ListView {
-                content-y <=> root.grid-scroll;
-                for row[ri] in root.rows : HorizontalLayout {
-                    height: 124px;
-                    spacing: 4px;
-                    padding-left: 4px;
+        if root.current-task == "cull" : VerticalLayout {
+            // The filter bar and status line.
+            Rectangle {
+                height: 36px;
+                background: #2b2b2b;
+                HorizontalLayout {
+                    padding: 6px;
+                    spacing: 6px;
                     alignment: start;
-                    for c[ci] in row.cells : Rectangle {
-                        width: 160px;
-                        height: 120px;
-                        background: #333333;
-                        border-width: c.selected ? 2px : 0px;
-                        border-color: #ffd24a;
-                        TouchArea {
-                            clicked => {
-                                grid-focus.focus();
-                                root.cell-clicked(ri * 8 + ci);
+                    Button { text: @tr("All"); clicked => { root.set-filter(0); } }
+                    Button { text: @tr("1+"); clicked => { root.set-filter(1); } }
+                    Button { text: @tr("2+"); clicked => { root.set-filter(2); } }
+                    Button { text: @tr("3+"); clicked => { root.set-filter(3); } }
+                    Button { text: @tr("4+"); clicked => { root.set-filter(4); } }
+                    Button { text: @tr("5"); clicked => { root.set-filter(5); } }
+                    Text {
+                        text: root.status;
+                        color: #99cc99;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // The library grid.
+            grid-focus := FocusScope {
+                init => { self.focus(); }
+                key-pressed(event) => {
+                    if (event.text == "0" || event.text == "1" || event.text == "2" || event.text == "3" || event.text == "4" || event.text == "5") {
+                        root.rate-selected(event.text);
+                        return accept;
+                    }
+                    if (event.text == Key.UpArrow) { root.move-selection(0, -1); return accept; }
+                    if (event.text == Key.DownArrow) { root.move-selection(0, 1); return accept; }
+                    if (event.text == Key.LeftArrow) { root.move-selection(-1, 0); return accept; }
+                    if (event.text == Key.RightArrow) { root.move-selection(1, 0); return accept; }
+                    reject
+                }
+                ListView {
+                    content-y <=> root.grid-scroll;
+                    for row[ri] in root.rows : HorizontalLayout {
+                        height: 124px;
+                        spacing: 4px;
+                        padding-left: 4px;
+                        alignment: start;
+                        for c[ci] in row.cells : Rectangle {
+                            width: 160px;
+                            height: 120px;
+                            background: #333333;
+                            border-width: c.selected ? 2px : 0px;
+                            border-color: #ffd24a;
+                            TouchArea {
+                                clicked => {
+                                    grid-focus.focus();
+                                    root.cell-clicked(ri * 8 + ci);
+                                }
                             }
-                        }
-                        if c.ready : Image {
-                            source: c.thumb;
-                            width: 100%;
-                            height: 100%;
-                            image-fit: contain;
-                            accessible-role: image;
-                            accessible-label: c.rating > 0 ? @tr("Photo, {} stars", c.rating) : @tr("Photo");
-                        }
-                        if c.rating > 0 : Text {
-                            x: 6px;
-                            y: 4px;
-                            text: "\{c.rating}★";
-                            color: #ffd24a;
+                            if c.ready : Image {
+                                source: c.thumb;
+                                width: 100%;
+                                height: 100%;
+                                image-fit: contain;
+                                accessible-role: image;
+                                accessible-label: c.rating > 0 ? @tr("Photo, {} stars", c.rating) : @tr("Photo");
+                            }
+                            if c.unavailable : Text {
+                                text: @tr("No preview");
+                                color: #888888;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                width: 100%;
+                                height: 100%;
+                                accessible-role: text;
+                            }
+                            if c.rating > 0 : Text {
+                                x: 6px;
+                                y: 4px;
+                                text: "\{c.rating}★";
+                                color: #ffd24a;
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // A status strip for the selected photo (a minimal metadata panel, WP8's own scope note:
-        // filters, collections, keywords are grown in a later pass).
-        Rectangle {
-            height: 28px;
-            background: #262626;
-            Text {
-                text: root.selected-summary;
-                color: #cccccc;
-                x: 6px;
-                vertical-alignment: center;
-                height: 100%;
+            // A status strip for the selected photo (a minimal metadata panel, WP8's own scope
+            // note: filters, collections, keywords are grown in a later pass).
+            Rectangle {
+                height: 28px;
+                background: #262626;
+                Text {
+                    text: root.selected-summary;
+                    color: #cccccc;
+                    x: 6px;
+                    vertical-alignment: center;
+                    height: 100%;
+                }
             }
         }
     }

@@ -2,6 +2,7 @@ msgid ""
 msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: en\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 msgid "Auroraw"
 msgstr "Auroraw"
@@ -41,3 +42,73 @@ msgstr "Photo, {} stars"
 
 msgid "Photo"
 msgstr "Photo"
+
+msgid "Cards and drives"
+msgstr "Cards and drives"
+
+msgid "No card detected"
+msgstr "No card detected"
+
+msgid "Refresh"
+msgstr "Refresh"
+
+msgid "Import from (card or folder)"
+msgstr "Import from (card or folder)"
+
+msgid "Archive folder"
+msgstr "Archive folder"
+
+msgid "Backup folder (optional)"
+msgstr "Backup folder (optional)"
+
+msgid "Folders and file names"
+msgstr "Folders and file names"
+
+msgid "Shoot name (optional)"
+msgstr "Shoot name (optional)"
+
+msgid "Creator"
+msgstr "Creator"
+
+msgid "Copyright"
+msgstr "Copyright"
+
+msgid "Cancel"
+msgstr "Cancel"
+
+msgid "Show photos"
+msgstr "Show photos"
+
+msgid "No preview"
+msgstr "No preview"
+
+msgid "Importing {} of {}…"
+msgstr "Importing {} of {}…"
+
+msgid "{} copied, {} already in the library, {} failed. Run it again to retry."
+msgstr "{} copied, {} already in the library, {} failed. Run it again to retry."
+
+msgid "The import stopped: {}"
+msgstr "The import stopped: {}"
+
+msgid "Cannot start the import: {}"
+msgstr "Cannot start the import: {}"
+
+msgid "Import cancelled. Running it again resumes where it stopped."
+msgstr "Import cancelled. Running it again resumes where it stopped."
+
+msgid "Reading the card…"
+msgstr "Reading the card…"
+
+msgid "{n} photo"
+msgid_plural "{n} photos"
+msgstr[0] "{n} photo"
+msgstr[1] "{n} photos"
+
+msgid "All {n} file copied and verified."
+msgid_plural "All {n} files copied and verified."
+msgstr[0] "All {n} file copied and verified."
+msgstr[1] "All {n} files copied and verified."
+
+msgid "Where the photos are copied to"
+msgstr "Where the photos are copied to"

@@ -18,15 +18,18 @@ mod command;
 mod coordinator;
 mod error;
 mod event;
+mod import_flow;
 mod import_job;
 mod job;
 mod refresh;
 mod thumbnails;
 
+pub use auroraw_import::{ItemOutcome, MetadataTemplate, PairRule, Profile};
 pub use command::Command;
 pub use coordinator::Outcome;
 pub use error::{EngineError, Result};
 pub use event::Event;
+pub use import_flow::{ImportRequest, VolumeInfo};
 pub use job::JobId;
 pub use thumbnails::ThumbnailService;
 
@@ -995,15 +998,18 @@ mod tests {
             simple_profile("{original}.{ext}"),
             state_path,
         );
-        assert!(matches!(
-            finished,
-            Event::ImportFinished {
-                copied: 1,
-                skipped: 0,
-                failed: 0,
-                ..
-            }
-        ));
+        assert!(
+            matches!(
+                finished,
+                Event::ImportFinished {
+                    copied: 2,
+                    skipped: 0,
+                    failed: 0,
+                    ..
+                }
+            ),
+            "the report covers the whole import, the file an earlier run settled included"
+        );
         assert!(
             !archive.join("a.raw").exists(),
             "already-settled in the state file: not retried"
@@ -1090,6 +1096,176 @@ mod tests {
             &events,
             |e| matches!(e, Event::ImportFinished { job: j, .. } if *j == job),
             Duration::from_secs(10),
+        );
+    }
+
+    fn request(dir: &std::path::Path, card: &std::path::Path) -> ImportRequest {
+        ImportRequest {
+            source_root: card.to_path_buf(),
+            archive_root: dir.join("Archive"),
+            profile: simple_profile("{original}.{ext}"),
+            shoot: None,
+            backup_root: None,
+            state_dir: dir.join("state"),
+        }
+    }
+
+    fn finished(events: &EventReceiver, job: JobId) -> Event {
+        wait_for(
+            events,
+            |e| matches!(e, Event::ImportFinished { job: j, .. } if *j == job),
+            Duration::from_secs(10),
+        )
+    }
+
+    #[test]
+    fn importing_by_folder_registers_both_sources_once_and_reuses_them() {
+        let (engine, events, dir) = new_engine();
+        let card = dir.path().join("Card");
+        std::fs::create_dir_all(&card).unwrap();
+        std::fs::write(card.join("a.raw"), b"photo a").unwrap();
+
+        let job = engine.import(request(dir.path(), &card)).unwrap();
+        assert!(matches!(
+            finished(&events, job),
+            Event::ImportFinished { copied: 1, .. }
+        ));
+        assert_eq!(
+            std::fs::read(dir.path().join("Archive/a.raw")).unwrap(),
+            b"photo a"
+        );
+        let sources = engine.read_catalogue().unwrap().list_sources().unwrap();
+        assert_eq!(sources.len(), 2, "the card and the archive");
+
+        std::fs::write(card.join("b.raw"), b"photo b").unwrap();
+        let job = engine.import(request(dir.path(), &card)).unwrap();
+        assert!(matches!(
+            finished(&events, job),
+            Event::ImportFinished {
+                copied: 1,
+                skipped: 1,
+                ..
+            }
+        ));
+        assert_eq!(
+            engine
+                .read_catalogue()
+                .unwrap()
+                .list_sources()
+                .unwrap()
+                .len(),
+            2,
+            "the same two sources, not two more"
+        );
+    }
+
+    #[test]
+    fn a_reformatted_card_reusing_file_names_is_not_mistaken_for_the_last_one() {
+        let (engine, events, dir) = new_engine();
+        let card = dir.path().join("Card");
+        std::fs::create_dir_all(&card).unwrap();
+        std::fs::write(card.join("IMG_0001.raw"), b"first shoot").unwrap();
+        let job = engine.import(request(dir.path(), &card)).unwrap();
+        finished(&events, job);
+        assert!(
+            std::fs::read_dir(dir.path().join("state"))
+                .unwrap()
+                .next()
+                .is_none(),
+            "a clean import leaves nothing to resume"
+        );
+
+        // The card was reformatted and the camera started again at 0001.
+        std::fs::write(card.join("IMG_0001.raw"), b"second shoot").unwrap();
+        let job = engine.import(request(dir.path(), &card)).unwrap();
+        assert!(matches!(
+            finished(&events, job),
+            Event::ImportFinished {
+                copied: 1,
+                skipped: 0,
+                ..
+            }
+        ));
+        assert_eq!(
+            std::fs::read(dir.path().join("Archive/IMG_0001.raw")).unwrap(),
+            b"first shoot"
+        );
+        assert_eq!(
+            std::fs::read(dir.path().join("Archive/IMG_0001_2.raw")).unwrap(),
+            b"second shoot"
+        );
+    }
+
+    #[test]
+    fn a_backup_root_receives_a_verified_second_copy() {
+        let (engine, events, dir) = new_engine();
+        let card = dir.path().join("Card");
+        std::fs::create_dir_all(&card).unwrap();
+        std::fs::write(card.join("a.raw"), b"photo a").unwrap();
+        let mut req = request(dir.path(), &card);
+        req.backup_root = Some(dir.path().join("Backup"));
+        let job = engine.import(req).unwrap();
+        assert!(matches!(
+            finished(&events, job),
+            Event::ImportFinished {
+                copied: 1,
+                failed: 0,
+                ..
+            }
+        ));
+        assert_eq!(
+            std::fs::read(dir.path().join("Backup/a.raw")).unwrap(),
+            b"photo a"
+        );
+    }
+
+    #[test]
+    fn an_import_that_cannot_make_sense_is_refused_before_anything_is_registered() {
+        let (engine, _events, dir) = new_engine();
+        let card = dir.path().join("Card");
+        std::fs::create_dir_all(&card).unwrap();
+
+        assert!(
+            engine
+                .import(request(dir.path(), &dir.path().join("Nowhere")))
+                .is_err()
+        );
+        let mut into_itself = request(dir.path(), &card);
+        into_itself.archive_root = card.clone();
+        assert!(engine.import(into_itself).is_err());
+        assert!(
+            engine
+                .read_catalogue()
+                .unwrap()
+                .list_sources()
+                .unwrap()
+                .is_empty(),
+            "a refused import registers nothing"
+        );
+    }
+
+    #[test]
+    fn a_template_with_date_folders_never_escapes_the_archive_for_a_photo_with_no_date() {
+        let (engine, events, dir) = new_engine();
+        let card = dir.path().join("Card");
+        std::fs::create_dir_all(&card).unwrap();
+        // No readable capture time: `{year}` and `{date}` render as nothing, which used to make
+        // the destination an absolute path.
+        std::fs::write(card.join("a.raw"), b"photo a").unwrap();
+        let mut req = request(dir.path(), &card);
+        req.profile = simple_profile("{year}/{date}/{original}.{ext}");
+        let job = engine.import(req).unwrap();
+        assert!(matches!(
+            finished(&events, job),
+            Event::ImportFinished {
+                copied: 1,
+                failed: 0,
+                ..
+            }
+        ));
+        assert_eq!(
+            std::fs::read(dir.path().join("Archive/a.raw")).unwrap(),
+            b"photo a"
         );
     }
 }

@@ -143,3 +143,28 @@ fn a_photo_with_no_decodable_file_is_never_delivered_but_never_blocks_either() {
         "an undecodable file yields nothing, not a crash"
     );
 }
+
+#[test]
+fn a_photo_no_thumbnail_can_be_made_from_is_reported_not_silently_missing() {
+    let (engine, _events, dir) = new_engine();
+    let source_root = dir.path().join("Card");
+    std::fs::create_dir_all(&source_root).unwrap();
+    // A file with a photo's extension but nothing decodable in it, the same clean failure two of
+    // the real sample RAW files give (no embedded preview `rawler` can read).
+    std::fs::write(source_root.join("broken.jpg"), b"not an image").unwrap();
+    let id = import_one_photo(&engine, &source_root);
+
+    let service = engine
+        .start_thumbnails(&dir.path().join("previews.db"), 1)
+        .unwrap();
+    service.request(id);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        assert!(service.poll().is_empty());
+        if service.poll_failed().contains(&id) {
+            break;
+        }
+        assert!(Instant::now() < deadline, "the failure was never reported");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}

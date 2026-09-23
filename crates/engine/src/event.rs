@@ -113,6 +113,14 @@ pub enum Event {
         /// What happened.
         outcome: ItemOutcome,
     },
+    /// An import job could not run at all (the source vanished or cannot be listed): no
+    /// `ImportFinished` follows, only `JobFinished`.
+    ImportAborted {
+        /// The job.
+        job: JobId,
+        /// Why, for a person.
+        reason: String,
+    },
     /// An import job finished (every file it found has a settled outcome).
     ImportFinished {
         /// The job.

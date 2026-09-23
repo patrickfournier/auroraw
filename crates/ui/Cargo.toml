@@ -16,6 +16,8 @@ auroraw-catalogue = { path = "../catalogue" }
 auroraw-engine = { path = "../engine" }
 auroraw-imaging = { path = "../imaging" }
 auroraw-types = { path = "../types" }
+serde.workspace = true
+serde_json.workspace = true
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
 slint = "1.18"
 

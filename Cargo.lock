@@ -656,6 +656,8 @@ dependencies = [
  "auroraw-types",
  "auroraw-workspace",
  "image",
+ "serde",
+ "serde_json",
  "slint",
  "slint-build",
 ]

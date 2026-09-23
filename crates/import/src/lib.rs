@@ -35,7 +35,7 @@ pub use discover::DiscoveredFile;
 pub use error::{ImportError, Result};
 pub use gpx::{GpsFix, Trackpoint, corrected_time, parse as parse_gpx, position_at};
 pub use pair::{PhotoGroup, pair_files};
-pub use plan::{PlannedFile, PlannedPhoto, UsedPaths, plan};
+pub use plan::{Exists, PlannedFile, PlannedPhoto, Root, UsedPaths, plan};
 pub use profile::{MetadataTemplate, PairRule, Profile};
 pub use state::{ImportState, ItemOutcome};
 pub use template::{TemplateContext, render as render_template};

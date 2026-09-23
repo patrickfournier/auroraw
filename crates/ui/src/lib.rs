@@ -10,6 +10,7 @@ pub mod commands;
 mod grid;
 #[cfg(test)]
 mod i18n_check;
+mod settings;
 
 // Slint's own generated code carries no doc comments; this crate's `missing_docs` lint (workspace
 // wide) would otherwise warn on every item the macro below produces.
@@ -17,16 +18,18 @@ mod i18n_check;
 mod generated {
     slint::include_modules!();
 }
-use generated::{Cell, GridRow, MainWindow};
+use generated::{Cell, GridRow, MainWindow, Texts, VolumeEntry};
 
-use std::path::Path;
+use std::cell::{Cell as StdCell, RefCell};
+use std::path::PathBuf;
 use std::rc::Rc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use auroraw_engine::{Command, Engine, Event, EventReceiver};
+use auroraw_engine::{Command, Engine, Event, EventReceiver, ImportRequest, JobId};
 use auroraw_types::PhotoId;
 use grid::{GridState, Item, RowModel};
-use slint::{ComponentHandle, Timer, TimerMode};
+use settings::Settings;
+use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 
 /// Every photo the catalogue currently has, in the grid's own order (spike 3: the whole ordered
 /// list is cheap even at 100,000 photos; only thumbnails are lazy). `min_rating` mirrors the
@@ -78,30 +81,103 @@ fn summary_of(engine: &Engine, id: PhotoId) -> String {
     }
 }
 
-/// Runs the shell until its window is closed. `previews_path` is where the thumbnail cache lives
-/// (D-075); this crate resolves no cache directory itself, matching every other crate under
-/// `engine`'s own precedent -- the caller (`app`) decides.
+/// Where this machine keeps what is local to it and to one workspace (design note 001 §5.4).
+/// This crate resolves no directory itself; `app` decides.
+pub struct LocalPaths {
+    /// The thumbnail cache (D-075).
+    pub previews: PathBuf,
+    /// What the import view remembers between launches.
+    pub settings: PathBuf,
+    /// Where an import job keeps the state that lets an interrupted one resume.
+    pub import_state: PathBuf,
+}
+
+/// The import in progress, if any: which job, so its events are told apart from anything else.
+#[derive(Default)]
+struct ImportRun {
+    job: Option<JobId>,
+}
+
+fn volume_entries(engine: &Engine) -> Vec<VolumeEntry> {
+    engine
+        .removable_volumes()
+        .into_iter()
+        .map(|v| VolumeEntry {
+            label: format!("{} ({})", v.name, v.mount_point.display()).into(),
+            path: v.mount_point.to_string_lossy().into_owned().into(),
+        })
+        .collect()
+}
+
+fn refresh_volumes(engine: &Engine, ui: &MainWindow) {
+    let entries = volume_entries(engine);
+    // A single camera card, and nothing typed yet: offer it (one click to import, spec §5.2).
+    if ui.get_import_source().is_empty() && entries.len() == 1 {
+        ui.set_import_source(entries[0].path.clone());
+    }
+    ui.set_volumes(ModelRc::new(VecModel::from(entries)));
+}
+
+fn field(text: SharedString) -> String {
+    text.trim().to_string()
+}
+
+/// The fields of the import view, as settings (what is remembered, and what a profile is built
+/// from).
+fn settings_from(ui: &MainWindow) -> Settings {
+    Settings {
+        archive: field(ui.get_import_archive()),
+        backup: field(ui.get_import_backup()),
+        template: field(ui.get_import_template()),
+        creator: field(ui.get_import_creator()),
+        rights: field(ui.get_import_rights()),
+        source: field(ui.get_import_source()),
+    }
+}
+
+/// Reloads the grid's list from the catalogue and says how many photos there are.
+fn reload(engine: &Engine, state: &GridState, ui: &MainWindow) {
+    let items = load_items(engine, 0).unwrap_or_default();
+    ui.set_status(ui.global::<Texts>().invoke_photos(items.len() as i32));
+    ui.set_selected_summary(SharedString::new());
+    state.set_items(items);
+}
+
+/// Runs the shell until its window is closed.
 pub fn run(
     engine: Engine,
     events: EventReceiver,
-    previews_path: &Path,
+    paths: &LocalPaths,
 ) -> Result<(), slint::PlatformError> {
     let ui = MainWindow::new()?;
 
     let state = Rc::new(GridState::default());
     let items = load_items(&engine, 0).unwrap_or_default();
-    ui.set_status(format!("{} photos", items.len()).into());
+    ui.set_status(ui.global::<Texts>().invoke_photos(items.len() as i32));
     state.set_items(items);
 
     let thumbnails = Rc::new(
         engine
-            .start_thumbnails(previews_path, 4)
+            .start_thumbnails(&paths.previews, 4)
             .expect("the previews database can be opened"),
     );
-    ui.set_rows(slint::ModelRc::new(RowModel::new(
+    ui.set_rows(ModelRc::new(RowModel::new(
         state.clone(),
         thumbnails.clone(),
     )));
+
+    let saved = Settings::load(&paths.settings);
+    ui.set_import_archive(saved.archive.into());
+    ui.set_import_backup(saved.backup.into());
+    ui.set_import_template(saved.template.into());
+    ui.set_import_creator(saved.creator.into());
+    ui.set_import_rights(saved.rights.into());
+    ui.set_import_source(saved.source.into());
+    refresh_volumes(&engine, &ui);
+    // A library with nothing in it yet opens on what fills it.
+    if state.len() == 0 {
+        ui.set_current_task("import".into());
+    }
 
     // Thumbnails and engine events both arrive off the UI thread; a short repeating timer drains
     // each, the same shape spike 3 used for pictures arriving from its own worker threads.
@@ -112,23 +188,86 @@ pub fn run(
             for (id, thumbnail) in thumbnails.poll() {
                 state.deliver(id, &thumbnail);
             }
+            for id in thumbnails.poll_failed() {
+                state.mark_unavailable(id);
+            }
         });
     }
+
+    let run = Rc::new(RefCell::new(ImportRun::default()));
+    let new_photos = Rc::new(StdCell::new(false));
     let event_timer = Timer::default();
     {
         let (state, engine, weak) = (state.clone(), engine.clone(), ui.as_weak());
+        let (run, new_photos) = (run.clone(), new_photos.clone());
+        let mut last_reload = Instant::now();
         event_timer.start(TimerMode::Repeated, Duration::from_millis(50), move || {
+            let Some(ui) = weak.upgrade() else { return };
+            let texts = ui.global::<Texts>();
             while let Some(event) = events.try_recv() {
-                if let Event::PhotoChanged(id) = event
-                    && let Some(row) = photo_row(&engine, id)
-                {
-                    state.set_rating(id, row.effective_rating);
-                    if state.selected_id() == Some(id)
-                        && let Some(ui) = weak.upgrade()
-                    {
-                        ui.set_selected_summary(summary_of(&engine, id).into());
+                let ours = |job: &JobId| run.borrow().job.as_ref() == Some(job);
+                match event {
+                    Event::PhotoChanged(id) => {
+                        if let Some(row) = photo_row(&engine, id) {
+                            state.set_rating(id, row.effective_rating);
+                            if state.selected_id() == Some(id) {
+                                ui.set_selected_summary(summary_of(&engine, id).into());
+                            }
+                        }
                     }
+                    Event::ImportItem {
+                        job,
+                        photo_id: Some(_),
+                        ..
+                    } if ours(&job) => new_photos.set(true),
+                    Event::JobProgress { job, done, total } if ours(&job) && total > 0 => {
+                        ui.set_import_progress(done as f32 / total as f32);
+                        ui.set_import_status(texts.invoke_importing(done as i32, total as i32));
+                    }
+                    Event::ImportFinished {
+                        job,
+                        copied,
+                        skipped,
+                        failed,
+                    } if ours(&job) => {
+                        run.borrow_mut().job = None;
+                        ui.set_importing(false);
+                        ui.set_import_finished(true);
+                        ui.set_import_status(if skipped == 0 && failed == 0 {
+                            texts.invoke_all_copied(copied as i32)
+                        } else {
+                            texts.invoke_import_summary(
+                                copied as i32,
+                                skipped as i32,
+                                failed as i32,
+                            )
+                        });
+                        new_photos.set(true);
+                    }
+                    Event::ImportAborted { job, reason } if ours(&job) => {
+                        run.borrow_mut().job = None;
+                        ui.set_importing(false);
+                        ui.set_import_status(texts.invoke_import_stopped(reason.into()));
+                    }
+                    Event::JobCancelled(job) if ours(&job) => {
+                        run.borrow_mut().job = None;
+                        ui.set_importing(false);
+                        ui.set_import_finished(true);
+                        ui.set_import_status(texts.invoke_import_cancelled());
+                        new_photos.set(true);
+                    }
+                    _ => {}
                 }
+            }
+            // Photos an import has registered since the grid was last loaded: refresh it, at
+            // most once a second, and only while it is the view on screen.
+            if new_photos.get()
+                && ui.get_current_task() == "cull"
+                && last_reload.elapsed() > Duration::from_secs(1)
+            {
+                new_photos.set(false);
+                last_reload = Instant::now();
+                reload(&engine, &state, &ui);
             }
         });
     }
@@ -182,9 +321,67 @@ pub fn run(
         ui.on_set_filter(move |min_rating| {
             let Some(ui) = weak.upgrade() else { return };
             let items = load_items(&engine, min_rating as u8).unwrap_or_default();
-            ui.set_status(format!("{} photos", items.len()).into());
+            ui.set_status(ui.global::<Texts>().invoke_photos(items.len() as i32));
             state.set_items(items);
             ui.set_selected_summary(String::new().into());
+        });
+    }
+
+    {
+        let (engine, weak) = (engine.clone(), ui.as_weak());
+        ui.on_refresh_volumes(move || {
+            if let Some(ui) = weak.upgrade() {
+                refresh_volumes(&engine, &ui);
+            }
+        });
+    }
+
+    {
+        let (engine, state, weak) = (engine.clone(), state.clone(), ui.as_weak());
+        ui.on_show_photos(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            reload(&engine, &state, &ui);
+            ui.set_current_task("cull".into());
+        });
+    }
+
+    {
+        let (engine, run, weak) = (engine.clone(), run.clone(), ui.as_weak());
+        let (settings_path, state_dir) = (paths.settings.clone(), paths.import_state.clone());
+        ui.on_start_import(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            let texts = ui.global::<Texts>();
+            let fields = settings_from(&ui);
+            fields.save(&settings_path);
+            let request = ImportRequest {
+                source_root: PathBuf::from(&fields.source),
+                archive_root: PathBuf::from(&fields.archive),
+                profile: fields.profile(),
+                shoot: Some(field(ui.get_import_shoot())).filter(|s| !s.is_empty()),
+                backup_root: Some(fields.backup.clone())
+                    .filter(|b| !b.is_empty())
+                    .map(PathBuf::from),
+                state_dir: state_dir.clone(),
+            };
+            match engine.import(request) {
+                Ok(job) => {
+                    run.borrow_mut().job = Some(job);
+                    ui.set_importing(true);
+                    ui.set_import_finished(false);
+                    ui.set_import_progress(0.0);
+                    ui.set_import_status(texts.invoke_reading_card());
+                }
+                Err(e) => ui.set_import_status(texts.invoke_import_refused(e.to_string().into())),
+            }
+        });
+    }
+
+    {
+        let (engine, run) = (engine.clone(), run.clone());
+        ui.on_cancel_import(move || {
+            if let Some(job_id) = run.borrow().job {
+                let _ = engine.submit(Command::CancelJob { job_id });
+            }
         });
     }
 

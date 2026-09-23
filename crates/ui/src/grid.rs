@@ -6,7 +6,7 @@
 //! row that is on screen", checked without a window in this module's own tests).
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use auroraw_engine::ThumbnailService;
 use auroraw_imaging::Thumbnail;
@@ -50,6 +50,7 @@ pub struct GridState {
     items: RefCell<Vec<Item>>,
     index: RefCell<HashMap<PhotoId, usize>>,
     cache: RefCell<HashMap<PhotoId, Image>>,
+    unavailable: RefCell<HashSet<PhotoId>>,
     selected: RefCell<Option<usize>>,
     notify: ModelNotify,
 }
@@ -60,6 +61,7 @@ impl Default for GridState {
             items: RefCell::new(Vec::new()),
             index: RefCell::new(HashMap::new()),
             cache: RefCell::new(HashMap::new()),
+            unavailable: RefCell::new(HashSet::new()),
             selected: RefCell::new(None),
             notify: ModelNotify::default(),
         }
@@ -74,6 +76,7 @@ impl GridState {
         *self.index.borrow_mut() = items.iter().enumerate().map(|(i, it)| (it.id, i)).collect();
         let keep: std::collections::HashSet<PhotoId> = items.iter().map(|it| it.id).collect();
         self.cache.borrow_mut().retain(|id, _| keep.contains(id));
+        self.unavailable.borrow_mut().retain(|id| keep.contains(id));
         *self.items.borrow_mut() = items;
         *self.selected.borrow_mut() = None;
         self.notify.reset();
@@ -103,6 +106,16 @@ impl GridState {
         let row = self.index.borrow().get(&id).copied()? / COLS;
         self.notify.row_changed(row);
         Some(row)
+    }
+
+    /// Records that no thumbnail can be made for `id` (an unreadable file, or a RAW with no
+    /// embedded preview `rawler` can decode): its cell says so instead of staying empty, and is
+    /// never asked for again, which would otherwise repeat on every redraw.
+    pub fn mark_unavailable(&self, id: PhotoId) {
+        self.unavailable.borrow_mut().insert(id);
+        if let Some(i) = self.index.borrow().get(&id).copied() {
+            self.notify.row_changed(i / COLS);
+        }
     }
 
     /// The identifier at a flat cell index, for a click or a keyboard move.
@@ -170,6 +183,7 @@ impl Model for RowModel {
         let items = self.state.items.borrow();
         let selected = *self.state.selected.borrow();
         let cache = self.state.cache.borrow();
+        let unavailable = self.state.unavailable.borrow();
         let cells: Vec<Cell> = (0..COLS)
             .filter_map(|c| items.get(row * COLS + c).map(|it| (row * COLS + c, it)))
             .map(|(flat, it)| match cache.get(&it.id) {
@@ -178,15 +192,20 @@ impl Model for RowModel {
                     thumb: image.clone(),
                     rating: it.rating as i32,
                     ready: true,
+                    unavailable: false,
                     selected: selected == Some(flat),
                 },
                 None => {
-                    self.thumbnails.request(it.id);
+                    let unavailable = unavailable.contains(&it.id);
+                    if !unavailable {
+                        self.thumbnails.request(it.id);
+                    }
                     Cell {
                         photo_id: it.id.to_string().into(),
                         thumb: Image::default(),
                         rating: it.rating as i32,
                         ready: false,
+                        unavailable,
                         selected: selected == Some(flat),
                     }
                 }
@@ -260,6 +279,27 @@ mod tests {
         let model = RowModel::new(state, service());
         assert_eq!(model.row_count(), 2);
         assert_eq!(model.row_data(1).unwrap().cells.row_count(), 3);
+    }
+
+    #[test]
+    fn a_photo_no_thumbnail_can_be_made_for_says_so_and_is_not_asked_for_again() {
+        let state = state_with(2);
+        let id = state.id_at(0).unwrap();
+        let model = RowModel::new(state.clone(), service());
+        assert!(
+            !model
+                .row_data(0)
+                .unwrap()
+                .cells
+                .row_data(0)
+                .unwrap()
+                .unavailable
+        );
+        state.mark_unavailable(id);
+        let cell = model.row_data(0).unwrap().cells.row_data(0).unwrap();
+        assert!(cell.unavailable && !cell.ready);
+        let other = model.row_data(0).unwrap().cells.row_data(1).unwrap();
+        assert!(!other.unavailable, "only the photo that failed");
     }
 
     #[test]

@@ -22,6 +22,13 @@ use auroraw_workspace::Workspace;
 
 use crate::error::Result;
 
+/// What workers have finished and nobody has collected yet.
+#[derive(Default)]
+struct Inbox {
+    ready: Vec<(PhotoId, Thumbnail)>,
+    failed: Vec<PhotoId>,
+}
+
 struct Shared {
     queue: Mutex<Vec<PhotoId>>,
     cv: Condvar,
@@ -32,7 +39,7 @@ struct Shared {
 /// first request if none exists yet.
 pub struct ThumbnailService {
     shared: Arc<Shared>,
-    inbox: Arc<Mutex<Vec<(PhotoId, Thumbnail)>>>,
+    inbox: Arc<Mutex<Inbox>>,
     requested: Mutex<HashSet<PhotoId>>,
     workers: Vec<std::thread::JoinHandle<()>>,
 }
@@ -56,7 +63,7 @@ impl ThumbnailService {
             cv: Condvar::new(),
             stop: AtomicBool::new(false),
         });
-        let inbox = Arc::new(Mutex::new(Vec::new()));
+        let inbox = Arc::new(Mutex::new(Inbox::default()));
         let handles = (0..workers.max(1))
             .map(|_| {
                 let shared = shared.clone();
@@ -89,12 +96,25 @@ impl ThumbnailService {
 
     /// Every thumbnail a worker has finished since the last call, without blocking.
     pub fn poll(&self) -> Vec<(PhotoId, Thumbnail)> {
-        let items = std::mem::take(&mut *self.inbox.lock().expect("not poisoned"));
+        let items = std::mem::take(&mut self.inbox.lock().expect("not poisoned").ready);
         let mut requested = self.requested.lock().expect("not poisoned");
         for (id, _) in &items {
             requested.remove(id);
         }
         items
+    }
+
+    /// Every photo a worker gave up on since the last call (the file is unreadable, or it has no
+    /// embedded preview to make a thumbnail from), without blocking. Such a photo is asked for
+    /// again only if [`Self::request`] is called for it after this returned it: a caller that
+    /// wants to stop asking remembers it, or the grid would retry it on every redraw.
+    pub fn poll_failed(&self) -> Vec<PhotoId> {
+        let failed = std::mem::take(&mut self.inbox.lock().expect("not poisoned").failed);
+        let mut requested = self.requested.lock().expect("not poisoned");
+        for id in &failed {
+            requested.remove(id);
+        }
+        failed
     }
 }
 
@@ -123,7 +143,7 @@ fn source_root(workspace: &Workspace, source_id: SourceId) -> Option<PathBuf> {
 
 fn worker(
     shared: Arc<Shared>,
-    inbox: Arc<Mutex<Vec<(PhotoId, Thumbnail)>>>,
+    inbox: Arc<Mutex<Inbox>>,
     workspace: Arc<Workspace>,
     catalogue_path: PathBuf,
     previews_path: PathBuf,
@@ -147,8 +167,11 @@ fn worker(
                 queue = shared.cv.wait(queue).expect("not poisoned");
             }
         };
-        if let Some(thumbnail) = generate(&catalogue, &previews, &workspace, id) {
-            inbox.lock().expect("not poisoned").push((id, thumbnail));
+        let generated = generate(&catalogue, &previews, &workspace, id);
+        let mut inbox = inbox.lock().expect("not poisoned");
+        match generated {
+            Some(thumbnail) => inbox.ready.push((id, thumbnail)),
+            None => inbox.failed.push(id),
         }
     }
 }

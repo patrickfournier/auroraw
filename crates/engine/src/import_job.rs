@@ -19,7 +19,7 @@ use std::sync::mpsc;
 use auroraw_catalogue::{Catalogue, SidecarStat};
 use auroraw_format::sidecar::{FileEntry, FileRole, Location, Metadata, PhotoSidecar};
 use auroraw_import::{
-    DiscoveredFile, ImportState, ItemOutcome, PlannedFile, PlannedPhoto, Profile, UsedPaths,
+    DiscoveredFile, ImportState, ItemOutcome, PlannedFile, PlannedPhoto, Profile, Root, UsedPaths,
     pair_files, plan, read_source, write_verified,
 };
 use auroraw_plugin_api::source::{Source, SourceState};
@@ -345,13 +345,23 @@ fn import_group(
 }
 
 fn run(job: ImportJob) {
-    if job.source.state() != SourceState::Online {
+    let abort = |reason: &str| {
+        let _ = job.events.send(Event::ImportAborted {
+            job: job.job,
+            reason: reason.to_string(),
+        });
         let _ = job.events.send(Event::JobFinished(job.job));
+    };
+    if job.source.state() != SourceState::Online {
+        abort("the source is not reachable");
         return;
     }
-    let Ok(entries) = job.source.list() else {
-        let _ = job.events.send(Event::JobFinished(job.job));
-        return;
+    let entries = match job.source.list() {
+        Ok(entries) => entries,
+        Err(e) => {
+            abort(&format!("the source cannot be listed: {e}"));
+            return;
+        }
     };
     let source_root_path = job.source.root().to_path_buf();
 
@@ -367,12 +377,20 @@ fn run(job: ImportJob) {
 
     let groups = pair_files(discovered, job.profile.pair_rule);
     let mut used = UsedPaths::new();
+    let on_disk = |root: Root, relative: &Path| match root {
+        Root::Destination => job.dest_root.join(relative).exists(),
+        Root::Backup(i) => job
+            .backup_roots
+            .get(i)
+            .is_some_and(|backup| backup.join(relative).exists()),
+    };
     let planned: Vec<PlannedPhoto> = plan(
         groups,
         &job.profile.destination_template,
         &job.profile.backup_templates,
         job.shoot.as_deref(),
         &mut used,
+        &on_disk,
     );
 
     let mut state = ImportState::load(&job.state_path).unwrap_or_default();
@@ -386,7 +404,14 @@ fn run(job: ImportJob) {
             return;
         }
         let key = planned_photo.original.source_path.clone();
-        if !state.is_settled(&key) {
+        if state.is_settled(&key) {
+            // Resumed: an earlier run already settled this one; count it so the final report
+            // covers the whole import, not only this run's share.
+            match state.outcome(&key) {
+                Some(ItemOutcome::Copied) => copied += 1,
+                _ => skipped += 1,
+            }
+        } else {
             let outcome = import_group(&job, catalogue.as_ref(), planned_photo, &meta_by_path);
             let (item_outcome, photo_id) = match outcome {
                 GroupOutcome::Copied(id) => {
@@ -423,6 +448,11 @@ fn run(job: ImportJob) {
         });
     }
 
+    if failed == 0 {
+        // Nothing left to resume. Leaving the state behind would make a later import from a
+        // reformatted card that reuses file names skip files it has never seen.
+        let _ = std::fs::remove_file(&job.state_path);
+    }
     let _ = job.events.send(Event::ImportFinished {
         job: job.job,
         copied,
