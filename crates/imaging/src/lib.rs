@@ -32,6 +32,7 @@ mod previews;
 mod thumbnail;
 
 pub use error::{ImagingError, Result};
+pub use format::is_photo_file;
 pub use metadata::{Metadata, read_metadata};
 pub use phash::perceptual_hash;
 pub use preview::embedded_preview;

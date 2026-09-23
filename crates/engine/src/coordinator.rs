@@ -23,7 +23,9 @@ use crate::command::Command;
 use crate::error::{EngineError, Result};
 use crate::event::Event;
 use crate::import_job::{self, ImportJob};
+use crate::index_job::{self, IndexJob};
 use crate::job::{CancelToken, JobId};
+use crate::remove_job::{self, RemoveJob};
 
 /// What a command that waits for its result (`Engine::submit_and_wait`) gets back.
 #[derive(Debug, Clone, PartialEq)]
@@ -66,11 +68,43 @@ pub enum Outcome {
         /// The job doing the import.
         job: JobId,
     },
+    /// `IndexSource`'s background job.
+    IndexStarted {
+        /// The job scanning the source.
+        job: JobId,
+    },
+    /// `RemoveSource`'s background job.
+    RemoveStarted {
+        /// The job removing the source.
+        job: JobId,
+    },
 }
 
 pub(crate) type Reply = mpsc::Sender<Result<Outcome>>;
 
 pub(crate) enum Inbound {
+    /// An event a job wants reported after everything it sent before it has been applied: the
+    /// catalogue writes it queued are ahead of it in this queue, so whoever reacts to the event by
+    /// reading the catalogue sees them all.
+    Report(Event),
+    /// A remove job took a photo's sidecar out of the workspace (recoverably): take its row out of
+    /// the catalogue.
+    Removed { photo_id: PhotoId },
+    /// A remove job dropped a source from a photo that has another location: point its row at it.
+    Relocated {
+        photo_id: PhotoId,
+        source_id: SourceId,
+        path: String,
+        filename: String,
+        fingerprint: auroraw_types::Fingerprint,
+    },
+    /// A remove job is done with a source's photos: take the source itself out.
+    SourceGone {
+        job: JobId,
+        source_id: SourceId,
+        removed: usize,
+        kept: usize,
+    },
     /// The last [`crate::Engine`] handle was dropped: cancel what runs in the background and stop.
     /// (The coordinator holds a sender to its own queue for the jobs it starts, so a closed queue
     /// never signals the end by itself.)
@@ -114,6 +148,8 @@ pub(crate) struct Coordinator {
     events: mpsc::Sender<Event>,
     inbound: mpsc::Sender<Inbound>,
     jobs: HashMap<JobId, CancelToken>,
+    /// Where the answer to an index job's pause goes.
+    index_decisions: HashMap<JobId, mpsc::Sender<bool>>,
     next_job: u64,
 }
 
@@ -130,6 +166,7 @@ impl Coordinator {
             events,
             inbound,
             jobs: HashMap::new(),
+            index_decisions: HashMap::new(),
             next_job: 0,
         }
     }
@@ -144,6 +181,33 @@ impl Coordinator {
                     }
                     break;
                 }
+                Inbound::Report(event) => {
+                    let _ = self.events.send(event);
+                }
+                Inbound::Removed { photo_id } => {
+                    let _ = self.catalogue.remove_photo(&photo_id);
+                }
+                Inbound::Relocated {
+                    photo_id,
+                    source_id,
+                    path,
+                    filename,
+                    fingerprint,
+                } => {
+                    let _ = self.catalogue.apply_relink(
+                        &photo_id,
+                        &source_id,
+                        &path,
+                        &filename,
+                        &fingerprint,
+                    );
+                }
+                Inbound::SourceGone {
+                    job,
+                    source_id,
+                    removed,
+                    kept,
+                } => self.finish_remove_source(job, source_id, removed, kept),
                 Inbound::Command { command, reply } => self.handle_command(command, reply),
                 Inbound::Refreshed {
                     photo,
@@ -206,6 +270,14 @@ impl Coordinator {
             Command::AddSource { name, root, kind } => self.add_source(name, root, kind),
             Command::ScanSource { source_id } => self.scan_source(source_id),
             Command::AddNewPhotos { source_id, paths } => self.add_new_photos(source_id, paths),
+            Command::IndexSource { source_id, merge } => self.start_index(source_id, merge),
+            Command::ContinueIndex { job_id, restore } => {
+                if let Some(answer) = self.index_decisions.get(&job_id) {
+                    let _ = answer.send(restore);
+                }
+                Ok(Outcome::Applied)
+            }
+            Command::RemoveSource { source_id } => self.start_remove(source_id),
             Command::Import {
                 source_id,
                 destination_source_id,
@@ -834,6 +906,107 @@ impl Coordinator {
         });
         let _ = self.events.send(Event::ImportStarted { job, source_id });
         Ok(Outcome::ImportStarted { job })
+    }
+
+    /// Starts the background scan of a source (`Command::IndexSource`).
+    fn start_index(&mut self, source_id: SourceId, merge: Vec<SourceId>) -> Result<Outcome> {
+        let entry = self.source_entry(&source_id)?;
+        let root = Self::source_root(&entry)?;
+        let source = Self::open_source(&entry)?;
+        let slash = |relative: PathBuf| {
+            relative
+                .to_string_lossy()
+                .replace(std::path::MAIN_SEPARATOR, "/")
+        };
+        // Other sources whose folder is inside this one: their files belong to them, unless they
+        // are being merged into this one, in which case they are this source's own.
+        let mut skip = Vec::new();
+        let mut merged = Vec::new();
+        for other in self.read_sources()?.sources {
+            if other.id == source_id {
+                continue;
+            }
+            let Ok(other_root) = Self::source_root(&other) else {
+                continue;
+            };
+            let Some(relative) = crate::paths::relative_to(&other_root, &root)
+                .filter(|relative| !relative.as_os_str().is_empty())
+            else {
+                continue;
+            };
+            if merge.contains(&other.id) {
+                merged.push((other.id, slash(relative)));
+            } else {
+                skip.push(slash(relative));
+            }
+        }
+        let job = self.spawn_job();
+        let (answer_tx, answer_rx) = mpsc::channel();
+        self.index_decisions.insert(job, answer_tx);
+        let catalogue_path = self
+            .catalogue
+            .path()
+            .expect("the engine's catalogue is always a file")
+            .to_path_buf();
+        index_job::spawn(IndexJob {
+            job,
+            workspace: self.workspace.clone(),
+            source,
+            source_id,
+            skip,
+            merge: merged,
+            catalogue_path,
+            events: self.events.clone(),
+            inbound: self.inbound.clone(),
+            cancel: self.jobs[&job].clone(),
+            decision: answer_rx,
+        });
+        Ok(Outcome::IndexStarted { job })
+    }
+
+    /// Starts taking a source out (`Command::RemoveSource`).
+    fn start_remove(&mut self, source_id: SourceId) -> Result<Outcome> {
+        self.source_entry(&source_id)?;
+        let job = self.spawn_job();
+        let catalogue_path = self
+            .catalogue
+            .path()
+            .expect("the engine's catalogue is always a file")
+            .to_path_buf();
+        remove_job::spawn(RemoveJob {
+            job,
+            workspace: self.workspace.clone(),
+            source_id,
+            catalogue_path,
+            events: self.events.clone(),
+            inbound: self.inbound.clone(),
+            cancel: self.jobs[&job].clone(),
+        });
+        Ok(Outcome::RemoveStarted { job })
+    }
+
+    /// The photos of a removed source are gone: take the source out of the workspace's list and
+    /// the catalogue's.
+    fn finish_remove_source(
+        &mut self,
+        job: JobId,
+        source_id: SourceId,
+        removed: usize,
+        kept: usize,
+    ) {
+        if let Ok(mut sources) = self.read_sources() {
+            sources.sources.retain(|entry| entry.id != source_id);
+            sources.updated = Timestamp::now();
+            if self.workspace.write_sources(&sources).is_ok() {
+                let _ = self.catalogue.remove_source(&source_id);
+                let _ = self.events.send(Event::SourceRemoved {
+                    job,
+                    source_id,
+                    removed,
+                    kept,
+                });
+            }
+        }
     }
 
     fn handle_imported(

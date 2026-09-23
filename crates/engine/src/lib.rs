@@ -20,12 +20,16 @@ mod error;
 mod event;
 mod import_flow;
 mod import_job;
+mod index_job;
 mod job;
 pub mod paths;
 mod refresh;
+mod remove_job;
+mod sources_api;
 mod thumbnails;
 mod workspaces;
 
+pub use auroraw_catalogue::SourceCounts;
 pub use auroraw_import::{ItemOutcome, MetadataTemplate, PairRule, Profile};
 pub use command::Command;
 pub use coordinator::Outcome;
@@ -33,6 +37,7 @@ pub use error::{EngineError, Result};
 pub use event::Event;
 pub use import_flow::{ImportRequest, VolumeInfo};
 pub use job::JobId;
+pub use sources_api::{AddPlan, AddSourceRequest, AddedSource, SourceInfo, SourceKind};
 pub use thumbnails::ThumbnailService;
 pub use workspaces::{KnownWorkspace, LocalDirs, OpenedWorkspace};
 
@@ -1105,7 +1110,9 @@ mod tests {
             .workspace()
             .write_photo(&PhotoSidecar::new(photo_id))
             .unwrap();
-        engine.submit_and_wait(Command::Rebuild).unwrap();
+        // (Not a rebuild: that replaces the database file, which Windows refuses while the import
+        // job has its own connection to it open.)
+        engine.submit_and_wait(Command::Reconcile).unwrap();
 
         wait_for(
             &events,

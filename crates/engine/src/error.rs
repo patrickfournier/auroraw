@@ -34,6 +34,13 @@ pub enum EngineError {
     /// A source refused an operation (WP4): unreachable, or no file at the path asked for.
     #[error(transparent)]
     Source(#[from] auroraw_plugin_api::source::SourceError),
+    /// The folder is inside a source that is already registered: its photos are there already.
+    #[error("this folder is already part of the source \"{0}\"")]
+    AlreadyCovered(String),
+    /// The folder contains sources that are already registered: adding it would list their photos
+    /// twice unless they are merged into it.
+    #[error("this folder contains the sources {0}; merge them into it, or add another folder")]
+    ContainsSources(String),
     /// The previews database, or decoding a photo for its thumbnail, refused an operation (WP8).
     #[error(transparent)]
     Imaging(#[from] auroraw_imaging::ImagingError),

@@ -126,7 +126,10 @@ fn read_raw_metadata(path: &Path) -> Result<Metadata> {
     };
 
     Ok(Metadata {
-        capture_time: exif.date_time_original.clone(),
+        capture_time: exif
+            .date_time_original
+            .as_deref()
+            .and_then(|t| normalise_capture_time(t, exif.offset_time_original.as_deref())),
         make: (!raw_meta.make.is_empty()).then_some(raw_meta.make.clone()),
         model: (!raw_meta.model.is_empty()).then_some(raw_meta.model.clone()),
         serial: exif.serial_number.clone(),
@@ -177,7 +180,8 @@ fn read_standard_metadata(path: &Path) -> Result<Metadata> {
         _ => None,
     };
 
-    metadata.capture_time = text(exif::Tag::DateTimeOriginal);
+    metadata.capture_time = text(exif::Tag::DateTimeOriginal)
+        .and_then(|t| normalise_capture_time(&t, text(exif::Tag::OffsetTimeOriginal).as_deref()));
     metadata.make = text(exif::Tag::Make);
     metadata.model = text(exif::Tag::Model);
     metadata.serial = text(exif::Tag::BodySerialNumber);
@@ -234,4 +238,95 @@ fn read_standard_metadata(path: &Path) -> Result<Metadata> {
     metadata.gps_altitude = rational(exif::Tag::GPSAltitude);
 
     Ok(metadata)
+}
+
+/// A camera's `DateTimeOriginal` (`2016:09:02 10:28:00`, or `2016-09-02 10:28:00`) as an ISO 8601
+/// timestamp with an offset (`2016-09-02T10:28:00+02:00`), which is what the sidecars and the
+/// catalogue hold (an EXIF date has no zone of its own). When the camera also wrote its offset
+/// (`OffsetTimeOriginal`) it is used; otherwise the wall-clock time is kept as if it were UTC
+/// (`Z`): the date and time are those of the place the photo was taken, and that is what sorting
+/// and naming by date want. `None` for text that is not a date and time.
+pub fn normalise_capture_time(text: &str, offset: Option<&str>) -> Option<String> {
+    let text = text.trim().trim_matches('"');
+    let (date, time) = text.split_once(['T', ' '])?;
+    let date: Vec<&str> = date.split([':', '-']).collect();
+    let time = time.split(['+', 'Z', 'z']).next()?;
+    let time: Vec<&str> = time.split(':').collect();
+    let number = |part: &str| part.trim().parse::<u32>().ok();
+    let (year, month, day) = (
+        number(date.first()?)?,
+        number(date.get(1)?)?,
+        number(date.get(2)?)?,
+    );
+    let (hour, minute) = (number(time.first()?)?, number(time.get(1)?)?);
+    let second = time
+        .get(2)
+        .map(|s| s.split('.').next().unwrap_or(s))
+        .and_then(number)
+        .unwrap_or(0);
+    if year == 0
+        || !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+        || minute > 59
+        || second > 60
+    {
+        return None;
+    }
+    let zone = offset
+        .map(|o| o.trim().trim_matches('"'))
+        .filter(|o| {
+            o.len() == 6
+                && matches!(o.as_bytes()[0], b'+' | b'-')
+                && o.as_bytes()[3] == b':'
+                && o[1..3].chars().all(|c| c.is_ascii_digit())
+                && o[4..].chars().all(|c| c.is_ascii_digit())
+        })
+        .unwrap_or("Z");
+    Some(format!(
+        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}{zone}"
+    ))
+}
+
+#[cfg(test)]
+mod capture_time_tests {
+    use super::normalise_capture_time as n;
+
+    #[test]
+    fn the_forms_cameras_and_readers_write_become_one_iso_timestamp() {
+        assert_eq!(
+            n("2016:09:02 10:28:00", None).as_deref(),
+            Some("2016-09-02T10:28:00Z")
+        );
+        assert_eq!(
+            n("2016-09-02 10:28:00", None).as_deref(),
+            Some("2016-09-02T10:28:00Z")
+        );
+        assert_eq!(
+            n("2016:09:02 10:28:00", Some("+02:00")).as_deref(),
+            Some("2016-09-02T10:28:00+02:00")
+        );
+        assert_eq!(
+            n("2016-09-02T10:28:00Z", None).as_deref(),
+            Some("2016-09-02T10:28:00Z")
+        );
+        assert_eq!(
+            n("2016:09:02 10:28:00.45", Some("bogus")).as_deref(),
+            Some("2016-09-02T10:28:00Z")
+        );
+    }
+
+    #[test]
+    fn text_that_is_not_a_date_is_refused() {
+        for bad in [
+            "",
+            "0000:00:00 00:00:00",
+            "yesterday",
+            "2016:13:02 10:28:00",
+            "2016:09:02",
+            "2016:09:02 25:00:00",
+        ] {
+            assert_eq!(n(bad, None), None, "{bad:?}");
+        }
+    }
 }

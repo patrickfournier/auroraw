@@ -425,6 +425,115 @@ impl Workspace {
     }
 }
 
+/// A photo sidecar found under `removed/` (moved there by [`Workspace::remove_recoverably`]).
+#[derive(Debug, Clone)]
+pub struct RemovedPhoto {
+    /// Where the sidecar is now.
+    pub path: PathBuf,
+    /// What it holds.
+    pub photo: PhotoSidecar,
+}
+
+fn files_under(folder: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(folder) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            files_under(&path, out);
+        } else if path.extension().is_some_and(|e| e == "xmp") {
+            out.push(path);
+        }
+    }
+}
+
+impl Workspace {
+    /// The live version sidecars of a photo (the files that move with it when it is removed).
+    pub fn version_files_of(&self, photo: &PhotoId) -> Vec<PathBuf> {
+        let Some(shard) = self
+            .version_path(photo, &VersionId::random())
+            .parent()
+            .map(Path::to_path_buf)
+        else {
+            return Vec::new();
+        };
+        let prefix = format!("{photo}.");
+        let mut files = Vec::new();
+        files_under(&shard, &mut files);
+        files.retain(|path| {
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with(&prefix))
+        });
+        files
+    }
+
+    /// Every photo sidecar under `removed/` that can be read: what a person removed earlier,
+    /// with its ratings and keywords, waiting to be restored (a file that cannot be read, or that
+    /// is from a newer schema, is left alone and left out).
+    pub fn removed_photos(&self) -> Vec<RemovedPhoto> {
+        let mut files = Vec::new();
+        files_under(
+            &self.root.join(layout::REMOVED).join(layout::PHOTOS),
+            &mut files,
+        );
+        files.sort();
+        files
+            .into_iter()
+            .filter_map(|path| {
+                let bytes = read_capped(&path).ok()??;
+                let photo = PhotoSidecar::from_bytes(&bytes).ok()?.current()?;
+                Some(RemovedPhoto { path, photo })
+            })
+            .collect()
+    }
+
+    /// Puts a removed photo back: writes `photo` (the removed sidecar, usually with its location
+    /// updated) at its live place, moves its version sidecars back from `removed/`, and then
+    /// takes the removed copy away, so that it is not offered again. Returns how many version
+    /// sidecars came back.
+    pub fn restore_photo(
+        &self,
+        removed: &RemovedPhoto,
+        photo: &PhotoSidecar,
+    ) -> Result<usize, WorkspaceError> {
+        if self.access == Access::ReadOnly {
+            return Err(WorkspaceError::ReadOnly);
+        }
+        self.write_photo(photo)?;
+        let mut versions = 0;
+        let mut files = Vec::new();
+        files_under(
+            &self.root.join(layout::REMOVED).join(layout::VERSIONS),
+            &mut files,
+        );
+        let prefix = format!("{}.", photo.photo_id);
+        for path in files {
+            let belongs = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with(&prefix));
+            if !belongs {
+                continue;
+            }
+            let Some(bytes) = read_capped(&path)? else {
+                continue;
+            };
+            let Ok(loaded) = VersionSidecar::from_bytes(&bytes) else {
+                continue;
+            };
+            if let Some(version) = loaded.current() {
+                self.write_version(&version)?;
+                fs::remove_file(&path).map_err(io_err(&path))?;
+                versions += 1;
+            }
+        }
+        fs::remove_file(&removed.path).map_err(io_err(&removed.path))?;
+        Ok(versions)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,5 +576,42 @@ mod tests {
         assert_eq!(ws.access(), Access::ReadWrite);
         assert_eq!(fs::read_dir(&tmp).unwrap().count(), 0);
         assert_eq!(fs::read(ws.photo_path(&id)).unwrap(), before);
+    }
+
+    #[test]
+    fn a_removed_photo_can_be_listed_and_put_back_with_its_versions() {
+        let dir = temp_dir();
+        let ws = Workspace::create(&dir.path().join("w"), "Main").unwrap();
+        let id = PhotoId::random();
+        let mut photo = PhotoSidecar::new(id);
+        photo.meta.rating = Some(4);
+        ws.write_photo(&photo).unwrap();
+        let version = VersionSidecar::new(&photo, VersionId::random());
+        ws.write_version(&version).unwrap();
+        assert!(ws.removed_photos().is_empty());
+
+        ws.remove_recoverably(&ws.photo_path(&id)).unwrap();
+        ws.remove_recoverably(&ws.version_path(&id, &version.version_id))
+            .unwrap();
+        assert!(ws.read_photo(&id).unwrap().is_none());
+
+        let removed = ws.removed_photos();
+        assert_eq!(removed.len(), 1);
+        assert_eq!(removed[0].photo.meta.rating, Some(4));
+
+        let versions = ws.restore_photo(&removed[0], &removed[0].photo).unwrap();
+        assert_eq!(versions, 1);
+        assert_eq!(
+            ws.read_photo(&id)
+                .unwrap()
+                .unwrap()
+                .current()
+                .unwrap()
+                .meta
+                .rating,
+            Some(4)
+        );
+        assert!(ws.read_version(&id, &version.version_id).unwrap().is_some());
+        assert!(ws.removed_photos().is_empty(), "it is not offered again");
     }
 }

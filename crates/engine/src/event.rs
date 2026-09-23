@@ -113,6 +113,52 @@ pub enum Event {
         /// What happened.
         outcome: ItemOutcome,
     },
+    /// An index job listed its source and knows what it will do: `new_files` files become new
+    /// photos, of which `restorable` match photos removed earlier. When `restorable` is not zero
+    /// the job waits for [`crate::Command::ContinueIndex`].
+    IndexPlanned {
+        /// The job.
+        job: JobId,
+        /// The source.
+        source_id: SourceId,
+        /// How many photos the source's unknown files make.
+        new_files: usize,
+        /// How many of them are photos that were removed earlier.
+        restorable: usize,
+    },
+    /// An index job finished.
+    IndexFinished {
+        /// The job.
+        job: JobId,
+        /// The source.
+        source_id: SourceId,
+        /// New photos added.
+        added: usize,
+        /// Removed photos restored.
+        restored: usize,
+        /// Files the catalogue already knew.
+        known: usize,
+        /// Files that could not be read.
+        failed: usize,
+    },
+    /// An index job could not run at all (the source is not reachable, or cannot be listed).
+    IndexAborted {
+        /// The job.
+        job: JobId,
+        /// Why, for a person.
+        reason: String,
+    },
+    /// A source was removed from the catalogue.
+    SourceRemoved {
+        /// The job.
+        job: JobId,
+        /// The source.
+        source_id: SourceId,
+        /// Photos taken out of the catalogue (their sidecars are in `removed/`).
+        removed: usize,
+        /// Photos kept because they have another location.
+        kept: usize,
+    },
     /// An import job could not run at all (the source vanished or cannot be listed): no
     /// `ImportFinished` follows, only `JobFinished`.
     ImportAborted {

@@ -119,4 +119,34 @@ pub enum Command {
         /// Where this job's resumable state is kept.
         state_path: PathBuf,
     },
+    /// Scans a registered source in the background and adds every file it holds that the
+    /// catalogue does not know as a photo (RAW and JPEG of one shot as one photo, D-032), reading
+    /// each file's metadata into its sidecar (D-074): nothing is copied (spec §5.1, "adding a
+    /// folder in place"). Reports `Event::IndexPlanned` first; if some of the files match photos
+    /// that were removed earlier (their sidecars wait in the workspace's `removed/`), the job
+    /// pauses there until [`Command::ContinueIndex`] says whether to restore them.
+    IndexSource {
+        /// The source to scan.
+        source_id: SourceId,
+        /// Sources whose folders are inside this one, to be merged into it first: their photos are
+        /// kept, with their ratings and versions, and become this source's (each location gets this
+        /// source's identifier and the folder's place in it), then their entries go.
+        merge: Vec<SourceId>,
+    },
+    /// Answers the pause of an index job (`Event::IndexPlanned` with something to restore).
+    ContinueIndex {
+        /// The index job.
+        job_id: crate::job::JobId,
+        /// Whether to restore the photos that were removed earlier (with their ratings, keywords
+        /// and versions), rather than add their files as new photos.
+        restore: bool,
+    },
+    /// Takes a source out of the catalogue, in the background. Every photo whose original is only
+    /// in this source is removed from the catalogue and its sidecars are moved, recoverably, to the
+    /// workspace's `removed/`; a photo that has another location keeps it. Originals are never
+    /// touched.
+    RemoveSource {
+        /// The source to remove.
+        source_id: SourceId,
+    },
 }

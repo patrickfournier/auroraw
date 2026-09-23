@@ -316,6 +316,39 @@ impl Catalogue {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Every photo whose original lives in `source_id`, by identifier.
+    pub fn photos_in_source(&self, source_id: &SourceId) -> Result<Vec<PhotoId>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM photo WHERE source_id = ?1")?;
+        let rows = stmt.query_map([source_id.to_string()], |r| r.get::<_, String>(0))?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?.parse().map_err(|_| {
+                rusqlite::Error::InvalidColumnType(0, "id".into(), rusqlite::types::Type::Text)
+            })?);
+        }
+        Ok(out)
+    }
+
+    /// What is in `source_id`, for a person deciding whether to remove it.
+    pub fn source_counts(&self, source_id: &SourceId) -> Result<SourceCounts> {
+        let (photos, worked_on) = self.conn.query_row(
+            "SELECT COUNT(*),
+                    COALESCE(SUM(CASE WHEN rating > 0 OR flag > 0 OR version_count > 0
+                                        OR caption IS NOT NULL OR title IS NOT NULL
+                                        OR EXISTS(SELECT 1 FROM photo_keyword k WHERE k.photo_id = photo.id)
+                                      THEN 1 ELSE 0 END), 0)
+             FROM photo WHERE source_id = ?1",
+            [source_id.to_string()],
+            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)),
+        )?;
+        Ok(SourceCounts {
+            photos: photos as u64,
+            worked_on: worked_on as u64,
+        })
+    }
+
     /// Every photo the catalogue has on record for `source_id`: its identifier, path and
     /// fingerprint, for a reconcile scan (design note 004 §6.4) to compare against a fresh
     /// listing. `catalogue` does not depend on `sources` (both sit beside each other under
@@ -403,6 +436,16 @@ pub struct FingerprintCandidate {
     pub source_id: Option<SourceId>,
     /// Its path inside that source.
     pub path: Option<String>,
+}
+
+/// What a source holds, in numbers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceCounts {
+    /// How many photos have their original in the source.
+    pub photos: u64,
+    /// How many of them carry work a person did: a rating, a flag, keywords, a title or caption, or
+    /// a version.
+    pub worked_on: u64,
 }
 
 /// One row of the `source` table.

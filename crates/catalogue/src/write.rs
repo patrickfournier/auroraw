@@ -135,6 +135,39 @@ impl Catalogue {
         Ok(())
     }
 
+    /// Takes a photo out of the catalogue (its sidecar is dealt with by the caller, recoverably):
+    /// the row, its keywords and versions, its place in collections and its search entry.
+    pub fn remove_photo(&mut self, photo_id: &PhotoId) -> Result<()> {
+        let id = photo_id.to_string();
+        let tx = self.conn.transaction()?;
+        let rowid: Option<i64> = tx
+            .query_row("SELECT rowid FROM photo WHERE id = ?1", [&id], |r| r.get(0))
+            .optional()?;
+        let Some(rowid) = rowid else {
+            return Ok(());
+        };
+        tx.execute("DELETE FROM photo_fts WHERE rowid = ?1", [rowid])?;
+        tx.execute(
+            "DELETE FROM version_keyword WHERE version_id IN
+                 (SELECT id FROM version WHERE photo_id = ?1)",
+            [&id],
+        )?;
+        tx.execute("DELETE FROM version WHERE photo_id = ?1", [&id])?;
+        tx.execute("DELETE FROM photo_keyword WHERE photo_id = ?1", [&id])?;
+        tx.execute("DELETE FROM collection_member WHERE photo_id = ?1", [&id])?;
+        tx.execute("DELETE FROM photo WHERE id = ?1", [&id])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Takes a source out of the catalogue's list. Its photos are the caller's business (remove
+    /// them first, or move them, as the sources' owner decides).
+    pub fn remove_source(&mut self, source_id: &SourceId) -> Result<()> {
+        self.conn
+            .execute("DELETE FROM source WHERE id = ?1", [source_id.to_string()])?;
+        Ok(())
+    }
+
     /// Updates an existing photo's file location after a reconcile relinks it (design note 004
     /// §6.4): the file moved or was renamed within its source, silently, since the match was
     /// unique. Nothing about the photo's metadata changes.

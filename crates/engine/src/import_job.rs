@@ -55,7 +55,7 @@ pub(crate) fn spawn(job: ImportJob) {
     std::thread::spawn(move || run(job));
 }
 
-fn stat_of(size: u64, modified: Option<std::time::SystemTime>) -> SidecarStat {
+pub(crate) fn stat_of(size: u64, modified: Option<std::time::SystemTime>) -> SidecarStat {
     let modified = modified
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64);
@@ -89,7 +89,7 @@ fn to_original(m: auroraw_imaging::Metadata) -> auroraw_format::sidecar::Origina
 /// [`DiscoveredFile`], with nothing but its path and size: planned and copied like any other,
 /// just placed by whatever the template renders with empty tokens rather than dropped from the
 /// import entirely (spec §5.2: everything is imported).
-fn discover_one(root: &Path, path: &str) -> (DiscoveredFile, Option<Metadata>) {
+pub(crate) fn discover_one(root: &Path, path: &str) -> (DiscoveredFile, Option<Metadata>) {
     let full = root.join(path.replace('/', std::path::MAIN_SEPARATOR_STR));
     let size = std::fs::metadata(&full).map(|m| m.len()).unwrap_or(0);
     let Ok(read) = auroraw_imaging::read_metadata(&full) else {
@@ -453,11 +453,13 @@ fn run(job: ImportJob) {
         // reformatted card that reuses file names skip files it has never seen.
         let _ = std::fs::remove_file(&job.state_path);
     }
-    let _ = job.events.send(Event::ImportFinished {
+    let _ = job.inbound.send(Inbound::Report(Event::ImportFinished {
         job: job.job,
         copied,
         skipped,
         failed,
-    });
-    let _ = job.events.send(Event::JobFinished(job.job));
+    }));
+    let _ = job
+        .inbound
+        .send(Inbound::Report(Event::JobFinished(job.job)));
 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! RAW+JPEG pairing (D-032): "one photo with two files". Grouped by name stem, ignoring case (a
-//! card's own filesystem is almost always case-insensitive).
+//! card's own filesystem is almost always case-insensitive), and only within one folder: a RAW and
+//! a JPEG that merely share a number in two different folders (two cameras, two shoots) are two
+//! photos.
 
 use std::collections::HashMap;
 
@@ -30,7 +32,12 @@ pub fn pair_files(files: Vec<DiscoveredFile>, rule: PairRule) -> Vec<PhotoGroup>
     let mut by_stem: HashMap<String, Vec<DiscoveredFile>> = HashMap::new();
     for file in files {
         let (stem, _) = stem_and_extension(&file.path);
-        let key = stem.to_ascii_lowercase();
+        let folder = file.path.rsplit_once('/').map_or("", |(folder, _)| folder);
+        let key = format!(
+            "{}/{}",
+            folder.to_ascii_lowercase(),
+            stem.to_ascii_lowercase()
+        );
         if !by_stem.contains_key(&key) {
             order.push(key.clone());
         }
@@ -169,5 +176,28 @@ mod tests {
             PairRule::Both,
         );
         assert_eq!(groups.len(), 2);
+    }
+
+    #[test]
+    fn a_raw_and_a_jpeg_in_different_folders_are_not_a_pair() {
+        let file = |path: &str| DiscoveredFile {
+            path: path.to_string(),
+            size: 1,
+            capture_time: None,
+            camera: None,
+        };
+        let groups = pair_files(
+            vec![
+                file("100CANON/IMG_0001.CR2"),
+                file("100NIKON/IMG_0001.JPG"),
+                file("100CANON/IMG_0002.CR2"),
+                file("100CANON/IMG_0002.JPG"),
+            ],
+            PairRule::Both,
+        );
+        assert_eq!(groups.len(), 3);
+        assert!(groups.iter().filter(|g| g.companion.is_some()).count() == 1);
+        let paired = groups.iter().find(|g| g.companion.is_some()).unwrap();
+        assert_eq!(paired.original.path, "100CANON/IMG_0002.CR2");
     }
 }

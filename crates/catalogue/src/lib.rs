@@ -33,7 +33,7 @@ pub mod dataset;
 pub use effective::{effective_flag, effective_rating};
 pub use error::CatalogueError;
 pub use open::{CURRENT_SCHEMA, Catalogue};
-pub use query::{Cursor, PhotoRow};
+pub use query::{Cursor, PhotoRow, SourceCounts, SourceRow};
 pub use rebuild::{RebuildInput, keyword_paths, rebuild_to_file};
 pub use reconcile::ReconcileReport;
 pub use registry::{Registry, RegistryEntry};
