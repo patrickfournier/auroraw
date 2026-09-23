@@ -720,7 +720,13 @@ fn creating_a_workspace_from_the_dialog_opens_it_and_remembers_it() {
         "catalogue",
         "a new workspace opens on what fills it"
     );
-    assert!(f.pictures.join("Auroraw/Main/workspace.json").is_file());
+    assert!(
+        f.pictures
+            .join("Auroraw")
+            .join("Main")
+            .join("workspace.json")
+            .is_file()
+    );
     let known = Engine::known_workspaces(&f.dirs);
     assert_eq!(known.len(), 1);
     assert_eq!(known[0].name, "Main");
@@ -736,7 +742,7 @@ fn the_proposed_folder_follows_the_name_until_the_folder_is_edited() {
     type_into(&app, "Name", "Family");
     assert_eq!(
         app.ui().get_new_location(),
-        f.pictures.join("Auroraw/Family").to_string_lossy()
+        f.pictures.join("Auroraw").join("Family").to_string_lossy()
     );
     type_into(&app, "Name", "Family / trips: 2026");
     assert_eq!(
@@ -757,12 +763,12 @@ fn the_proposed_folder_follows_the_name_until_the_folder_is_edited() {
 fn a_taken_name_is_offered_with_a_number() {
     init();
     let f = fixture(0);
-    std::fs::create_dir_all(f.pictures.join("Auroraw/Main")).unwrap();
+    std::fs::create_dir_all(f.pictures.join("Auroraw").join("Main")).unwrap();
     let app = launch(&f);
     click(&app, "New workspace…");
     assert_eq!(
         app.ui().get_new_location(),
-        f.pictures.join("Auroraw/Main 2").to_string_lossy()
+        f.pictures.join("Auroraw").join("Main 2").to_string_lossy()
     );
 }
 
