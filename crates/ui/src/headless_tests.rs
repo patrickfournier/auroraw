@@ -899,8 +899,8 @@ fn a_workspace_opens_from_a_folder_chosen_in_the_dialog_and_a_plain_folder_is_re
     assert!(
         known
             .iter()
-            .any(|w| w.name == "Second" && w.path == hidden && w.found),
-        "the registry follows the workspace to where it now is"
+            .any(|w| w.name == "Second" && w.path == canonical(&hidden) && w.found),
+        "the registry follows the workspace to where it now is: {known:?} (moved to {hidden:?})"
     );
 }
 
