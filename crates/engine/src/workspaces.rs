@@ -401,7 +401,15 @@ mod tests {
         drop(engine);
 
         // This machine loses its database (a new machine, a cleaned data folder).
-        std::fs::remove_dir_all(&dirs.data).unwrap();
+        // (Windows refuses while the closed engine's thread is still letting go of the database.)
+        let started = std::time::Instant::now();
+        while std::fs::remove_dir_all(&dirs.data).is_err() {
+            assert!(
+                started.elapsed() < Duration::from_secs(10),
+                "the database stayed open"
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        }
         let reopened = Engine::open_workspace(&root, &dirs).unwrap();
         assert!(reopened.rebuilt);
         assert_eq!(reopened.workspace_id, id);
