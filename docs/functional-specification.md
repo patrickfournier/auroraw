@@ -25,9 +25,10 @@ galleries, all in a simple, fast and professional workflow.
 
 **Simple by default, deep on demand** [decided, D-089]. Everyday work needs no configuration:
 guided panels by task and a default pipeline that works out of the box (§5.4, §5.6). Depth is
-the same model, not a second application: a photographer who wants more builds on versions and
-snapshots, styles, local adjustments, plugin operations and a documented, shareable pipeline
-definition (§5.6, §5.10), reused as named building blocks. There is no expert mode that changes
+the same model, not a second application. The advanced pipeline is the **configurable pipeline
+definition** of §5.6 (D-037): a documented, shareable file that advanced users and plugin authors
+edit, outside the everyday interface, on top of what every photographer already has (versions and
+snapshots, styles, local adjustments, plugin operations). There is no expert mode that changes
 how the everyday interface behaves, and what needs explaining appears only once it is used.
 
 **One place, no round trip** [decided, D-089]. Everything Auroraw does to a photo (import,
@@ -1011,11 +1012,9 @@ Sorted by when they need an answer. No question is left to decide before the tec
     obtain its bytes with no manual download step: fetched once on demand into a cache with a
     rule the photographer sets, what is shown while it is fetched, and how this sits with D-021
     (developing while offline stays unsupported, so an unreachable original is "unavailable").
-42. **Advanced pipelines beyond the pipeline definition** (follows D-089): what an advanced
-    photographer can build on §5.6's configurable definition (several definitions chosen per
-    camera or per style, named chains reused across versions, a headless batch run from the
-    command line), and what stays out of v1. To settle together with question 17 when M2 is
-    planned.
+42. ~~Advanced pipelines beyond the pipeline definition~~: resolved by D-089. An advanced
+    pipeline is the configurable pipeline definition of §5.6 (D-037) and nothing more is planned
+    for it; its details stay in question 17.
 
 ## 11. Next steps
 
