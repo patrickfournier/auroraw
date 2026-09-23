@@ -58,10 +58,19 @@ jobs:
             macOS) brew install exiftool ;;
             Windows) choco install exiftool -y --no-progress ;;
           esac
+      - name: Cache RAW samples (testing strategy §5)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: testdata/samples
+          key: raw-samples-${{ hashFiles('tools/fetch-samples.sh') }}
+      - name: Fetch RAW samples
+        shell: bash
+        run: tools/fetch-samples.sh
       - run: cargo build --workspace --locked
       - run: cargo nextest run --workspace --locked
         env:
           AUR_REQUIRE_EXIFTOOL: "1"
+          AUR_REQUIRE_SAMPLES: "1"
       - run: cargo test --workspace --doc --locked
       - name: Launch test
         run: cargo run --locked --package auroraw-app -- --self-test

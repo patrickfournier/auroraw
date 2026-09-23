@@ -53,10 +53,10 @@ Budgets and what the spikes measured against them:
 | Accessibility | AccessKit, through Slint | spike 2 |
 
 Chosen by this document, still to confirm [proposed]: `notify` for file watching, `keyring` for
-the operating system's keychain, `image`, `fast_image_resize` and `jpeg-encoder` for thumbnails
-and common formats, `quick-xml` and `serde_json` for sidecars, threads and channels with rayon
-rather than a global async runtime, and a small dedicated runtime for HTTP inside the publication
-code only.
+the operating system's keychain, `image`, `fast_image_resize`, `jpeg-encoder` and `kamadak-exif`
+for thumbnails and common formats, `quick-xml` and `serde_json` for sidecars, threads and channels
+with rayon rather than a global async runtime, and a small dedicated runtime for HTTP inside the
+publication code only.
 
 Open: the colour engine (lcms2 or moxcms), the AI runtime (ONNX Runtime is the usual candidate),
 and the packaging of each platform.
@@ -91,7 +91,6 @@ flowchart TD
   host --> api["plugin-api (declaration, interface)"]
   format --> types["types (ids, errors)"]
   imaging --> types
-  imaging --> api
   sources --> api
   sources --> types
   import --> sources
@@ -104,9 +103,9 @@ flowchart TD
 | `types` | Identifiers, units, error types. No dependencies. | M1 |
 | `format` | Reading and writing XMP, version sidecars and state files; schema versions; **unknown content is preserved on a round trip**. Pure functions, no file access. | M1 |
 | `catalogue` | The SQLite schema, migrations, queries, keyword vocabulary, effective values, series and duplicates, collections. Blocking API, called from worker threads. | M1 |
-| `workspace` | The folder on disk: atomic sidecar writes, state files, drift detection, rebuild, the previews database. | M1 |
+| `workspace` | The folder on disk: atomic sidecar writes, state files, drift detection, rebuild. | M1 |
 | `sources` | The source interface; local folders and mounted cards through it; states (online, offline, missing); monitoring; fingerprints. | M1 |
-| `imaging` | Decoders glue, CFA handling, colour (working space, profiles), thumbnail generation. | M1 |
+| `imaging` | Decoders glue, CFA handling, colour (working space, profiles), thumbnail generation, the previews database (D-075: a cache, not the truth, so it lives with the code that fills it, not with `workspace`). | M1 |
 | `import` | Import profiles, verified copy, RAW+JPEG pairing, series detection, GPX. | M1 |
 | `pipeline` | The wgpu engine: devices, stages, caching, tiling, fallbacks, shaders, plugin slots. **Depends on neither the catalogue nor the interface**, so it runs headless and is tested alone. | M2 |
 | `develop` | The version model: operations, history, snapshots, styles, local adjustments, base looks. | M2 |

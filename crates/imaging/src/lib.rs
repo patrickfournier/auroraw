@@ -1,3 +1,54 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! Decoders, embedded previews, thumbnails and the preview colour conversion
-//! (architecture §3.1). Work package WP5.
+//! Decoders, embedded previews, thumbnails, the previews database and the preview colour
+//! (architecture §3.1, §5.7, D-075). Work package WP5.
+//!
+//! Native code, not yet a sandboxed plugin: WP6 promotes a `Decoder` interface into
+//! `plugin-api`, the way it will promote `Source` (already there, WP4); until then this crate
+//! dispatches by extension itself ([`format::is_standard`]).
+//!
+//! - [`read_metadata`] reads what a photo sidecar caches (design note 003 §4.3): camera, lens,
+//!   exposure, capture time, GPS, as text in the shapes `auroraw_format::sidecar::Original`
+//!   expects (this crate does not depend on `format`; the two are siblings under `engine`).
+//! - [`embedded_preview`] decodes the image a thumbnail is made from: the file itself for a
+//!   standard format, the largest embedded preview `rawler` can find for a RAW one.
+//! - [`make_thumbnail`] resizes and encodes it, applying orientation first.
+//! - [`perceptual_hash`] is a similarity fingerprint, computed alongside a thumbnail; WP9 decides
+//!   what to do with it.
+//! - [`PreviewsDb`] is the cache database thumbnails live in (D-075).
+//!
+//! Colour: an embedded preview is, in practice, always an sRGB JPEG already (what a camera's own
+//! processor writes for its own LCD and for other software to show unmodified) — this crate
+//! trusts that rather than building colour management for it. A wide-gamut embedded preview,
+//! and a RAW file's own sensor data converted through a working space, both need the image
+//! engine (M2); WP5 does not have one to convert through.
+
+mod error;
+mod format;
+mod metadata;
+mod phash;
+mod preview;
+mod previews;
+mod thumbnail;
+
+pub use error::{ImagingError, Result};
+pub use metadata::{Metadata, read_metadata};
+pub use phash::perceptual_hash;
+pub use preview::embedded_preview;
+pub use previews::PreviewsDb;
+pub use thumbnail::{Thumbnail, make_thumbnail};
+
+use std::path::Path;
+
+/// Everything a future import (WP7) wants from one file, in one call: metadata, a thumbnail
+/// (256 px on the long edge, D-075) and its perceptual hash. The returned [`Metadata`]'s pixel
+/// dimensions are the preview's (this crate makes no full RAW decode), filled in here rather
+/// than requiring a second read of the file.
+pub fn process(path: &Path) -> Result<(Metadata, Thumbnail, u64)> {
+    let mut metadata = read_metadata(path)?;
+    let preview = embedded_preview(path)?;
+    metadata.pixel_width.get_or_insert(preview.width());
+    metadata.pixel_height.get_or_insert(preview.height());
+    let hash = perceptual_hash(&preview);
+    let thumbnail = make_thumbnail(preview, metadata.orientation, 256, path)?;
+    Ok((metadata, thumbnail, hash))
+}

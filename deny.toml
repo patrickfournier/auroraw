@@ -28,6 +28,7 @@ allow = [
     "CC0-1.0",
     "0BSD",
     "BSL-1.0",
+    "LGPL-2.1",
     "LGPL-2.1-or-later",
     "LGPL-3.0-or-later",
 ]

@@ -324,6 +324,52 @@ similarity (WP9). Applies the sidecar's stored preview dimensions and orientatio
 Done when: a 1,000-photo import produces thumbnails at spike 3's rate on each platform; the decoder
 passes the sample-file checks of the testing strategy §3; a corrupt file fails cleanly.
 
+**Status: done for the resize-and-encode rate the "done when" asks for; decode speed and colour
+management carry real, documented limits (below).** Built: `imaging`, dispatching by extension
+(`rawler` for the camera RAW formats and DNG, `image` for JPEG/PNG/TIFF) rather than through a
+`Decoder` interface in `plugin-api` yet — that promotion, like `Source`'s in WP4, is WP6's job
+once it needs one for real sandboxing, not before. `read_metadata` reads what a photo sidecar
+caches (design note 003 §4.3): camera, lens, exposure, capture time, GPS, via `rawler`'s own
+metadata for RAW and `kamadak-exif` for JPEG/TIFF (an addition to the stack the architecture
+hadn't named yet). `embedded_preview` decodes the image a thumbnail is made from: the file itself
+for a standard format, the largest preview `rawler` can find for a RAW one. `make_thumbnail`
+resizes (`fast_image_resize`) and encodes (`jpeg-encoder`) to 256 px on the long edge, applying
+the orientation the sidecar already has rather than re-reading the file. `perceptual_hash` is a
+64-bit dHash, built and tested but unused here: WP9 decides what "similar" means. `PreviewsDb` is
+the cache database (D-075: 32 KB pages, deletable, regenerated from the workspace and the
+sources); architecture.md's module table had assigned it to `workspace`, corrected here to
+`imaging` (the code that fills a cache should own it, not the crate that holds the truth).
+
+Three deviations, none silent: **"decode at reduced size" (DCT scaling)**, the optimisation spike
+3 flagged as the next step beyond its own measurement, is not built — none of the crates the
+architecture already named do it, and adding one (a libjpeg-turbo binding, typically) is its own
+decision, not a side effect of this work package. Thumbnails are instead a full decode followed by
+`fast_image_resize`, and the measurement below shows that is enough to meet spike 3's own number
+regardless. **Colour** trusts an embedded preview to already be sRGB (what a camera's own
+processor writes) rather than reading or converting a profile: correct for every sample tested,
+wrong only for the rare wide-gamut embedded preview, and full colour management needs the image
+engine (M2) this work package does not have. **Two of the eight real per-maker samples have no
+usable embedded preview through `rawler` 0.8**: Canon's "CRAW" compressed variant of CR3 stores
+its preview in a codec `rawler` does not decode (HEIF, by its own warning), and its ORF (Olympus)
+decoder implements no preview extraction at all. Both are real gaps in the decoder library, not
+bugs here: `embedded_preview` correctly returns `NoPreview` for them, metadata is unaffected
+(it never needed the preview codec), and `crates/imaging/tests/samples.rs` tests the two for that
+specific, clean failure instead of a thumbnail.
+
+The measurement, separated from decode on purpose (spike 3 measured resize and encode **from an
+already-extracted 1.6 MP preview**, and real embedded previews range from 1.7 MP to 45 MP by
+camera, nowhere near comparable on their own): normalising five real samples to spike 3's own
+1,600 px input size, then resizing and encoding each to a thumbnail 1,000 times, one thread,
+release build, developer machine: **267/s**, against spike 3's 10.4 ms/thumbnail (about 96/s)
+for the same two steps. Full RAW decode of a large embedded preview is a real, separate cost
+this work package does not optimise away (the first deviation above); a 1,000-photo *import*
+at spike 3's own rate, decode included, is WP7's "done when" to prove once the pipeline exists to
+run one. `tools/fetch-samples.sh` now checks each download against a recorded SHA-256 (testing strategy
+§5) and gained a Leica M9 DNG, the eighth sample, next to the seven the spikes already fetched
+(the RAW formats the plan text names had no DNG among them); CI fetches and caches all eight
+(`.github/workflows/ci.yml`) and requires them present via `AUR_REQUIRE_SAMPLES=1`, the same
+pattern `AUR_REQUIRE_EXIFTOOL` already used.
+
 ### WP6 Plugin API v0 and host (L). Needs WP4, WP5
 
 `plugin-api` (declaration schema, the `Source` and `Decoder` interfaces, permissions) and

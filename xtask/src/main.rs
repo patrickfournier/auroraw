@@ -28,7 +28,7 @@ const ALLOWED: &[(&str, &[&str])] = &[
         "auroraw-sources",
         &["auroraw-plugin-api", "auroraw-types", "auroraw-format"],
     ),
-    ("auroraw-imaging", &["auroraw-plugin-api", "auroraw-types"]),
+    ("auroraw-imaging", &["auroraw-types"]),
     (
         "auroraw-import",
         &["auroraw-imaging", "auroraw-sources", "auroraw-types"],
