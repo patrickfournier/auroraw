@@ -285,7 +285,8 @@ mod tests {
     impl Machine {
         fn new() -> Self {
             let dir = auroraw_testkit::temp_dir();
-            let home = dir.path().canonicalize().unwrap().join("patrick");
+            // Canonical, as `resolve` returns it (without Windows' `\\?\` prefix).
+            let home = strip_verbatim(dir.path().canonicalize().unwrap()).join("patrick");
             std::fs::create_dir_all(home.join("Images")).unwrap();
             Self { _dir: dir, home }
         }

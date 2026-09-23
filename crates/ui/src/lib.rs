@@ -7,6 +7,7 @@
 //! (cull mode, develop, publish, WP9 onward).
 
 mod app;
+mod app_settings;
 pub mod commands;
 mod grid;
 #[cfg(test)]

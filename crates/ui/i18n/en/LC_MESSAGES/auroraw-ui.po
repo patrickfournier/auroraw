@@ -193,3 +193,72 @@ msgstr "Choose the workspace folder"
 
 msgid "Choose the folder"
 msgstr "Choose the folder"
+
+msgid "Menu"
+msgstr "Menu"
+
+msgid "File"
+msgstr "File"
+
+msgid "Edit"
+msgstr "Edit"
+
+msgid "Help"
+msgstr "Help"
+
+msgid "Settings…"
+msgstr "Settings…"
+
+msgid "Import…"
+msgstr "Import…"
+
+msgid "Quit"
+msgstr "Quit"
+
+msgid "Undo"
+msgstr "Undo"
+
+msgid "Redo"
+msgstr "Redo"
+
+msgid "Cut"
+msgstr "Cut"
+
+msgid "Copy"
+msgstr "Copy"
+
+msgid "Paste"
+msgstr "Paste"
+
+msgid "Select all"
+msgstr "Select all"
+
+msgid "Delete"
+msgstr "Delete"
+
+msgid "About Auroraw"
+msgstr "About Auroraw"
+
+msgid "Settings"
+msgstr "Settings"
+
+msgid "Language"
+msgstr "Language"
+
+msgid "System"
+msgstr "System"
+
+msgid "Close"
+msgstr "Close"
+
+msgid "Auroraw {}"
+msgstr "Auroraw {}"
+
+msgid "A free application for photographers: organise photos, develop RAW files and deliver galleries."
+msgstr "A free application for photographers: organise photos, develop RAW files and deliver galleries."
+
+msgid "Free software, GNU General Public License 3.0 or later."
+msgstr "Free software, GNU General Public License 3.0 or later."
+
+msgid "Made with Slint."
+msgstr "Made with Slint."

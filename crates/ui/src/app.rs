@@ -10,8 +10,10 @@ use std::rc::{Rc, Weak};
 use std::time::Duration;
 
 use auroraw_engine::{Engine, KnownWorkspace, OpenedWorkspace, paths};
+use slint::platform::{Key, WindowEvent};
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, VecModel};
 
+use crate::app_settings::{AppSettings, resolve_language};
 use crate::generated::{KnownEntry, MainWindow, Texts};
 use crate::{Launch, Platform, start_directory, workspace_shell};
 
@@ -52,6 +54,10 @@ pub(crate) struct Launcher {
     screen: RefCell<Option<Shell>>,
     /// The workspace on screen, so that opening it again is not a second attempt to lock it.
     current: RefCell<Option<PathBuf>>,
+    settings: RefCell<AppSettings>,
+    /// The folder the New workspace dialog proposed for the name it shows, so that a folder chosen
+    /// by hand is told apart from one still following the name.
+    automatic_location: RefCell<String>,
     me: Weak<Launcher>,
 }
 
@@ -67,9 +73,13 @@ impl Launcher {
             platform,
             screen: RefCell::new(None),
             current: RefCell::new(None),
+            settings: RefCell::new(AppSettings::default()),
+            automatic_location: RefCell::new(String::new()),
             me: me.clone(),
         });
+        *launcher.settings.borrow_mut() = AppSettings::load(&launcher.settings_path());
         launcher.first_screen()?;
+        launcher.apply_language();
         Ok(launcher)
     }
 
@@ -233,6 +243,24 @@ impl Launcher {
     /// What every window does the same way: the dialogs for a new or another workspace, the folder
     /// dialogs behind every Browse button, and the message banner.
     pub(crate) fn wire(self: &Rc<Self>, ui: &MainWindow) {
+        ui.set_modifier_name(
+            if cfg!(target_os = "macos") {
+                "⌘"
+            } else {
+                "Ctrl"
+            }
+            .into(),
+        );
+        ui.set_redo_shortcut(
+            if cfg!(target_os = "windows") {
+                "Ctrl+Y"
+            } else if cfg!(target_os = "macos") {
+                "⌘+Shift+Z"
+            } else {
+                "Ctrl+Shift+Z"
+            }
+            .into(),
+        );
         ui.on_dismiss_notice({
             let weak = ui.as_weak();
             move || {
@@ -250,34 +278,46 @@ impl Launcher {
             }
         });
 
-        // The folder proposed for a new workspace follows its name until a person edits the folder.
-        let automatic = Rc::new(RefCell::new(String::new()));
         {
-            let (launcher, weak, automatic) = (self.me.clone(), ui.as_weak(), automatic.clone());
+            let (launcher, weak) = (self.me.clone(), ui.as_weak());
             ui.on_new_workspace(move || {
                 let (Some(launcher), Some(ui)) = (launcher.upgrade(), weak.upgrade()) else {
                     return;
                 };
-                let name = ui.global::<Texts>().invoke_default_workspace_name();
-                let location = launcher.default_location(&name);
-                *automatic.borrow_mut() = location.clone();
-                ui.set_new_name(name);
-                ui.set_new_location(location.into());
-                ui.set_dialog_error(SharedString::new());
-                ui.set_dialog("new-workspace".into());
+                launcher.new_workspace_dialog(&ui);
             });
         }
         {
-            let (launcher, weak, automatic) = (self.me.clone(), ui.as_weak(), automatic.clone());
+            let (launcher, weak) = (self.me.clone(), ui.as_weak());
             ui.on_new_name_edited(move |name| {
                 let (Some(launcher), Some(ui)) = (launcher.upgrade(), weak.upgrade()) else {
                     return;
                 };
-                if ui.get_new_location() == automatic.borrow().as_str() && !name.trim().is_empty() {
+                let follows_the_name =
+                    ui.get_new_location() == launcher.automatic_location.borrow().as_str();
+                if follows_the_name && !name.trim().is_empty() {
                     let location = launcher.default_location(&name);
-                    *automatic.borrow_mut() = location.clone();
+                    *launcher.automatic_location.borrow_mut() = location.clone();
                     ui.set_new_location(location.into());
                 }
+            });
+        }
+        {
+            let (launcher, weak) = (self.me.clone(), ui.as_weak());
+            ui.on_command(move |id| {
+                let (Some(launcher), Some(ui)) = (launcher.upgrade(), weak.upgrade()) else {
+                    return;
+                };
+                launcher.run_command(&ui, id.as_str());
+            });
+        }
+        {
+            let (launcher, weak) = (self.me.clone(), ui.as_weak());
+            ui.on_language_chosen(move |code| {
+                let (Some(launcher), Some(ui)) = (launcher.upgrade(), weak.upgrade()) else {
+                    return;
+                };
+                launcher.choose_language(&ui, code.as_str());
             });
         }
         {
@@ -307,6 +347,71 @@ impl Launcher {
                 launcher.pick(which.as_str(), &ui);
             });
         }
+    }
+
+    fn settings_path(&self) -> PathBuf {
+        self.launch.dirs.data.join("app-settings.json")
+    }
+
+    /// Selects the language of the settings (the bundled translations exist once a window has).
+    fn apply_language(&self) {
+        let language = self.settings.borrow().language.clone();
+        if language != "system" {
+            let _ = slint::select_bundled_translation(resolve_language(&language));
+        }
+    }
+
+    fn choose_language(&self, ui: &MainWindow, code: &str) {
+        self.settings.borrow_mut().language = code.to_string();
+        self.settings.borrow().save(&self.settings_path());
+        let _ = slint::select_bundled_translation(resolve_language(code));
+        ui.set_language(code.into());
+    }
+
+    fn new_workspace_dialog(&self, ui: &MainWindow) {
+        let name = ui.global::<Texts>().invoke_default_workspace_name();
+        let location = self.default_location(&name);
+        *self.automatic_location.borrow_mut() = location.clone();
+        ui.set_new_name(name);
+        ui.set_new_location(location.into());
+        ui.set_dialog_error(SharedString::new());
+        ui.set_dialog("new-workspace".into());
+    }
+
+    /// Carries out a command of the menus or their shortcuts (`commands.rs`); false for an id it
+    /// does not know.
+    pub(crate) fn run_command(self: &Rc<Self>, ui: &MainWindow, id: &str) -> bool {
+        match id {
+            "file.new-workspace" => self.new_workspace_dialog(ui),
+            "file.open-workspace" => self.pick("workspace", ui),
+            "file.settings" => {
+                ui.set_language(self.settings.borrow().language.as_str().into());
+                ui.set_dialog("settings".into());
+            }
+            "file.import" => {
+                if ui.get_screen() == "workspace" {
+                    ui.set_current_task("import".into());
+                }
+            }
+            "file.quit" => {
+                let _ = slint::quit_event_loop();
+            }
+            "help.about" => {
+                ui.set_about_version(Engine::version().into());
+                ui.set_dialog("about".into());
+            }
+            "edit.undo" => shortcut(ui, "z", false),
+            // The platform's own redo, as Slint recognises it: Ctrl+Y on Windows, Ctrl+Shift+Z elsewhere.
+            "edit.redo" if cfg!(target_os = "windows") => shortcut(ui, "y", false),
+            "edit.redo" => shortcut(ui, "z", true),
+            "edit.cut" => shortcut(ui, "x", false),
+            "edit.copy" => shortcut(ui, "c", false),
+            "edit.paste" => shortcut(ui, "v", false),
+            "edit.select-all" => shortcut(ui, "a", false),
+            "edit.delete" => press(ui, &Key::Delete.into()),
+            _ => return false,
+        }
+        true
     }
 
     /// `<Pictures>/Auroraw/<name>`, numbered when it already exists (design note 001 §5.7).
@@ -404,4 +509,33 @@ fn known_entry(known: &KnownWorkspace) -> KnownEntry {
             .into(),
         found: known.found,
     }
+}
+
+/// A key pressed and released, delivered to whatever has the keyboard in the window.
+fn press(ui: &MainWindow, key: &SharedString) {
+    let window = ui.window();
+    window.dispatch_event(WindowEvent::KeyPressed { text: key.clone() });
+    window.dispatch_event(WindowEvent::KeyReleased { text: key.clone() });
+}
+
+/// The shortcut modifier plus `letter`: the text field that has the keyboard does what it would
+/// for a person pressing it, which is how the Edit menu reaches the field it is for. Slint reports
+/// the Command key of a Mac as `control`, so it is the same key on every platform.
+fn shortcut(ui: &MainWindow, letter: &str, shift: bool) {
+    let modifier: SharedString = Key::Control.into();
+    let shift_key: SharedString = Key::Shift.into();
+    let window = ui.window();
+    window.dispatch_event(WindowEvent::KeyPressed {
+        text: modifier.clone(),
+    });
+    if shift {
+        window.dispatch_event(WindowEvent::KeyPressed {
+            text: shift_key.clone(),
+        });
+    }
+    press(ui, &letter.into());
+    if shift {
+        window.dispatch_event(WindowEvent::KeyReleased { text: shift_key });
+    }
+    window.dispatch_event(WindowEvent::KeyReleased { text: modifier });
 }

@@ -16,6 +16,9 @@ export struct VolumeEntry { label: string, path: string }
 // Every sentence the Rust side builds at run time goes through here, so it is translated like the
 // rest (`@tr()` only works in a .slint file).
 export global Texts {
+    public pure function default-name() -> string {
+        return @tr("Auroraw");
+    }
     public pure function photos(n: int) -> string {
         return @tr("{n} photo" | "{n} photos" % n);
     }
@@ -76,6 +79,15 @@ export global Texts {
     }
 }
 
+// What the Edit menu needs to know: whether a text field has the keyboard, so Cut, Copy, Paste and
+// the others have something to act on.
+export global Editing {
+    in-out property <bool> text-focused: false;
+}
+
+// One item of the hamburger menu (its id is a command of `commands.rs`).
+export struct MenuEntry { id: string, label: string, shortcut: string, enabled: bool }
+
 // One line of the welcome list: a workspace this machine knows.
 export struct KnownEntry { name: string, path: string, opened: string, found: bool }
 
@@ -124,6 +136,7 @@ export component Field inherits HorizontalLayout {
         placeholder-text: root.placeholder;
         accessible-label: root.label;
         edited(text) => { root.edited(text); }
+        changed has-focus => { Editing.text-focused = self.has-focus; }
     }
     // Every field ends at the same place, with or without a button.
     if !root.browsable : Rectangle { width: 100px; }

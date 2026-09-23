@@ -22,6 +22,7 @@ image = { version = "0.25", default-features = false, features = ["jpeg"] }
 # Native folder picker: the Windows and macOS system dialogs, the desktop portal on Linux.
 rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 slint = "1.18"
+sys-locale = "0.3"
 
 [build-dependencies]
 slint-build = "1.18"

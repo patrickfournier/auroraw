@@ -20,10 +20,11 @@ use i_slint_backend_testing::{
     init_no_event_loop, mock_elapsed_time,
 };
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
-use slint::platform::{PointerEventButton, WindowEvent};
+use slint::platform::{Key, PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, Model};
 
 use crate::app::Launcher;
+use crate::commands::COMMANDS;
 use crate::generated::{MainWindow, Texts};
 use crate::{FolderPicker, Launch, Platform, start_directory};
 
@@ -480,6 +481,13 @@ fn the_views_render_and_can_be_written_out_as_pictures() {
     snapshot(&welcome, "welcome-empty");
     click(&welcome, "Nouveau workspace…");
     snapshot(&welcome, "new-workspace-dialog");
+    click(&welcome, "Annuler");
+    menu_open(&welcome);
+    click_on_top(&welcome, "Édition");
+    snapshot(&welcome, "menu-edit");
+    welcome.ui().set_menu_open(false);
+    welcome.launcher.run_command(&welcome.ui(), "help.about");
+    snapshot(&welcome, "about");
     drop(welcome);
     let shell = open_in(&f, "fr");
     snapshot(&shell, "import-empty");
@@ -632,7 +640,25 @@ fn the_dialog_opens_at_the_closest_folder_that_exists() {
 
 /// The welcome list's rows are buttons named "<name>, <folder>".
 fn click_known(app: &App, name: &str, folder: &Path) {
-    click(app, &format!("{name}, {}", folder.display()));
+    click(app, &format!("{name}, {}", canonical(folder).display()));
+}
+
+/// Renames a folder once the engine that had it open has let go of it (Windows refuses to move a
+/// folder holding an open file, and a closed workspace is let go of a moment after it is dropped).
+fn rename_when_free(from: &Path, to: &Path) {
+    for _ in 0..50 {
+        if std::fs::rename(from, to).is_ok() {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    std::fs::rename(from, to).unwrap();
+}
+
+/// A folder as the application stores and shows it: canonical (on a Mac the temporary folder of a
+/// test is behind a symlink, on Windows it has a verbatim prefix).
+fn canonical(folder: &Path) -> PathBuf {
+    auroraw_engine::paths::resolve(&folder.to_string_lossy()).unwrap()
 }
 
 #[test]
@@ -782,7 +808,7 @@ fn a_last_workspace_that_cannot_be_found_leads_back_to_the_welcome_list() {
     init();
     let f = fixture(0);
     drop(open(&f));
-    std::fs::rename(&f.workspace, f.workspace.with_file_name("Moved")).unwrap();
+    rename_when_free(&f.workspace, &f.workspace.with_file_name("Moved"));
 
     let app = launch(&f);
     let ui = app.ui();
@@ -815,7 +841,7 @@ fn machine_with_a_lost_last_workspace(f: &Fixture) -> PathBuf {
             .engine,
     );
     let hidden = f.workspace.with_file_name("Hidden");
-    std::fs::rename(&second, &hidden).unwrap();
+    rename_when_free(&second, &hidden);
     hidden
 }
 
@@ -875,5 +901,238 @@ fn a_workspace_opens_from_a_folder_chosen_in_the_dialog_and_a_plain_folder_is_re
             .iter()
             .any(|w| w.name == "Second" && w.path == hidden && w.found),
         "the registry follows the workspace to where it now is"
+    );
+}
+
+/// Clicks the *last* element with this label and role: what is drawn on top (a menu over the
+/// window), since it comes last in the tree.
+fn click_on_top(app: &App, label: &str) {
+    let ui = app.ui();
+    let button = ElementQuery::from_root(&ui)
+        .match_descendants()
+        .match_accessible_role(AccessibleRole::Button)
+        .match_predicate({
+            let label = label.to_string();
+            move |element| element.accessible_label().is_some_and(|l| l == label)
+        })
+        .find_all()
+        .into_iter()
+        .next_back()
+        .unwrap_or_else(|| panic!("no button labelled {label:?}"));
+    button.mock_single_click(PointerEventButton::Left);
+}
+
+/// Whether the menu row with this label is enabled.
+fn menu_row_enabled(app: &App, label: &str) -> bool {
+    let ui = app.ui();
+    ElementQuery::from_root(&ui)
+        .match_descendants()
+        .match_accessible_role(AccessibleRole::Button)
+        .match_predicate({
+            let label = label.to_string();
+            move |element| element.accessible_label().is_some_and(|l| l == label)
+        })
+        .find_all()
+        .into_iter()
+        .next_back()
+        .and_then(|element| element.accessible_enabled())
+        .unwrap_or_else(|| panic!("no menu row labelled {label:?}"))
+}
+
+/// The platform's shortcut modifier held while `key` is pressed, as a person would.
+fn combo(app: &App, key: &str) {
+    let ui = app.ui();
+    let window = ui.window();
+    let modifier: slint::SharedString = Key::Control.into();
+    window.dispatch_event(WindowEvent::KeyPressed {
+        text: modifier.clone(),
+    });
+    window.dispatch_event(WindowEvent::KeyPressed { text: key.into() });
+    window.dispatch_event(WindowEvent::KeyReleased { text: key.into() });
+    window.dispatch_event(WindowEvent::KeyReleased { text: modifier });
+}
+
+fn type_keys(app: &App, text: &str) {
+    let ui = app.ui();
+    for c in text.chars() {
+        ui.window().dispatch_event(WindowEvent::KeyPressed {
+            text: c.to_string().into(),
+        });
+        ui.window().dispatch_event(WindowEvent::KeyReleased {
+            text: c.to_string().into(),
+        });
+    }
+}
+
+/// Puts the keyboard in the text field labelled `label`, with a real click on it.
+fn focus_field(app: &App, label: &str) {
+    let ui = app.ui();
+    let field = ElementHandle::find_by_accessible_label(&ui, label)
+        .find(|element| element.accessible_value().is_some())
+        .unwrap_or_else(|| panic!("no text field labelled {label:?}"));
+    field.mock_single_click(PointerEventButton::Left);
+}
+
+fn escape() -> slint::SharedString {
+    Key::Escape.into()
+}
+
+fn menu_open(app: &App) {
+    click(app, "Menu");
+    assert!(app.ui().get_menu_open());
+}
+
+#[test]
+fn the_hamburger_menu_opens_lists_its_sections_and_runs_a_command() {
+    init();
+    let f = fixture(0);
+    let app = launch(&f);
+    assert!(!app.ui().get_menu_open());
+    menu_open(&app);
+
+    // File is shown first; a click on a row closes the menu and runs the command.
+    assert!(menu_row_enabled(&app, "Settings…"));
+    assert!(!menu_row_enabled(&app, "Import…"), "no workspace is open");
+    click_on_top(&app, "New workspace…");
+    assert!(!app.ui().get_menu_open());
+    assert_eq!(app.ui().get_dialog(), "new-workspace");
+
+    // Edit and Help are other sections of the same menu.
+    click(&app, "Cancel");
+    menu_open(&app);
+    click_on_top(&app, "Edit");
+    assert!(
+        !menu_row_enabled(&app, "Select all"),
+        "no text field has the keyboard"
+    );
+    click_on_top(&app, "Help");
+    assert!(menu_row_enabled(&app, "About Auroraw"));
+}
+
+#[test]
+fn importing_is_available_in_the_menu_once_a_workspace_is_open() {
+    init();
+    let f = fixture(0);
+    let app = open(&f);
+    app.ui().set_current_task("cull".into());
+    menu_open(&app);
+    assert!(menu_row_enabled(&app, "Import…"));
+    click_on_top(&app, "Import…");
+    assert_eq!(app.ui().get_current_task(), "import");
+}
+
+#[test]
+fn every_command_of_the_menu_is_carried_out_by_the_interface() {
+    init();
+    let f = fixture(0);
+    let picker: FolderPicker = Rc::new(|_, _, _| false);
+    let app = launch_in(&f, "en", platform(picker));
+    for command in COMMANDS.iter().filter(|c| c.menu) {
+        assert!(
+            app.launcher.run_command(&app.ui(), command.id),
+            "{} is in the menu but the interface does not know it",
+            command.id
+        );
+        app.ui().set_dialog(slint::SharedString::new());
+    }
+    assert!(!app.launcher.run_command(&app.ui(), "nonsense.command"));
+}
+
+#[test]
+fn the_shortcuts_reach_the_same_commands_as_the_menu() {
+    init();
+    let f = fixture(0);
+    let app = launch(&f);
+    combo(&app, "n");
+    assert_eq!(app.ui().get_dialog(), "new-workspace");
+    click(&app, "Cancel");
+
+    app.ui().window().dispatch_event(WindowEvent::KeyPressed {
+        text: Key::F1.into(),
+    });
+    assert_eq!(app.ui().get_dialog(), "about");
+    assert_eq!(app.ui().get_about_version(), Engine::version());
+    click(&app, "Close");
+    assert_eq!(app.ui().get_dialog(), "");
+
+    combo(&app, ",");
+    assert_eq!(app.ui().get_dialog(), "settings");
+}
+
+#[test]
+fn escape_closes_the_menu_and_the_dialogs() {
+    init();
+    let f = fixture(0);
+    let app = launch(&f);
+    menu_open(&app);
+    press(&app, escape().as_str());
+    assert!(!app.ui().get_menu_open());
+
+    combo(&app, "n");
+    assert_eq!(app.ui().get_dialog(), "new-workspace");
+    focus_field(&app, "Name");
+    press(&app, escape().as_str());
+    assert_eq!(
+        app.ui().get_dialog(),
+        "",
+        "Escape reaches the dialog from its own field"
+    );
+}
+
+#[test]
+fn the_edit_menu_acts_on_the_text_field_that_has_the_keyboard() {
+    init();
+    let f = fixture(0);
+    let app = open(&f);
+    // The import fields are on screen while the menu is used (a dialog would sit over the menu).
+    assert_eq!(app.ui().get_current_task(), "import");
+    type_into(&app, "Creator", "Patrick");
+    focus_field(&app, "Creator");
+    let creator = |app: &App| app.ui().get_import_creator().to_string();
+
+    // A field has the keyboard: Edit's items are usable, and act on it.
+    menu_open(&app);
+    click_on_top(&app, "Edit");
+    assert!(menu_row_enabled(&app, "Select all"));
+    click_on_top(&app, "Select all");
+    menu_open(&app);
+    click_on_top(&app, "Edit");
+    click_on_top(&app, "Delete");
+    assert_eq!(creator(&app), "", "the selected text was deleted");
+
+    type_keys(&app, "Zed");
+    assert_eq!(creator(&app), "Zed");
+    app.launcher.run_command(&app.ui(), "edit.select-all");
+    app.launcher.run_command(&app.ui(), "edit.cut");
+    assert_eq!(creator(&app), "");
+    app.launcher.run_command(&app.ui(), "edit.paste");
+    assert_eq!(creator(&app), "Zed", "what was cut is pasted back");
+    app.launcher.run_command(&app.ui(), "edit.undo");
+    assert_ne!(creator(&app), "Zed", "the paste is undone");
+    app.launcher.run_command(&app.ui(), "edit.redo");
+    assert_eq!(creator(&app), "Zed", "and redone");
+}
+
+#[test]
+fn the_language_is_chosen_in_settings_and_remembered() {
+    init();
+    let f = fixture(0);
+    let app = launch(&f);
+    combo(&app, ",");
+    click(&app, "Français");
+    assert_eq!(app.ui().get_language(), "fr");
+    assert_eq!(
+        app.ui().global::<Texts>().invoke_default_workspace_name(),
+        "Principal"
+    );
+    assert_eq!(
+        crate::app_settings::AppSettings::load(&f.dirs.data.join("app-settings.json")).language,
+        "fr"
+    );
+
+    click(&app, "English");
+    assert_eq!(
+        app.ui().global::<Texts>().invoke_default_workspace_name(),
+        "Main"
     );
 }

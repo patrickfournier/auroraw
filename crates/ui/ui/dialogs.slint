@@ -77,3 +77,45 @@ export component NewWorkspaceDialog inherits Modal {
         Button { text: @tr("Create"); primary: true; clicked => { root.create(); } }
     }
 }
+
+export component SettingsDialog inherits Modal {
+    // "system", "en" or "fr".
+    in property <string> language;
+    callback language-chosen(string);
+    title: @tr("Settings");
+    Text {
+        text: @tr("Language");
+        color: #cccccc;
+        font-weight: 700;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        Button { text: @tr("System"); primary: root.language == "system"; clicked => { root.language-chosen("system"); } }
+        Button { text: "English"; primary: root.language == "en"; clicked => { root.language-chosen("en"); } }
+        Button { text: "Français"; primary: root.language == "fr"; clicked => { root.language-chosen("fr"); } }
+    }
+    HorizontalLayout {
+        alignment: end;
+        Button { text: @tr("Close"); clicked => { root.close(); } }
+    }
+}
+
+export component AboutDialog inherits Modal {
+    in property <string> version;
+    title: @tr("About Auroraw");
+    card-width: 480px;
+    Text { text: @tr("Auroraw {}", root.version); color: white; font-size: 18px; }
+    Text {
+        text: @tr("A free application for photographers: organise photos, develop RAW files and deliver galleries.");
+        color: #cccccc;
+        wrap: word-wrap;
+    }
+    Text { text: @tr("Free software, GNU General Public License 3.0 or later."); color: #aaaaaa; wrap: word-wrap; }
+    Text { text: @tr("Made with Slint."); color: #aaaaaa; }
+    Text { text: "https://auroraw.org"; color: #7fb0e0; }
+    HorizontalLayout {
+        alignment: end;
+        Button { text: @tr("Close"); primary: true; clicked => { root.close(); } }
+    }
+}

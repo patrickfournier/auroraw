@@ -1,0 +1,131 @@
+import { Editing, MenuEntry } from "common.slint";
+
+// One line of a menu: a label, its shortcut, and a click.
+component MenuRow inherits Rectangle {
+    in property <MenuEntry> entry;
+    callback activated(string);
+    height: 30px;
+    background: touch.has-hover && root.entry.enabled ? #3a5f8a : transparent;
+    accessible-role: button;
+    accessible-label: root.entry.label;
+    accessible-enabled: root.entry.enabled;
+    accessible-action-default => {
+        if (root.entry.enabled) { root.activated(root.entry.id); }
+    }
+    touch := TouchArea {
+        enabled: root.entry.enabled;
+        clicked => { root.activated(root.entry.id); }
+    }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 24px;
+        Text {
+            text: root.entry.label;
+            color: root.entry.enabled ? white : #777777;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        Text {
+            text: root.entry.shortcut;
+            color: #999999;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// A section title of the hamburger menu; pointing at it, or clicking it, shows its items.
+component MenuHeader inherits Rectangle {
+    in property <string> label;
+    in property <bool> selected;
+    callback chosen();
+    height: 34px;
+    background: root.selected ? #3a3a3a : transparent;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.chosen(); }
+    touch := TouchArea {
+        clicked => { root.chosen(); }
+        changed has-hover => {
+            if (self.has-hover) { root.chosen(); }
+        }
+    }
+    Text {
+        x: 12px;
+        text: root.label;
+        color: white;
+        font-weight: 700;
+        vertical-alignment: center;
+    }
+}
+
+// The hamburger menu (spec §3: every action is a command reachable by keyboard and menu): File,
+// Edit and Help, each a list of commands. It is drawn over the window and dismissed by a click
+// outside it. Nothing in it takes the keyboard focus, so a text field keeps it and Cut, Copy,
+// Paste and the others still know which field they are for.
+export component MenuOverlay inherits Rectangle {
+    in property <bool> has-workspace;
+    // How this platform writes its shortcut key, and its redo shortcut ("Ctrl" and "Ctrl+Y" on
+    // Windows, "Ctrl+Shift+Z" elsewhere, "⌘" on macOS): set from Rust.
+    in property <string> modifier: "Ctrl";
+    in property <string> redo-shortcut: "Ctrl+Y";
+    in-out property <string> section: "file";
+    callback command(string);
+    callback close();
+    background: transparent;
+
+    property <[MenuEntry]> file-items: [
+        { id: "file.new-workspace", label: @tr("New workspace…"), shortcut: root.modifier + "+N", enabled: true },
+        { id: "file.open-workspace", label: @tr("Open workspace…"), shortcut: root.modifier + "+O", enabled: true },
+        { id: "file.settings", label: @tr("Settings…"), shortcut: root.modifier + "+,", enabled: true },
+        { id: "file.import", label: @tr("Import…"), shortcut: root.modifier + "+I", enabled: root.has-workspace },
+        { id: "file.quit", label: @tr("Quit"), shortcut: root.modifier + "+Q", enabled: true },
+    ];
+    property <[MenuEntry]> edit-items: [
+        { id: "edit.undo", label: @tr("Undo"), shortcut: root.modifier + "+Z", enabled: Editing.text-focused },
+        { id: "edit.redo", label: @tr("Redo"), shortcut: root.redo-shortcut, enabled: Editing.text-focused },
+        { id: "edit.cut", label: @tr("Cut"), shortcut: root.modifier + "+X", enabled: Editing.text-focused },
+        { id: "edit.copy", label: @tr("Copy"), shortcut: root.modifier + "+C", enabled: Editing.text-focused },
+        { id: "edit.paste", label: @tr("Paste"), shortcut: root.modifier + "+V", enabled: Editing.text-focused },
+        { id: "edit.select-all", label: @tr("Select all"), shortcut: root.modifier + "+A", enabled: Editing.text-focused },
+        { id: "edit.delete", label: @tr("Delete"), shortcut: "Del", enabled: Editing.text-focused },
+    ];
+    property <[MenuEntry]> help-items: [
+        { id: "help.about", label: @tr("About Auroraw"), shortcut: "F1", enabled: true },
+    ];
+    property <[MenuEntry]> items: root.section == "file" ? root.file-items
+        : root.section == "edit" ? root.edit-items : root.help-items;
+
+    TouchArea { clicked => { root.close(); } }
+    Rectangle {
+        x: 8px;
+        y: 40px;
+        width: 500px;
+        height: max(list.preferred-height, headers.preferred-height) + 8px;
+        background: #2b2b2b;
+        border-color: #4a4a4a;
+        border-width: 1px;
+        border-radius: 4px;
+        TouchArea { }
+        HorizontalLayout {
+            padding: 4px;
+            headers := VerticalLayout {
+                width: 130px;
+                alignment: start;
+                MenuHeader { label: @tr("File"); selected: root.section == "file"; chosen => { root.section = "file"; } }
+                MenuHeader { label: @tr("Edit"); selected: root.section == "edit"; chosen => { root.section = "edit"; } }
+                MenuHeader { label: @tr("Help"); selected: root.section == "help"; chosen => { root.section = "help"; } }
+            }
+            list := VerticalLayout {
+                alignment: start;
+                for entry in root.items : MenuRow {
+                    entry: entry;
+                    activated(id) => {
+                        root.close();
+                        root.command(id);
+                    }
+                }
+            }
+        }
+    }
+}
