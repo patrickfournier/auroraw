@@ -323,7 +323,11 @@ fn an_import_that_cannot_start_says_why_and_starts_nothing() {
         shell.ui().get_import_status()
     );
 
-    type_into(&shell, "Import from (card or folder)", "/nowhere/at/all");
+    type_into(
+        &shell,
+        "Import from (card or folder)",
+        &f.card.join("nowhere-at-all").to_string_lossy(),
+    );
     type_into(&shell, "Destination folder", &f.archive.to_string_lossy());
     click(&shell, "Import");
     assert!(!shell.ui().get_importing());
