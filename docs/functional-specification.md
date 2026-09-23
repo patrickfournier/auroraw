@@ -16,10 +16,28 @@ galleries, all in a simple, fast and professional workflow.
 **What should set it apart** [decided]:
 
 - **Against darktable**: simplicity and an intuitive workflow.
-- **Against Lightroom**: at least parity in speed, simplicity and capabilities. (An ambitious
-  goal, knowingly. The comparison will be refined once Patrick has tried Lightroom.)
+- **Against Lightroom** [D-089]: as simple to use for everyday work and at least on par in speed
+  and capabilities, while allowing **advanced development pipelines** and **never needing a round
+  trip between the cloud and the local machine** to carry out an operation. (An ambitious goal,
+  knowingly. The comparison will be refined once Patrick has tried Lightroom.)
 - **By design**: openness (documented data formats, plugins, no lock-in), development versions
   as a first-class concept, and delivery to clients built into the workflow.
+
+**Simple by default, deep on demand** [decided, D-089]. Everyday work needs no configuration:
+guided panels by task and a default pipeline that works out of the box (§5.4, §5.6). Depth is
+the same model, not a second application: a photographer who wants more builds on versions and
+snapshots, styles, local adjustments, plugin operations and a documented, shareable pipeline
+definition (§5.6, §5.10), reused as named building blocks. There is no expert mode that changes
+how the everyday interface behaves, and what needs explaining appears only once it is used.
+
+**One place, no round trip** [decided, D-089]. Everything Auroraw does to a photo (import,
+culling, development including its AI features, export) runs on the photographer's machine, on
+files it can read. No operation requires sending an original to a service to be processed or
+bringing a result back, and no photo has a "cloud" state and a "local" state that the
+photographer must reconcile by hand. Online storage can still be a source (§5.1, §5.10) and
+delivery to a gallery service is still an explicit action (principle 5), but neither is a step
+that development depends on. How originals on online storage reach the machine is still open
+(§10, question 41).
 
 ### Audience and scope [decided]
 
@@ -70,6 +88,10 @@ galleries, all in a simple, fast and professional workflow.
    require a particular service or piece of software; integrations go through open formats and
    plugins.
 7. **Measured performance budgets** [proposed]. See §9.
+8. **Simple by default, deep on demand** [decided, D-089]. The everyday path never depends on
+   the advanced one, and the advanced one is the same model, reached on demand (Vision).
+9. **Local, no round trip** [decided, D-089]. No operation of the core needs a cloud service or
+   a manual move of files between a cloud and the local machine (Vision; D-061 for AI).
 
 ## 4. Reference workflow [proposed]
 
@@ -984,6 +1006,16 @@ Sorted by when they need an answer. No question is left to decide before the tec
     to keep results stable across CPU and GPU (see 22).
 39. ~~Export before M4~~: resolved by D-062.
 40. ~~Rating level while culling~~: resolved by D-063.
+41. **Originals on online storage without a round trip** (follows D-089): for an original on an
+    online source (S3, WebDAV, Google Drive, Dropbox; §5.1, §5.10), how development and export
+    obtain its bytes with no manual download step: fetched once on demand into a cache with a
+    rule the photographer sets, what is shown while it is fetched, and how this sits with D-021
+    (developing while offline stays unsupported, so an unreachable original is "unavailable").
+42. **Advanced pipelines beyond the pipeline definition** (follows D-089): what an advanced
+    photographer can build on §5.6's configurable definition (several definitions chosen per
+    camera or per style, named chains reused across versions, a headless batch run from the
+    command line), and what stays out of v1. To settle together with question 17 when M2 is
+    planned.
 
 ## 11. Next steps
 
