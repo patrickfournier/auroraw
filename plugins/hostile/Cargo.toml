@@ -1,0 +1,10 @@
+[package]
+name = "hostile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "A plugin that misbehaves on purpose, for the permanent sandbox tests (WP6)"
+
+[lib]
+crate-type = ["cdylib"]

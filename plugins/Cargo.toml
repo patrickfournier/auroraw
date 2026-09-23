@@ -1,0 +1,21 @@
+# The plugins built into Auroraw itself, compiled to WebAssembly and loaded through
+# `auroraw-plugin-host` (architecture §8, work package WP6). A separate workspace from the main
+# one: these target `wasm32-wasip1`, not the host, and gain nothing from sharing its dependency
+# resolution (`tools/build-plugins.sh`, run by CI before the main workspace's tests).
+#
+#   cargo build --release --target wasm32-wasip1 --manifest-path plugins/Cargo.toml
+[workspace]
+resolver = "3"
+members = ["rawler-decoder", "hostile"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

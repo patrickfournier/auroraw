@@ -12,4 +12,8 @@ description = "The plugin API: declaration schema and interfaces (MIT OR Apache-
 workspace = true
 
 [dependencies]
+serde.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

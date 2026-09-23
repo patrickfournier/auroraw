@@ -2,9 +2,10 @@
 //! Decoders, embedded previews, thumbnails, the previews database and the preview colour
 //! (architecture §3.1, §5.7, D-075). Work package WP5.
 //!
-//! Native code, not yet a sandboxed plugin: WP6 promotes a `Decoder` interface into
-//! `plugin-api`, the way it will promote `Source` (already there, WP4); until then this crate
-//! dispatches by extension itself ([`format::is_standard`]).
+//! Native code, dispatching by extension itself ([`format::is_standard`]), and stays that way:
+//! WP6 added `plugin_api::Decoder`, but for the sensor's own mosaic (architecture §8.1, "Import:
+//! pixels (linear)"), a full RAW decode this crate never needs for a cheap embedded-preview
+//! thumbnail. The two are separate on purpose, not a promotion of this crate's own code.
 //!
 //! - [`read_metadata`] reads what a photo sidecar caches (design note 003 §4.3): camera, lens,
 //!   exposure, capture time, GPS, as text in the shapes `auroraw_format::sidecar::Original`

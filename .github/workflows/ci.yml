@@ -27,8 +27,16 @@ jobs:
       - name: Install the pinned toolchain
         run: rustup show
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: |
+            .
+            plugins
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Format and lint the WebAssembly plugins (a separate workspace, WP6)
+        run: |
+          cargo fmt --manifest-path plugins/Cargo.toml --all --check
+          cargo clippy --manifest-path plugins/Cargo.toml --workspace --all-targets --locked -- -D warnings
       - name: Licence headers and dependency rules between crates
         run: cargo xtask check
 
@@ -47,6 +55,10 @@ jobs:
       - name: Install the pinned toolchain
         run: rustup show
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: |
+            .
+            plugins
       - uses: taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
         with:
           tool: nextest
@@ -66,11 +78,15 @@ jobs:
       - name: Fetch RAW samples
         shell: bash
         run: tools/fetch-samples.sh
+      - name: Build the WebAssembly plugins (WP6)
+        shell: bash
+        run: tools/build-plugins.sh
       - run: cargo build --workspace --locked
       - run: cargo nextest run --workspace --locked
         env:
           AUR_REQUIRE_EXIFTOOL: "1"
           AUR_REQUIRE_SAMPLES: "1"
+          AUR_REQUIRE_PLUGINS: "1"
       - run: cargo test --workspace --doc --locked
       - name: Launch test
         run: cargo run --locked --package auroraw-app -- --self-test

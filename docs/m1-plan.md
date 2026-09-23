@@ -384,6 +384,72 @@ Done when: importing 1,000 photos through the WebAssembly decoder is within the 
 native on one thread, and several files decode in parallel; all hostile cases leave the host alive on
 three platforms; the API is marked experimental.
 
+**Status: done.** Built: `plugin-api` gained `declaration` (`Declaration`, `Family`, `Placement`,
+D-078's schema; `Operation`-only fields such as a pipeline stage carried as `Option` so the shape
+does not change when WP builds an operation plugin, not exercised before then), `permissions`
+(`Permissions`: folders, network, secrets and the clock, all declared, none granted by default),
+and `decoder` (`Decoder`, `RawImage`, `DecoderError`: the sensor mosaic a RAW file decodes to,
+mirroring `Source`'s own shape from WP4, narrower than a demosaiced or colour-managed image —
+that is a future develop pipeline's job, not this one's). `plugin-host` productizes spike 4:
+`PluginHost` (an engine, a content-addressed compiled-module cache keyed by a `blake3` hash, a
+free-running 1 ms background timer driving every instance's epoch deadline), `Grants` (folders
+mounted read-only at `/granted/0`, `/granted/1`, ...; a memory ceiling), `Instance` (`alloc`,
+`write`, `read`, `call` with a per-call timeout), and `WasmDecoder` (`Decoder` implemented by a
+sandboxed plugin, a fresh instance per call so concurrent decodes never share mutable state).
+
+**The interface decision** (§6 item 1): a WIT world with a no-op export and a byte-copy export,
+`wit-bindgen` on the guest and `wasmtime::component` on the host, against the same shape of call
+spike 4 measured for its hand-made C interface. Component model: **446 ns/call (11x spike 4's 40
+ns) and 39 ms to copy a 64 MB buffer (3.3x spike 4's 12 ms for a 4 MP tile)**, plus `wit-bindgen`,
+`wasm-tools` (to turn the compiled core module into a component; no crate does this alone) and a
+WIT file the C interface needs none of. **The C interface stays** (architecture §8.2b, updated);
+`plugins/rawler-decoder` and `plugin-host::plugin` speak it exactly as spike 4's `rawimport` and
+`plugin-host` did, black and white level now encoded as `f32::to_bits` rather than truncated to an
+integer (spike 4's own shortcut; harmless there since only the samples were compared, not worth
+repeating here).
+
+**The first real plugin**: `plugins/rawler-decoder` and `plugins/hostile`, a separate Cargo
+workspace (`wasm32-wasip1`, not the host's own target; `tools/build-plugins.sh`, wired into CI
+before the test step, `AUR_REQUIRE_PLUGINS=1` matching `AUR_REQUIRE_SAMPLES`'s own pattern; the
+main lint job now also runs `cargo fmt`/`cargo clippy` against this second workspace, which spike
+4 itself never had checked). `crates/plugin-host/tests/decoder.rs` decodes all eight real samples
+both natively and through the plugin and asserts identical width, height, components per pixel
+and samples — including the two formats WP5 could not extract a *preview* from (Canon's CRAW and
+Olympus's ORF): the full mosaic decode is a different `rawler` code path from preview extraction
+and works for both. `crates/plugin-host/tests/hostile.rs` makes spike 4's cases permanent and
+extends the file-access ones to testing strategy's full list: `../`, an absolute host path, a
+Windows drive and a UNC form (harmless under WASI on every host, tested everywhere rather than
+only on Windows), and a symbolic link out of the granted folder (best effort: skipped, not failed,
+if this host cannot create one at all). Fuel-based stopping (spike 4's second, optional mechanism)
+is not built: architecture §8.2 only decides the epoch timer; adding a second, redundant stop
+mechanism without a consumer asking for one is not this work package's job.
+
+**The rate measurement** (`crates/plugin-host/tests/throughput.rs`, `--ignored`, release,
+`RAYON_NUM_THREADS=1`): native decoding must be pinned to one thread or the ratio is meaningless,
+since `rawler` uses `rayon` internally and this machine has 16 cores (spike 4's own "Running it"
+section says the same; missing it the first time here produced a false 21x "regression" that
+vanished once native was pinned). Matching spike 4's own definition exactly needs the decode call
+timed apart from instantiating and copying the file in and the mosaic back out (spike 4's own
+three-column table): **decode alone is 1.24x to 2.76x** across the eight real samples (spike 4:
+1.3x to 2.0x on six), the one outlier being this repository's fastest sample (a 38 ms Leica M9
+DNG), where a fixed per-call cost matters proportionally more than on spike 4's own six, slower
+samples. The full round trip an application actually pays (a fresh instance every file, spike 4's
+own recommended mitigation for the decoder's own overhead) is worse for that same reason, 1.37x to
+3.33x. Several files decode in parallel correctly (`several_files_decode_in_parallel`, one
+instance each, real threads, no shared mutable state): eight real samples, sequentially themselves
+2 to 40 seconds' worth of native decoding, complete together in about 4 seconds.
+
+Not built, and not needed for this work package's own "done when": a **persistent, cross-process**
+compiled-module cache (`Module::serialize`/`deserialize` to disk, spike 4's own 0.08 ms figure) has
+no home without an actual plugin installation flow (architecture §8.7, explicitly open), and
+`deserialize` is `unsafe`, which the main workspace denies outright; `PluginHost`'s in-memory cache
+(compile once, instantiate many times within one process) is what spike 4's own "instances scale"
+finding is really about and is what this work package's numbers measure. Wrapping the core's own
+`FilesystemSource` as an actual sandboxed plugin (`plugin-api`'s own doc comment once said WP6
+"wraps" it) is deferred: nothing in this work package's "done when" asks for it, and native still
+correctly satisfies §8.6 until a work package that needs the sandboxing actually arrives. `Operation`
+and GPU plugins (§8.4) stay entirely unbuilt, as M1's own roadmap (D-084) already says.
+
 ### WP7 Import (XL). Needs WP4, WP5; uses WP6
 
 Import profiles (D-029: destination and renaming templates, backup copies, metadata template,

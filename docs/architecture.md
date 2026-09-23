@@ -412,12 +412,18 @@ wasmtime runs each plugin in its own instance, with **no access to anything unle
   copy is loaded in 0.08 to 5 ms. Instances are created per worker (0.07 ms).
 - A plugin that fails repeatedly is disabled and reported, with its own log.
 
-### 8.2b The interface between host and plugin [open]
+### 8.2b The interface between host and plugin [decided in WP6]
 
 The spike used a **hand-made C interface**: the host reserves memory in the plugin, writes
 pixels, calls, reads back. It costs 40 ns per call and 12 ms to copy a 4 MP tile of f32 in and
-out. The WebAssembly **component model** would give typed interfaces; its cost was not measured.
-Whichever is chosen, it lives behind `plugin-api` and the API stays experimental until M5.
+out. WP6 measured the WebAssembly **component model** against the same shape of call (a WIT world
+with a no-op export and a byte-copy export, `wit-bindgen` on the guest, `wasmtime::component` on
+the host): **446 ns per call (11x) and 39 ms to copy a 64 MB buffer (3.3x)**, plus a second guest
+target, an external `wasm-tools` conversion step, and a WIT file the C interface needs none of.
+**The C interface stays** (`plugin-host`'s `Plugin::alloc`/`write`/`read`, spike 4's shape,
+productized): the component model's canonical-ABI copies cost real time on exactly the large
+buffers a decoder or an operation plugin moves every call, for typed interfaces this crate does
+not need yet. It lives behind `plugin-api` and the API stays experimental until M5.
 
 ### 8.3 The declaration [decided, D-078]
 

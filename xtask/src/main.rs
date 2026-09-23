@@ -116,6 +116,9 @@ fn spdx() -> bool {
     let mut files = Vec::new();
     rust_files(&root.join("crates"), &mut files);
     rust_files(&root.join("xtask"), &mut files);
+    // `plugins/` is a separate Cargo workspace (WP6: it targets wasm32-wasip1, not the host), so
+    // `layers()`'s `cargo metadata` never sees it; its licence headers are still checked here.
+    rust_files(&root.join("plugins"), &mut files);
     files.sort();
     let mut ok = true;
     for file in &files {

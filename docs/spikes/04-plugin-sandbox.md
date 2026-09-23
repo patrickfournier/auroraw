@@ -168,8 +168,11 @@ so a portability check must run on every platform before a plugin enters the ind
   comparable with the Linux figures and are not recorded here.
 - [ ] **A real Windows machine** would still confirm the permission behaviour (paths, file access
   rules) on the granted-folder cases.
-- [ ] **The component model.** These plugins use a hand-made C interface. wasmtime's component model
-  and WIT would give typed interfaces; its cost was not measured.
+- [x] **The component model**, measured in WP6: a WIT world with a no-op export and a
+  byte-copy export, `wit-bindgen` on the guest and `wasmtime::component` on the host, gave 446 ns
+  per call (11x this spike's 40 ns) and 39 ms to copy a 64 MB buffer (3.3x this spike's 12 ms for
+  4 MP of f32), plus `wasm-tools` as an external conversion step this spike's C interface needs
+  none of. The C interface stays (architecture §8.2b).
 - [ ] **WebAssembly threads**, which would recover the parallel decoders, are not enabled.
 - [ ] **LibRaw** as a plugin, needing wasi-sdk.
 - [ ] **A GPU shader safety check** that proves loops bounded, and the portability check.

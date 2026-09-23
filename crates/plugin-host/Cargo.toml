@@ -13,3 +13,11 @@ workspace = true
 
 [dependencies]
 auroraw-plugin-api = { path = "../plugin-api" }
+blake3.workspace = true
+thiserror.workspace = true
+wasmtime = "48"
+wasmtime-wasi = "48"
+
+[dev-dependencies]
+auroraw-testkit = { path = "../testkit" }
+rawler = "0.8"

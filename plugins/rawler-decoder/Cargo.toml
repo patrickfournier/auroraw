@@ -1,0 +1,13 @@
+[package]
+name = "rawler-decoder"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "The rawler RAW decoder as a sandboxed plugin (WP6, architecture §8.1)"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rawler = "0.8"
