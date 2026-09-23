@@ -183,6 +183,18 @@ impl Engine {
             state_dir,
             add_destination_as_source,
         } = request;
+        // However the paths arrived, compared and stored they are canonical (D-092): on a Mac a
+        // temporary folder is behind a symlink, on Windows a path may carry its verbatim prefix.
+        let canonical = |path: PathBuf| {
+            paths::resolve(&path.to_string_lossy()).map_err(|e| invalid(e.to_string()))
+        };
+        let source_root = canonical(source_root)?;
+        let destination_root = if destination_root.as_os_str().is_empty() {
+            destination_root
+        } else {
+            canonical(destination_root)?
+        };
+        let backup_root = backup_root.map(canonical).transpose()?;
         if !source_root.is_dir() {
             return Err(invalid(format!(
                 "{} is not a folder",
