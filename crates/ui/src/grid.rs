@@ -15,7 +15,7 @@ use slint::{
     Image, Model, ModelNotify, ModelRc, ModelTracker, Rgba8Pixel, SharedPixelBuffer, VecModel,
 };
 
-use crate::{Cell, GridRow};
+use crate::generated::{Cell, GridRow};
 
 /// The columns a row holds (spike 3's own number, measured against a typical window width).
 pub const COLS: usize = 8;

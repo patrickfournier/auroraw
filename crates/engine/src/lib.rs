@@ -54,6 +54,17 @@ pub struct Engine {
     inbound: mpsc::Sender<Inbound>,
     workspace: Arc<Workspace>,
     catalogue_path: PathBuf,
+    /// Dropped with the last handle, which stops the coordinator.
+    _stop: Arc<StopWhenDropped>,
+}
+
+/// Tells the coordinator to stop when the last [`Engine`] handle goes away.
+struct StopWhenDropped(mpsc::Sender<Inbound>);
+
+impl Drop for StopWhenDropped {
+    fn drop(&mut self) {
+        let _ = self.0.send(Inbound::Stop);
+    }
 }
 
 /// The engine's event stream. Drain it rather than reacting one event at a time (architecture
@@ -138,6 +149,7 @@ impl Engine {
         std::thread::spawn(move || coordinator.run(inbound_rx));
         (
             Self {
+                _stop: Arc::new(StopWhenDropped(inbound_tx.clone())),
                 inbound: inbound_tx,
                 workspace,
                 catalogue_path,

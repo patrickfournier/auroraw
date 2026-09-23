@@ -15,6 +15,8 @@ workspace = true
 auroraw-ui = { path = "../ui" }
 auroraw-engine = { path = "../engine" }
 auroraw-types = { path = "../types" }
+# The platform's own data, cache and Pictures folders (design note 001 §5.7).
+directories = "6"
 
 [[bin]]
 name = "auroraw"

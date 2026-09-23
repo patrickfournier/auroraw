@@ -225,6 +225,41 @@ fn strip_verbatim(path: PathBuf) -> PathBuf {
     path
 }
 
+/// A folder name made from what a person called something: the characters and trailing dots or
+/// spaces a file system refuses are replaced, so the name is safe on Linux, Windows and macOS. It may
+/// contain any script; an empty result becomes `fallback`.
+pub fn folder_name(name: &str, fallback: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| {
+            if c.is_control() || "<>:\"|?*/\\".contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let cleaned = cleaned.trim().trim_end_matches(['.', ' ']).to_string();
+    if cleaned.is_empty() {
+        fallback.to_string()
+    } else {
+        cleaned
+    }
+}
+
+/// `parent/name`, or `parent/name 2`, `parent/name 3`... when that already exists: the folder to
+/// offer for something new.
+pub fn unique_folder(parent: &Path, name: &str) -> PathBuf {
+    let first = parent.join(name);
+    if !first.exists() {
+        return first;
+    }
+    (2u32..)
+        .map(|n| parent.join(format!("{name} {n}")))
+        .find(|candidate| !candidate.exists())
+        .expect("some number is free")
+}
+
 /// Whether `inner` is `outer` or lies inside it, compared component by component on canonical
 /// paths (`/photos/2026-old` is not inside `/photos/2026`).
 pub fn is_inside(inner: &Path, outer: &Path) -> bool {
@@ -364,6 +399,27 @@ mod tests {
             m.r(&format!("{}/link/../real", m.home.display())).unwrap(),
             m.home.join("real")
         );
+    }
+
+    #[test]
+    fn a_folder_name_keeps_any_script_and_drops_what_a_file_system_refuses() {
+        assert_eq!(folder_name("Principal", "x"), "Principal");
+        assert_eq!(folder_name("Famille été 2026", "x"), "Famille été 2026");
+        assert_eq!(folder_name("日本の写真", "x"), "日本の写真");
+        assert_eq!(folder_name("a/b\\c:d*e?f", "x"), "a_b_c_d_e_f");
+        assert_eq!(folder_name("  trailing. . ", "x"), "trailing");
+        assert_eq!(folder_name("...", "Workspace"), "Workspace");
+        assert_eq!(folder_name("", "Workspace"), "Workspace");
+    }
+
+    #[test]
+    fn a_new_folder_is_offered_a_number_when_the_name_is_taken() {
+        let dir = auroraw_testkit::temp_dir();
+        assert_eq!(unique_folder(dir.path(), "Main"), dir.path().join("Main"));
+        std::fs::create_dir_all(dir.path().join("Main")).unwrap();
+        assert_eq!(unique_folder(dir.path(), "Main"), dir.path().join("Main 2"));
+        std::fs::create_dir_all(dir.path().join("Main 2")).unwrap();
+        assert_eq!(unique_folder(dir.path(), "Main"), dir.path().join("Main 3"));
     }
 
     #[test]

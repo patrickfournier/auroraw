@@ -13,7 +13,8 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
 
-use auroraw_engine::{Command, Engine};
+use auroraw_catalogue::Catalogue;
+use auroraw_engine::{Engine, LocalDirs};
 use i_slint_backend_testing::{
     AccessibleRole, ElementHandle, ElementQuery, TestingBackend, TestingBackendOptions,
     init_no_event_loop, mock_elapsed_time,
@@ -22,16 +23,19 @@ use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, Model};
 
-use crate::generated::Texts;
-use crate::{FolderPicker, LocalPaths, Shell, build, start_directory};
+use crate::app::Launcher;
+use crate::generated::{MainWindow, Texts};
+use crate::{FolderPicker, Launch, Platform, start_directory};
 
-/// A workspace, a folder of photos standing in for a card, and where everything local goes.
+/// A machine: its data and cache folders, its Pictures folder, a folder of photos standing in for
+/// a card, and where a workspace would go.
 struct Fixture {
     _dir: auroraw_testkit::TempDir,
+    dirs: LocalDirs,
+    pictures: PathBuf,
     workspace: PathBuf,
     card: PathBuf,
     archive: PathBuf,
-    paths: LocalPaths,
 }
 
 fn write_jpeg(path: &Path, seed: u8) {
@@ -50,31 +54,28 @@ fn fixture(photos: u8) -> Fixture {
     for n in 0..photos {
         write_jpeg(&card.join(format!("IMG_{n:04}.jpg")), n + 1);
     }
-    let local = dir.path().join("Workspace/.auroraw");
-    let paths = LocalPaths {
-        previews: local.join("previews.db"),
-        settings: local.join("settings.json"),
-        import_state: local.join("import"),
-    };
     Fixture {
-        workspace: dir.path().join("Workspace"),
+        dirs: LocalDirs {
+            data: dir.path().join("data"),
+            cache: dir.path().join("cache"),
+        },
+        pictures: dir.path().join("Pictures"),
+        workspace: dir.path().join("Workspaces/Test"),
         archive: dir.path().join("Archive"),
         card,
-        paths,
         _dir: dir,
     }
 }
 
-/// Opens (creating on first call) the fixture's workspace and builds the shell over it, in English:
-/// a test's own text checks must not depend on the machine's language.
-fn open(fixture: &Fixture) -> (Shell, Engine) {
-    open_in(fixture, "en")
+/// The application, as a person meets it: whatever window is on screen.
+struct App {
+    launcher: Rc<Launcher>,
 }
 
-/// As [`open`], in `language`. The bundled translations only exist once a window has been built,
-/// so the language is chosen after it.
-fn open_in(fixture: &Fixture, language: &str) -> (Shell, Engine) {
-    open_with(fixture, language, no_dialog())
+impl App {
+    fn ui(&self) -> MainWindow {
+        self.launcher.window()
+    }
 }
 
 /// A folder picker that must never be reached: a test that does not browse.
@@ -82,20 +83,81 @@ fn no_dialog() -> FolderPicker {
     Rc::new(|_, _, _| panic!("no folder dialog was expected"))
 }
 
-/// As [`open_in`], with `pick_folder` standing in for the system's folder dialog.
-fn open_with(fixture: &Fixture, language: &str, pick_folder: FolderPicker) -> (Shell, Engine) {
-    let catalogue = fixture.workspace.join(".auroraw/catalogue.sqlite");
-    std::fs::create_dir_all(catalogue.parent().unwrap()).unwrap();
-    let (engine, events) = if catalogue.exists() {
-        Engine::open(&fixture.workspace, &catalogue).unwrap()
-    } else {
-        Engine::create(&fixture.workspace, &catalogue, "Test").unwrap()
-    };
-    let shell = build(engine.clone(), events, &fixture.paths, pick_folder).unwrap();
+fn platform(pick_folder: FolderPicker) -> Platform {
+    Platform {
+        pick_folder,
+        volumes: Rc::new(Vec::new),
+    }
+}
+
+/// Launches the application on `fixture`'s machine, in `language` (chosen after the first window
+/// exists: the bundled translations only do once a window has been built). Opens the last workspace,
+/// or the welcome list on a first launch.
+fn launch_in(fixture: &Fixture, language: &str, platform: Platform) -> App {
+    let launcher = Launcher::start(
+        Launch {
+            dirs: fixture.dirs.clone(),
+            pictures: fixture.pictures.clone(),
+            open: None,
+        },
+        platform,
+    )
+    .unwrap();
     slint::select_bundled_translation(language).unwrap();
     // Elements under a condition only exist once the window has been laid out.
-    shell.ui.show().unwrap();
-    (shell, engine)
+    launcher.window().show().unwrap();
+    App { launcher }
+}
+
+fn launch(fixture: &Fixture) -> App {
+    launch_in(fixture, "en", platform(no_dialog()))
+}
+
+/// A workspace at `fixture.workspace`, made the way a person makes one: from the welcome list
+/// of a first launch, through the New workspace dialog. Leaves the application on it.
+fn open(fixture: &Fixture) -> App {
+    open_in(fixture, "en")
+}
+
+fn open_in(fixture: &Fixture, language: &str) -> App {
+    open_with(fixture, language, platform(no_dialog()))
+}
+
+fn open_with(fixture: &Fixture, language: &str, platform: Platform) -> App {
+    let app = launch_in(fixture, language, platform);
+    assert_eq!(app.ui().get_screen(), "welcome", "a first launch");
+    let new_workspace = if language == "fr" {
+        "Nouveau workspace…"
+    } else {
+        "New workspace…"
+    };
+    click(&app, new_workspace);
+    let folder = if language == "fr" {
+        "Dossier"
+    } else {
+        "Folder"
+    };
+    type_into(&app, folder, &fixture.workspace.to_string_lossy());
+    click(&app, if language == "fr" { "Créer" } else { "Create" });
+    assert_eq!(app.ui().get_screen(), "workspace");
+    app.ui().show().unwrap();
+    app
+}
+
+/// Where an import job of the workspace opened last keeps the state that lets it resume.
+fn import_state(fixture: &Fixture) -> PathBuf {
+    let id = Engine::last_opened_workspace(&fixture.dirs)
+        .expect("a workspace was opened")
+        .workspace_id;
+    fixture.dirs.workspace_data(id).join("import")
+}
+
+/// The catalogue of the workspace the fixture's machine opened last, for reading.
+fn catalogue(fixture: &Fixture) -> Catalogue {
+    let id = Engine::last_opened_workspace(&fixture.dirs)
+        .expect("a workspace was opened")
+        .workspace_id;
+    Catalogue::open(&fixture.dirs.catalogue_path(id)).unwrap()
 }
 
 /// The testing backend for this thread.
@@ -104,16 +166,16 @@ fn init() {
 }
 
 /// Types `text` into the field labelled `label`, the way an assistive technology sets a value.
-fn type_into(shell: &Shell, label: &str, text: &str) {
-    let field = ElementHandle::find_by_accessible_label(&shell.ui, label)
+fn type_into(shell: &App, label: &str, text: &str) {
+    let field = ElementHandle::find_by_accessible_label(&shell.ui(), label)
         .find(|element| element.accessible_value().is_some())
         .unwrap_or_else(|| panic!("no text field labelled {label:?}"));
     field.set_accessible_value(text);
 }
 
 /// Clicks the button labelled `label`: a real pointer press and release at its centre.
-fn click(shell: &Shell, label: &str) {
-    let button = ElementQuery::from_root(&shell.ui)
+fn click(shell: &App, label: &str) {
+    let button = ElementQuery::from_root(&shell.ui())
         .match_descendants()
         .match_accessible_role(AccessibleRole::Button)
         .match_predicate({
@@ -138,7 +200,7 @@ fn settle(what: &str, done: impl Fn() -> bool) {
     panic!("timed out waiting for {what}");
 }
 
-fn fill_import_form(shell: &Shell, f: &Fixture) {
+fn fill_import_form(shell: &App, f: &Fixture) {
     type_into(
         shell,
         "Import from (card or folder)",
@@ -148,56 +210,39 @@ fn fill_import_form(shell: &Shell, f: &Fixture) {
 }
 
 #[test]
-fn an_empty_library_opens_on_the_import_task_and_one_with_photos_on_the_grid() {
+fn a_workspace_that_is_empty_opens_on_what_fills_it_and_one_with_photos_on_the_grid() {
     init();
     let f = fixture(2);
-    let (shell, engine) = open(&f);
-    assert_eq!(shell.ui.get_current_task(), "import");
-
-    let root = f.card.clone();
-    let Ok(auroraw_engine::Outcome::SourceAdded(source)) =
-        engine.submit_and_wait(Command::AddSource {
-            name: "Card".into(),
-            root,
-            kind: "local-folder".into(),
-        })
-    else {
-        panic!("expected SourceAdded");
-    };
-    let auroraw_engine::Outcome::Scanned { new, .. } = engine
-        .submit_and_wait(Command::ScanSource { source_id: source })
-        .unwrap()
-    else {
-        panic!("expected Scanned");
-    };
-    engine
-        .submit_and_wait(Command::AddNewPhotos {
-            source_id: source,
-            paths: new,
-        })
-        .unwrap();
-    drop(shell);
-    let (shell, _engine) = open(&f);
-    assert_eq!(shell.ui.get_current_task(), "cull");
-    assert_eq!(shell.ui.get_status(), "2 photos");
+    {
+        let shell = open(&f);
+        assert_eq!(shell.ui().get_current_task(), "import");
+        fill_import_form(&shell, &f);
+        click(&shell, "Import");
+        settle("the import", || shell.ui().get_import_finished());
+    }
+    // The next launch reopens it, on the grid, because it now has photos.
+    let shell = launch(&f);
+    assert_eq!(shell.ui().get_screen(), "workspace");
+    assert_eq!(shell.ui().get_current_task(), "cull");
+    assert_eq!(shell.ui().get_status(), "2 photos");
 }
 
 #[test]
 fn filling_the_form_and_clicking_import_copies_verifies_and_shows_the_photos() {
     init();
     let f = fixture(3);
-    let (shell, _engine) = open(&f);
+    let shell = open(&f);
     fill_import_form(&shell, &f);
     type_into(&shell, "Creator", "Patrick Fournier");
-    assert_eq!(shell.ui.get_import_archive(), f.archive.to_string_lossy());
+    assert_eq!(shell.ui().get_import_archive(), f.archive.to_string_lossy());
 
     click(&shell, "Import");
-    assert!(shell.ui.get_importing(), "the import started");
-    settle("the import to finish", || shell.ui.get_import_finished());
+    assert!(shell.ui().get_importing(), "the import started");
+    settle("the import to finish", || shell.ui().get_import_finished());
 
-    assert!(!shell.ui.get_importing());
+    assert!(!shell.ui().get_importing());
     assert_eq!(
-        shell.ui.get_import_status(),
+        shell.ui().get_import_status(),
         "All 3 files copied and verified."
     );
     for n in 0..3 {
@@ -207,7 +252,7 @@ fn filling_the_form_and_clicking_import_copies_verifies_and_shows_the_photos() {
         );
     }
     assert!(
-        std::fs::read_dir(&f.paths.import_state)
+        std::fs::read_dir(import_state(&f))
             .unwrap()
             .next()
             .is_none(),
@@ -216,13 +261,13 @@ fn filling_the_form_and_clicking_import_copies_verifies_and_shows_the_photos() {
 
     // "Show photos" switches to the grid with what was just imported.
     click(&shell, "Show photos");
-    assert_eq!(shell.ui.get_current_task(), "cull");
-    assert_eq!(shell.ui.get_status(), "3 photos");
-    assert_eq!(shell.ui.get_rows().row_count(), 1);
+    assert_eq!(shell.ui().get_current_task(), "cull");
+    assert_eq!(shell.ui().get_status(), "3 photos");
+    assert_eq!(shell.ui().get_rows().row_count(), 1);
 
     // Thumbnails arrive from the background workers and fill the cells.
     settle("the thumbnails", || {
-        let row = shell.ui.get_rows().row_data(0).unwrap();
+        let row = shell.ui().get_rows().row_data(0).unwrap();
         (0..3).all(|i| row.cells.row_data(i).unwrap().ready)
     });
 }
@@ -231,18 +276,18 @@ fn filling_the_form_and_clicking_import_copies_verifies_and_shows_the_photos() {
 fn a_second_import_of_the_same_card_says_so_and_copies_nothing() {
     init();
     let f = fixture(2);
-    let (shell, _engine) = open(&f);
+    let shell = open(&f);
     fill_import_form(&shell, &f);
     click(&shell, "Import");
-    settle("the first import", || shell.ui.get_import_finished());
+    settle("the first import", || shell.ui().get_import_finished());
 
     click(&shell, "Import");
     // The flag is reset by the click and set again when the second job ends.
     settle("the second import", || {
-        !shell.ui.get_importing() && shell.ui.get_import_finished()
+        !shell.ui().get_importing() && shell.ui().get_import_finished()
     });
     assert_eq!(
-        shell.ui.get_import_status(),
+        shell.ui().get_import_status(),
         "0 copied, 2 already in the library, 0 failed. Run it again to retry."
     );
 }
@@ -251,24 +296,24 @@ fn a_second_import_of_the_same_card_says_so_and_copies_nothing() {
 fn an_import_that_cannot_start_says_why_and_starts_nothing() {
     init();
     let f = fixture(1);
-    let (shell, _engine) = open(&f);
+    let shell = open(&f);
 
     click(&shell, "Import");
-    assert!(!shell.ui.get_importing());
+    assert!(!shell.ui().get_importing());
     assert!(
         shell
-            .ui
+            .ui()
             .get_import_status()
             .starts_with("Cannot start the import:"),
         "{}",
-        shell.ui.get_import_status()
+        shell.ui().get_import_status()
     );
 
     type_into(&shell, "Import from (card or folder)", "/nowhere/at/all");
     type_into(&shell, "Archive folder", &f.archive.to_string_lossy());
     click(&shell, "Import");
-    assert!(!shell.ui.get_importing());
-    assert!(shell.ui.get_import_status().contains("is not a folder"));
+    assert!(!shell.ui().get_importing());
+    assert!(shell.ui().get_import_status().contains("is not a folder"));
     assert!(
         !f.archive.exists(),
         "nothing was created for a refused import"
@@ -280,35 +325,35 @@ fn the_form_is_remembered_the_next_time_the_workspace_opens() {
     init();
     let f = fixture(1);
     {
-        let (shell, _engine) = open(&f);
+        let shell = open(&f);
         fill_import_form(&shell, &f);
         type_into(&shell, "Creator", "Patrick Fournier");
         type_into(&shell, "Copyright", "© Patrick Fournier");
         click(&shell, "Import");
-        settle("the import", || shell.ui.get_import_finished());
+        settle("the import", || shell.ui().get_import_finished());
     }
-    let (shell, _engine) = open(&f);
-    assert_eq!(shell.ui.get_import_archive(), f.archive.to_string_lossy());
-    assert_eq!(shell.ui.get_import_source(), f.card.to_string_lossy());
-    assert_eq!(shell.ui.get_import_creator(), "Patrick Fournier");
-    assert_eq!(shell.ui.get_import_rights(), "© Patrick Fournier");
+    let shell = launch(&f);
+    assert_eq!(shell.ui().get_import_archive(), f.archive.to_string_lossy());
+    assert_eq!(shell.ui().get_import_source(), f.card.to_string_lossy());
+    assert_eq!(shell.ui().get_import_creator(), "Patrick Fournier");
+    assert_eq!(shell.ui().get_import_rights(), "© Patrick Fournier");
 }
 
 #[test]
 fn rating_from_the_keyboard_reaches_the_catalogue() {
     init();
     let f = fixture(2);
-    let (shell, engine) = open(&f);
+    let shell = open(&f);
     fill_import_form(&shell, &f);
     click(&shell, "Import");
-    settle("the import", || shell.ui.get_import_finished());
+    settle("the import", || shell.ui().get_import_finished());
     click(&shell, "Show photos");
 
     click_cell(&shell, 1);
     press(&shell, "4");
     assert_eq!(
         shell
-            .ui
+            .ui()
             .get_rows()
             .row_data(0)
             .unwrap()
@@ -320,42 +365,38 @@ fn rating_from_the_keyboard_reaches_the_catalogue() {
         "the clicked cell shows its new rating at once"
     );
     settle("the rating to be stored", || {
-        engine
-            .read_catalogue()
-            .unwrap()
-            .list_by_min_rating(4, None, 10)
-            .unwrap()
-            .len()
-            == 1
+        catalogue(&f).list_by_min_rating(4, None, 10).unwrap().len() == 1
     });
 }
 
 /// A key press and release, as the window's own event loop would deliver them.
-fn press(shell: &Shell, text: &str) {
-    let window = shell.ui.window();
-    window.dispatch_event(WindowEvent::KeyPressed { text: text.into() });
-    window.dispatch_event(WindowEvent::KeyReleased { text: text.into() });
+fn press(shell: &App, text: &str) {
+    let ui = shell.ui();
+    ui.window()
+        .dispatch_event(WindowEvent::KeyPressed { text: text.into() });
+    ui.window()
+        .dispatch_event(WindowEvent::KeyReleased { text: text.into() });
 }
 
 /// Clicks the n-th cell of the grid's first row.
-fn click_cell(shell: &Shell, n: usize) {
+fn click_cell(shell: &App, n: usize) {
     // A cell is 160 x 120 logical pixels with 4 between them, below the two 36 px bars.
     let x = 4.0 + n as f32 * 164.0 + 80.0;
     let y = 72.0 + 60.0;
     let position = slint::LogicalPosition::new(x, y);
     shell
-        .ui
+        .ui()
         .window()
         .dispatch_event(WindowEvent::PointerMoved { position });
     shell
-        .ui
+        .ui()
         .window()
         .dispatch_event(WindowEvent::PointerPressed {
             position,
             button: PointerEventButton::Left,
         });
     shell
-        .ui
+        .ui()
         .window()
         .dispatch_event(WindowEvent::PointerReleased {
             position,
@@ -367,8 +408,9 @@ fn click_cell(shell: &Shell, n: usize) {
 fn run_time_sentences_are_translated_with_their_plural_forms() {
     init();
     let f = fixture(0);
-    let (shell, _engine) = open(&f);
-    let texts = shell.ui.global::<Texts>();
+    let shell = open(&f);
+    let ui = shell.ui();
+    let texts = ui.global::<Texts>();
     assert_eq!(texts.invoke_photos(1), "1 photo");
     assert_eq!(texts.invoke_photos(2), "2 photos");
     assert_eq!(
@@ -405,13 +447,13 @@ fn init_rendering() {
 /// Draws the window at its real size and, when `AUR_SNAPSHOT_DIR` names a folder, writes it there
 /// as `name.png` (how layout is looked at without touching a display). Always checks that
 /// something other than one flat colour was drawn.
-fn snapshot(shell: &Shell, name: &str) {
+fn snapshot(shell: &App, name: &str) {
     shell
-        .ui
+        .ui()
         .window()
         .set_size(slint::PhysicalSize::new(1400, 900));
-    shell.ui.show().unwrap();
-    let picture = shell.ui.window().take_snapshot().expect("a picture");
+    shell.ui().show().unwrap();
+    let picture = shell.ui().window().take_snapshot().expect("a picture");
     let pixels = picture.as_bytes();
     assert!(
         pixels.chunks(4).any(|p| p != &pixels[..4]),
@@ -434,23 +476,28 @@ fn snapshot(shell: &Shell, name: &str) {
 fn the_views_render_and_can_be_written_out_as_pictures() {
     init_rendering();
     let f = fixture(10);
-    let (shell, _engine) = open_in(&f, "fr");
+    let welcome = launch_in(&f, "fr", platform(no_dialog()));
+    snapshot(&welcome, "welcome-empty");
+    click(&welcome, "Nouveau workspace…");
+    snapshot(&welcome, "new-workspace-dialog");
+    drop(welcome);
+    let shell = open_in(&f, "fr");
     snapshot(&shell, "import-empty");
 
     // The labels are French here, so the fields are set directly rather than found by label.
     shell
-        .ui
+        .ui()
         .set_import_source(f.card.to_string_lossy().as_ref().into());
     shell
-        .ui
+        .ui()
         .set_import_archive(f.archive.to_string_lossy().as_ref().into());
     click(&shell, "Import");
-    settle("the import", || shell.ui.get_import_finished());
+    settle("the import", || shell.ui().get_import_finished());
     snapshot(&shell, "import-done");
 
     click(&shell, "Voir les photos");
     settle("the thumbnails", || {
-        let row = shell.ui.get_rows().row_data(0).unwrap();
+        let row = shell.ui().get_rows().row_data(0).unwrap();
         (0..8).all(|i| row.cells.row_data(i).unwrap().ready)
     });
     snapshot(&shell, "grid");
@@ -487,12 +534,12 @@ fn browsing_fills_the_field_and_opens_the_dialog_where_the_field_points() {
     init();
     let f = fixture(0);
     let dialogs = Rc::new(RefCell::new(Dialogs::default()));
-    let (shell, _engine) = open_with(&f, "en", stand_in(&dialogs));
+    let shell = open_with(&f, "en", platform(stand_in(&dialogs)));
 
     // An empty field opens the system's default place; the answer fills the field.
     dialogs.borrow_mut().answer = Some(f.archive.clone());
     click(&shell, "Browse for: Archive folder");
-    assert_eq!(shell.ui.get_import_archive(), f.archive.to_string_lossy());
+    assert_eq!(shell.ui().get_import_archive(), f.archive.to_string_lossy());
     assert_eq!(
         dialogs.borrow().asked[0],
         ("Choose the archive folder".to_string(), None)
@@ -507,7 +554,7 @@ fn browsing_fills_the_field_and_opens_the_dialog_where_the_field_points() {
     );
     std::fs::create_dir_all(&f.workspace).unwrap();
     click(&shell, "Browse for: Import from (card or folder)");
-    assert_eq!(shell.ui.get_import_source(), f.card.to_string_lossy());
+    assert_eq!(shell.ui().get_import_source(), f.card.to_string_lossy());
     assert_eq!(
         dialogs.borrow().asked[1],
         (
@@ -518,7 +565,10 @@ fn browsing_fills_the_field_and_opens_the_dialog_where_the_field_points() {
 
     dialogs.borrow_mut().answer = Some(f.workspace.clone());
     click(&shell, "Browse for: Backup folder (optional)");
-    assert_eq!(shell.ui.get_import_backup(), f.workspace.to_string_lossy());
+    assert_eq!(
+        shell.ui().get_import_backup(),
+        f.workspace.to_string_lossy()
+    );
     assert_eq!(dialogs.borrow().asked[2].0, "Choose the backup folder");
 }
 
@@ -527,13 +577,13 @@ fn cancelling_the_dialog_leaves_the_field_alone() {
     init();
     let f = fixture(0);
     let dialogs = Rc::new(RefCell::new(Dialogs::default()));
-    let (shell, _engine) = open_with(&f, "en", stand_in(&dialogs));
+    let shell = open_with(&f, "en", platform(stand_in(&dialogs)));
     type_into(&shell, "Archive folder", "/kept/as/typed");
 
     dialogs.borrow_mut().answer = None;
     click(&shell, "Browse for: Archive folder");
-    assert_eq!(shell.ui.get_import_archive(), "/kept/as/typed");
-    assert!(!shell.ui.get_picking(), "the buttons are usable again");
+    assert_eq!(shell.ui().get_import_archive(), "/kept/as/typed");
+    assert!(!shell.ui().get_picking(), "the buttons are usable again");
 }
 
 #[test]
@@ -544,10 +594,10 @@ fn while_a_dialog_is_open_another_one_cannot_be_started() {
         hold: true,
         ..Dialogs::default()
     }));
-    let (shell, _engine) = open_with(&f, "en", stand_in(&dialogs));
+    let shell = open_with(&f, "en", platform(stand_in(&dialogs)));
 
     click(&shell, "Browse for: Archive folder");
-    assert!(shell.ui.get_picking());
+    assert!(shell.ui().get_picking());
     click(&shell, "Browse for: Import from (card or folder)");
     assert_eq!(
         dialogs.borrow().asked.len(),
@@ -557,8 +607,8 @@ fn while_a_dialog_is_open_another_one_cannot_be_started() {
 
     let done = dialogs.borrow_mut().held.take().unwrap();
     done(Some(f.archive.clone()));
-    assert!(!shell.ui.get_picking());
-    assert_eq!(shell.ui.get_import_archive(), f.archive.to_string_lossy());
+    assert!(!shell.ui().get_picking());
+    assert_eq!(shell.ui().get_import_archive(), f.archive.to_string_lossy());
 }
 
 #[test]
@@ -577,5 +627,253 @@ fn the_dialog_opens_at_the_closest_folder_that_exists() {
         start_directory(&existing.join("2026/September/half-typed").to_string_lossy()),
         Some(existing),
         "the folders that do not exist yet are skipped"
+    );
+}
+
+/// The welcome list's rows are buttons named "<name>, <folder>".
+fn click_known(app: &App, name: &str, folder: &Path) {
+    click(app, &format!("{name}, {}", folder.display()));
+}
+
+#[test]
+fn a_first_launch_offers_to_create_or_open_a_workspace() {
+    init();
+    let f = fixture(0);
+    let app = launch(&f);
+    let ui = app.ui();
+    assert_eq!(ui.get_screen(), "welcome");
+    assert_eq!(ui.get_known().row_count(), 0, "nothing is known yet");
+    // Both ways are there, and the second opens nothing until a folder is chosen.
+    assert!(ElementHandle::find_by_accessible_label(&ui, "Open workspace…").count() > 0);
+    click(&app, "New workspace…");
+    assert_eq!(app.ui().get_dialog(), "new-workspace");
+}
+
+#[test]
+fn creating_a_workspace_from_the_dialog_opens_it_and_remembers_it() {
+    init();
+    let f = fixture(0);
+    let app = launch(&f);
+    click(&app, "New workspace…");
+    // The dialog proposes <Pictures>/Auroraw/<name>, and the name is translated ("Main").
+    assert_eq!(app.ui().get_dialog(), "new-workspace");
+    assert_eq!(app.ui().get_new_name(), "Main");
+    assert_eq!(
+        app.ui().get_new_location(),
+        f.pictures.join("Auroraw").join("Main").to_string_lossy()
+    );
+
+    click(&app, "Create");
+    let ui = app.ui();
+    assert_eq!(ui.get_screen(), "workspace");
+    assert_eq!(ui.get_workspace_name(), "Main");
+    assert_eq!(
+        ui.get_current_task(),
+        "import",
+        "a new workspace opens on what fills it"
+    );
+    assert!(f.pictures.join("Auroraw/Main/workspace.json").is_file());
+    let known = Engine::known_workspaces(&f.dirs);
+    assert_eq!(known.len(), 1);
+    assert_eq!(known[0].name, "Main");
+}
+
+#[test]
+fn the_proposed_folder_follows_the_name_until_the_folder_is_edited() {
+    init();
+    let f = fixture(0);
+    let app = launch(&f);
+    click(&app, "New workspace…");
+
+    type_into(&app, "Name", "Family");
+    assert_eq!(
+        app.ui().get_new_location(),
+        f.pictures.join("Auroraw/Family").to_string_lossy()
+    );
+    type_into(&app, "Name", "Family / trips: 2026");
+    assert_eq!(
+        app.ui().get_new_location(),
+        f.pictures
+            .join("Auroraw/Family _ trips_ 2026")
+            .to_string_lossy(),
+        "what a file system refuses is replaced"
+    );
+
+    // A folder chosen by hand is not overwritten by a later change of name.
+    type_into(&app, "Folder", &f.workspace.to_string_lossy());
+    type_into(&app, "Name", "Renamed");
+    assert_eq!(app.ui().get_new_location(), f.workspace.to_string_lossy());
+}
+
+#[test]
+fn a_taken_name_is_offered_with_a_number() {
+    init();
+    let f = fixture(0);
+    std::fs::create_dir_all(f.pictures.join("Auroraw/Main")).unwrap();
+    let app = launch(&f);
+    click(&app, "New workspace…");
+    assert_eq!(
+        app.ui().get_new_location(),
+        f.pictures.join("Auroraw/Main 2").to_string_lossy()
+    );
+}
+
+#[test]
+fn a_workspace_that_cannot_be_created_says_why_and_the_dialog_stays() {
+    init();
+    let f = fixture(0);
+    let app = launch(&f);
+    click(&app, "New workspace…");
+
+    type_into(&app, "Name", "   ");
+    click(&app, "Create");
+    assert_eq!(app.ui().get_dialog_error(), "Give the workspace a name.");
+
+    type_into(&app, "Name", "Main");
+    type_into(&app, "Folder", "photos/relative");
+    click(&app, "Create");
+    assert!(
+        app.ui()
+            .get_dialog_error()
+            .starts_with("Cannot create the workspace:"),
+        "{}",
+        app.ui().get_dialog_error()
+    );
+    assert!(app.ui().get_dialog_error().contains("absolute"));
+    assert_eq!(app.ui().get_screen(), "welcome");
+    assert_eq!(app.ui().get_dialog(), "new-workspace");
+}
+
+#[test]
+fn a_typed_folder_is_shown_back_canonical() {
+    init();
+    let f = fixture(0);
+    let app = launch(&f);
+    click(&app, "New workspace…");
+    // A path with `..` and a repeated separator is what a person may type; the dialog shows what
+    // was understood (and the workspace is created there, not in a folder named "..").
+    let typed = format!(
+        "{}//Workspaces/x/../Test/",
+        f.workspace.parent().unwrap().parent().unwrap().display()
+    );
+    type_into(&app, "Folder", &typed);
+    click(&app, "Create");
+    assert_eq!(app.ui().get_screen(), "workspace");
+    assert!(f.workspace.join("workspace.json").is_file());
+}
+
+#[test]
+fn the_last_workspace_reopens_on_the_next_launch() {
+    init();
+    let f = fixture(0);
+    drop(open(&f));
+    let app = launch(&f);
+    assert_eq!(
+        app.ui().get_screen(),
+        "workspace",
+        "{}",
+        app.ui().get_notice()
+    );
+    assert_eq!(app.ui().get_workspace_name(), "Main");
+}
+
+#[test]
+fn a_last_workspace_that_cannot_be_found_leads_back_to_the_welcome_list() {
+    init();
+    let f = fixture(0);
+    drop(open(&f));
+    std::fs::rename(&f.workspace, f.workspace.with_file_name("Moved")).unwrap();
+
+    let app = launch(&f);
+    let ui = app.ui();
+    assert_eq!(ui.get_screen(), "welcome");
+    assert!(
+        ui.get_welcome_note()
+            .starts_with("The last workspace could not be found:"),
+        "{}",
+        ui.get_welcome_note()
+    );
+    let known = ui.get_known();
+    assert_eq!(known.row_count(), 1);
+    assert!(!known.row_data(0).unwrap().found);
+
+    // It can be taken off the list.
+    click(&app, "Remove from the list: Main");
+    settle("the list to be shown again", || {
+        app.ui().get_known().row_count() == 0
+    });
+}
+
+/// Two workspaces on one machine, the second (opened last) then moved out of sight: the next
+/// launch cannot reopen it and shows the welcome list. Returns where it went.
+fn machine_with_a_lost_last_workspace(f: &Fixture) -> PathBuf {
+    drop(open(f));
+    let second = f.workspace.with_file_name("Second");
+    drop(
+        Engine::create_workspace(&second, "Second", &f.dirs)
+            .unwrap()
+            .engine,
+    );
+    let hidden = f.workspace.with_file_name("Hidden");
+    std::fs::rename(&second, &hidden).unwrap();
+    hidden
+}
+
+#[test]
+fn a_known_workspace_opens_from_the_list() {
+    init();
+    let f = fixture(0);
+    machine_with_a_lost_last_workspace(&f);
+
+    let app = launch(&f);
+    assert_eq!(app.ui().get_screen(), "welcome");
+    assert_eq!(app.ui().get_known().row_count(), 2);
+    click_known(&app, "Main", &f.workspace);
+    assert_eq!(app.ui().get_screen(), "workspace");
+    assert_eq!(app.ui().get_workspace_name(), "Main");
+}
+
+#[test]
+fn a_workspace_opens_from_a_folder_chosen_in_the_dialog_and_a_plain_folder_is_refused() {
+    init();
+    let f = fixture(0);
+    let hidden = machine_with_a_lost_last_workspace(&f);
+    let plain = f.workspace.with_file_name("Plain");
+    std::fs::create_dir_all(&plain).unwrap();
+
+    // The stand-in dialog answers with the plain folder first, then with the moved workspace.
+    let answers = Rc::new(RefCell::new(vec![hidden.clone(), plain]));
+    let picker: FolderPicker = Rc::new(move |_, _, done| {
+        done(answers.borrow_mut().pop());
+        true
+    });
+    let app = launch_in(&f, "en", platform(picker));
+    assert_eq!(app.ui().get_screen(), "welcome");
+
+    click(&app, "Open workspace…");
+    assert_eq!(
+        app.ui().get_screen(),
+        "welcome",
+        "a plain folder is not a workspace"
+    );
+    assert!(
+        app.ui()
+            .get_notice()
+            .starts_with("Cannot open the workspace:"),
+        "{}",
+        app.ui().get_notice()
+    );
+
+    click(&app, "Dismiss");
+    assert_eq!(app.ui().get_notice(), "");
+    click(&app, "Open workspace…");
+    assert_eq!(app.ui().get_screen(), "workspace");
+    assert_eq!(app.ui().get_workspace_name(), "Second");
+    let known = Engine::known_workspaces(&f.dirs);
+    assert!(
+        known
+            .iter()
+            .any(|w| w.name == "Second" && w.path == hidden && w.found),
+        "the registry follows the workspace to where it now is"
     );
 }

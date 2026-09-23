@@ -1,0 +1,108 @@
+import { Button, ProgressIndicator } from "std-widgets.slint";
+import { Field, VolumeEntry } from "common.slint";
+
+export component ImportView inherits Rectangle {
+    in property <[VolumeEntry]> volumes;
+    in property <string> status;
+    in property <float> progress;
+    in property <bool> importing;
+    in property <bool> finished;
+    in property <bool> picking;
+    in-out property <string> source;
+    in-out property <string> archive;
+    in-out property <string> backup;
+    in-out property <string> template;
+    in-out property <string> shoot;
+    in-out property <string> creator;
+    in-out property <string> rights;
+
+    callback start-import();
+    callback cancel-import();
+    callback refresh-volumes();
+    callback show-photos();
+    callback browse-folder(string);
+
+    background: #1e1e1e;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+        alignment: start;
+
+        Text {
+            text: @tr("Cards and drives");
+            color: #cccccc;
+            font-weight: 700;
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            for v in root.volumes : Button {
+                text: v.label;
+                clicked => { root.source = v.path; }
+            }
+            if root.volumes.length == 0 : Text {
+                text: @tr("No card detected");
+                color: #888888;
+                vertical-alignment: center;
+            }
+            Button {
+                text: @tr("Refresh");
+                clicked => { root.refresh-volumes(); }
+            }
+        }
+        Field {
+            label: @tr("Import from (card or folder)");
+            text <=> root.source;
+            browsable: true;
+            browse-enabled: !root.picking;
+            browse => { root.browse-folder("source"); }
+        }
+        Field {
+            label: @tr("Archive folder");
+            placeholder: @tr("Where the photos are copied to");
+            text <=> root.archive;
+            browsable: true;
+            browse-enabled: !root.picking;
+            browse => { root.browse-folder("archive"); }
+        }
+        Field {
+            label: @tr("Backup folder (optional)");
+            text <=> root.backup;
+            browsable: true;
+            browse-enabled: !root.picking;
+            browse => { root.browse-folder("backup"); }
+        }
+        Field { label: @tr("Folders and file names"); placeholder: "{year}/{date}/{original}.{ext}"; text <=> root.template; }
+        Field { label: @tr("Shoot name (optional)"); text <=> root.shoot; }
+        Field { label: @tr("Creator"); text <=> root.creator; }
+        Field { label: @tr("Copyright"); text <=> root.rights; }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            Button {
+                text: @tr("Import");
+                enabled: !root.importing;
+                primary: true;
+                clicked => { root.start-import(); }
+            }
+            Button {
+                text: @tr("Cancel");
+                enabled: root.importing;
+                clicked => { root.cancel-import(); }
+            }
+            if root.finished : Button {
+                text: @tr("Show photos");
+                clicked => { root.show-photos(); }
+            }
+        }
+        if root.importing : ProgressIndicator {
+            progress: root.progress;
+        }
+        Text {
+            text: root.status;
+            color: #99cc99;
+            wrap: word-wrap;
+            accessible-role: text;
+        }
+    }
+}

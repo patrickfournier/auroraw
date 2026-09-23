@@ -62,7 +62,7 @@ fn invalid(message: String) -> EngineError {
 
 impl Engine {
     /// Every removable volume mounted right now, camera cards first.
-    pub fn removable_volumes(&self) -> Vec<VolumeInfo> {
+    pub fn removable_volumes() -> Vec<VolumeInfo> {
         let mut volumes: Vec<VolumeInfo> = list_removable_volumes()
             .into_iter()
             .map(|v| VolumeInfo {
@@ -127,8 +127,7 @@ impl Engine {
         std::fs::create_dir_all(&request.archive_root)?;
         std::fs::create_dir_all(&request.state_dir)?;
 
-        let removable = self
-            .removable_volumes()
+        let removable = Self::removable_volumes()
             .iter()
             .any(|v| same_place(&v.mount_point, &request.source_root));
         let source_name = request

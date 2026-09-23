@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use auroraw_catalogue::{Catalogue, Registry, RegistryEntry};
 use auroraw_types::{Timestamp, WorkspaceId};
-use auroraw_workspace::Workspace;
+use auroraw_workspace::{Access, Workspace, WorkspaceError};
 
 use crate::command::Command;
 use crate::coordinator::Outcome;
@@ -30,6 +30,12 @@ impl LocalDirs {
     /// The registry of workspaces this machine knows.
     pub fn registry_path(&self) -> PathBuf {
         self.data.join("registry.json")
+    }
+
+    /// What this machine keeps for one workspace besides its databases (the import form, the state
+    /// of an interrupted import).
+    pub fn workspace_data(&self, workspace: WorkspaceId) -> PathBuf {
+        self.data.join("catalogues").join(workspace.to_string())
     }
 
     /// The catalogue database of a workspace.
@@ -97,6 +103,33 @@ fn known(entry: &RegistryEntry) -> KnownWorkspace {
     }
 }
 
+/// Opens the workspace with the writer's lock. A workspace that was just closed by this very
+/// process is still being let go of by its engine's thread, so a held lock is retried for a moment
+/// before it is reported as another program's.
+fn open_for_writing(root: &Path) -> Result<Workspace> {
+    let mut attempts = 0;
+    loop {
+        let workspace = Workspace::open(root)?;
+        if workspace.access() == Access::ReadWrite {
+            return Ok(workspace);
+        }
+        attempts += 1;
+        if attempts >= 30 {
+            return Err(WorkspaceError::ReadOnly.into());
+        }
+        drop(workspace);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
+/// Creates the folder a file will live in.
+fn make_parent(path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    Ok(())
+}
+
 /// Removes a catalogue database and the files SQLite keeps beside it.
 fn remove_database(path: &Path) {
     for suffix in ["", "-wal", "-shm"] {
@@ -120,13 +153,15 @@ impl Engine {
         remove_database(&catalogue_path);
         let catalogue = Catalogue::create(&catalogue_path, id)?;
         let (engine, events) = Self::spawn(workspace, catalogue, catalogue_path.clone());
+        let previews_path = dirs.previews_path(id);
+        make_parent(&previews_path)?;
         let opened = OpenedWorkspace {
             engine,
             events,
             workspace_id: id,
             name: name.to_string(),
             root: root.to_path_buf(),
-            previews_path: dirs.previews_path(id),
+            previews_path,
             rebuilt: false,
         };
         remember(dirs, &opened, &catalogue_path)?;
@@ -137,7 +172,7 @@ impl Engine {
     /// unreadable or belongs to another workspace, it is rebuilt from the workspace's files
     /// (D-026: the database is an index, never the truth).
     pub fn open_workspace(root: &Path, dirs: &LocalDirs) -> Result<OpenedWorkspace> {
-        let workspace = Workspace::open(root)?;
+        let workspace = open_for_writing(root)?;
         let id = workspace.workspace_id();
         let name = workspace.marker().catalogue_name.clone();
         let catalogue_path = dirs.catalogue_path(id);
@@ -162,13 +197,15 @@ impl Engine {
                 other => unreachable!("Rebuild always answers Applied, not {other:?}"),
             }
         }
+        let previews_path = dirs.previews_path(id);
+        make_parent(&previews_path)?;
         let opened = OpenedWorkspace {
             engine,
             events,
             workspace_id: id,
             name,
             root: root.to_path_buf(),
-            previews_path: dirs.previews_path(id),
+            previews_path,
             rebuilt,
         };
         remember(dirs, &opened, &catalogue_path)?;
@@ -388,5 +425,23 @@ mod tests {
         let dir = temp_dir();
         std::fs::create_dir_all(dir.path().join("Plain")).unwrap();
         assert!(Engine::open_workspace(&dir.path().join("Plain"), &dirs(dir.path())).is_err());
+    }
+
+    #[test]
+    fn a_closed_workspace_lets_go_of_its_lock_so_it_can_be_opened_again() {
+        let dir = temp_dir();
+        let dirs = dirs(dir.path());
+        let root = dir.path().join("Main");
+        let first = Engine::create_workspace(&root, "Main", &dirs).unwrap();
+        // A background job is running when the last handle goes away: it is cancelled, not waited for.
+        drop((first.engine, first.events));
+
+        let started = std::time::Instant::now();
+        let again = Engine::open_workspace(&root, &dirs).unwrap();
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "the coordinator of the closed workspace stopped"
+        );
+        drop(again.engine);
     }
 }

@@ -71,6 +71,10 @@ pub enum Outcome {
 pub(crate) type Reply = mpsc::Sender<Result<Outcome>>;
 
 pub(crate) enum Inbound {
+    /// The last [`crate::Engine`] handle was dropped: cancel what runs in the background and stop.
+    /// (The coordinator holds a sender to its own queue for the jobs it starts, so a closed queue
+    /// never signals the end by itself.)
+    Stop,
     Command {
         command: Command,
         reply: Option<Reply>,
@@ -134,6 +138,12 @@ impl Coordinator {
     pub(crate) fn run(mut self, rx: mpsc::Receiver<Inbound>) {
         for message in rx {
             match message {
+                Inbound::Stop => {
+                    for token in self.jobs.values() {
+                        token.cancel();
+                    }
+                    break;
+                }
                 Inbound::Command { command, reply } => self.handle_command(command, reply),
                 Inbound::Refreshed {
                     photo,

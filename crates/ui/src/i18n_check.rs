@@ -42,9 +42,25 @@ fn manifest_path(rel: &str) -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(rel)
 }
 
+/// Every `.slint` file of the shell, joined: the strings may be in any of them.
+fn all_slint() -> String {
+    let mut files: Vec<_> = std::fs::read_dir(manifest_path("ui"))
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "slint"))
+        .collect();
+    files.sort();
+    files
+        .iter()
+        .map(|path| std::fs::read_to_string(path).unwrap())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[test]
 fn every_translatable_string_has_an_english_and_a_french_entry() {
-    let shell = std::fs::read_to_string(manifest_path("ui/shell.slint")).unwrap();
+    let shell = all_slint();
     let used = tr_strings(&shell);
     assert!(
         !used.is_empty(),

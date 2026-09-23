@@ -127,3 +127,69 @@ msgstr "Choisir le dossier d'archive"
 
 msgid "Choose the backup folder"
 msgstr "Choisir le dossier de sauvegarde"
+
+msgid "Welcome to Auroraw"
+msgstr "Bienvenue dans Auroraw"
+
+msgid "Open a workspace, or create a new one."
+msgstr "Ouvrez un workspace ou créez-en un nouveau."
+
+msgid "New workspace…"
+msgstr "Nouveau workspace…"
+
+msgid "Open workspace…"
+msgstr "Ouvrir un workspace…"
+
+msgid "Recent workspaces"
+msgstr "Workspaces récents"
+
+msgid "No workspace yet."
+msgstr "Aucun workspace pour l'instant."
+
+msgid "Not found"
+msgstr "Introuvable"
+
+msgid "Remove from the list"
+msgstr "Retirer de la liste"
+
+msgid "Remove from the list: {}"
+msgstr "Retirer de la liste : {}"
+
+msgid "New workspace"
+msgstr "Nouveau workspace"
+
+msgid "Name"
+msgstr "Nom"
+
+msgid "Folder"
+msgstr "Dossier"
+
+msgid "Create"
+msgstr "Créer"
+
+msgid "Dismiss"
+msgstr "Fermer"
+
+msgid "Main"
+msgstr "Principal"
+
+msgid "Give the workspace a name."
+msgstr "Donnez un nom au workspace."
+
+msgid "The last workspace could not be found: {}"
+msgstr "Le dernier workspace est introuvable : {}"
+
+msgid "Cannot open the workspace: {}"
+msgstr "Impossible d'ouvrir le workspace : {}"
+
+msgid "Cannot create the workspace: {}"
+msgstr "Impossible de créer le workspace : {}"
+
+msgid "The catalogue of \"{}\" was rebuilt from its files on this machine."
+msgstr "Le catalogue de « {} » a été reconstruit à partir de ses fichiers sur cette machine."
+
+msgid "Choose the workspace folder"
+msgstr "Choisir le dossier du workspace"
+
+msgid "Choose the folder"
+msgstr "Choisir le dossier"

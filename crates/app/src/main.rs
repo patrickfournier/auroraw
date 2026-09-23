@@ -1,40 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! The Auroraw application: `--version` and `--self-test` for CI's launch test, and, given a
-//! workspace folder, the real Slint shell (WP8).
+//! The Auroraw application: `--version` and `--self-test` for CI's launch test, and otherwise the
+//! real Slint shell, which opens the last workspace, or the welcome list (WP8).
 
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-/// Opens `workspace_path` (creating it if this is the first launch there) and its catalogue,
-/// alongside it, following the workspace's own `.auroraw/` convention for what is local to this
-/// machine rather than synced (design note 001 §5.4): the catalogue and the previews database
-/// (D-075) both live there. This crate resolves no platform cache directory yet (every crate
-/// under `engine` defers that to here, and here defers it further, honestly: a real cache
-/// directory, XDG/AppData/Library, is still open work, not done by WP8).
-fn open_or_create(
-    workspace_path: &Path,
-) -> auroraw_engine::Result<(
-    auroraw_engine::Engine,
-    auroraw_engine::EventReceiver,
-    auroraw_ui::LocalPaths,
-)> {
-    let local = workspace_path.join(".auroraw");
-    let catalogue_path = local.join("catalogue.sqlite");
-    let paths = auroraw_ui::LocalPaths {
-        previews: local.join("previews.db"),
-        settings: local.join("settings.json"),
-        import_state: local.join("import"),
-    };
-    let name = workspace_path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "Library".into());
-    let (engine, events) = if catalogue_path.exists() {
-        auroraw_engine::Engine::open(workspace_path, &catalogue_path)?
-    } else {
-        auroraw_engine::Engine::create(workspace_path, &catalogue_path, &name)?
-    };
-    Ok((engine, events, paths))
+use auroraw_engine::LocalDirs;
+use directories::{ProjectDirs, UserDirs};
+
+/// This machine's data and cache folders (design note 001 §5.7: the catalogue database and the
+/// previews are local, the workspace is what is backed up) and its Pictures folder.
+fn machine_folders() -> Option<(LocalDirs, PathBuf)> {
+    let project = ProjectDirs::from("org", "auroraw", "Auroraw")?;
+    let user = UserDirs::new()?;
+    let pictures = user
+        .picture_dir()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| user.home_dir().join("Pictures"));
+    Some((
+        LocalDirs {
+            data: project.data_local_dir().to_path_buf(),
+            cache: project.cache_dir().to_path_buf(),
+        },
+        pictures,
+    ))
 }
 
 fn main() -> ExitCode {
@@ -57,15 +46,18 @@ fn main() -> ExitCode {
             );
             ExitCode::SUCCESS
         }
-        Some(path) if !path.starts_with("--") => {
-            let (engine, events, paths) = match open_or_create(Path::new(path)) {
-                Ok(v) => v,
-                Err(e) => {
-                    eprintln!("cannot open {path}: {e}");
-                    return ExitCode::FAILURE;
-                }
+        Some(flag) if flag.starts_with("--") => usage(),
+        other => {
+            let Some((dirs, pictures)) = machine_folders() else {
+                eprintln!("cannot find this machine's data folders");
+                return ExitCode::FAILURE;
             };
-            match auroraw_ui::run(engine, events, &paths) {
+            let launch = auroraw_ui::Launch {
+                dirs,
+                pictures,
+                open: other.map(PathBuf::from),
+            };
+            match auroraw_ui::run(launch) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
                     eprintln!("cannot start the interface: {e}");
@@ -73,12 +65,13 @@ fn main() -> ExitCode {
                 }
             }
         }
-        _ => {
-            eprintln!(
-                "usage: {} <workspace folder> | --version | --self-test",
-                auroraw_types::APP_NAME
-            );
-            ExitCode::from(2)
-        }
     }
+}
+
+fn usage() -> ExitCode {
+    eprintln!(
+        "usage: {} [workspace folder] | --version | --self-test",
+        auroraw_types::APP_NAME
+    );
+    ExitCode::from(2)
 }

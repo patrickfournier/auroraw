@@ -1,219 +1,14 @@
-import { ListView, Button, LineEdit, ProgressIndicator, Palette } from "std-widgets.slint";
+import { Button, ListView, Palette } from "std-widgets.slint";
+import { Cell, GridRow, VolumeEntry, KnownEntry, Texts, Task } from "common.slint";
+import { ImportView } from "import.slint";
+import { WelcomeView } from "welcome.slint";
+import { NewWorkspaceDialog } from "dialogs.slint";
 
-export struct Cell {
-    photo-id: string,
-    thumb: image,
-    rating: int,
-    ready: bool,
-    unavailable: bool,
-    selected: bool,
-}
-export struct GridRow { cells: [Cell] }
-
-// A removable volume offered on the import view (a card or a drive).
-export struct VolumeEntry { label: string, path: string }
-
-// Every sentence the Rust side builds at run time goes through here, so it is translated like the
-// rest (`@tr()` only works in a .slint file).
-export global Texts {
-    public pure function photos(n: int) -> string {
-        return @tr("{n} photo" | "{n} photos" % n);
-    }
-    public pure function importing(done: int, total: int) -> string {
-        return @tr("Importing {} of {}…", done, total);
-    }
-    public pure function all-copied(n: int) -> string {
-        return @tr("All {n} file copied and verified." | "All {n} files copied and verified." % n);
-    }
-    public pure function import-summary(copied: int, skipped: int, failed: int) -> string {
-        return @tr("{} copied, {} already in the library, {} failed. Run it again to retry.", copied, skipped, failed);
-    }
-    public pure function import-stopped(reason: string) -> string {
-        return @tr("The import stopped: {}", reason);
-    }
-    public pure function import-refused(reason: string) -> string {
-        return @tr("Cannot start the import: {}", reason);
-    }
-    public pure function import-cancelled() -> string {
-        return @tr("Import cancelled. Running it again resumes where it stopped.");
-    }
-    public pure function reading-card() -> string {
-        return @tr("Reading the card…");
-    }
-    // The title of the folder dialog: `which` is "source", "archive" or "backup".
-    public pure function pick-title(which: string) -> string {
-        if (which == "source") {
-            return @tr("Choose the card or folder to import from");
-        }
-        if (which == "archive") {
-            return @tr("Choose the archive folder");
-        }
-        return @tr("Choose the backup folder");
-    }
-}
-
-component Task inherits Rectangle {
-    in property <string> label;
-    in property <bool> active;
-    in property <bool> enabled: true;
-    callback activate();
-    width: 120px;
-    height: 36px;
-    background: active ? #3a5f8a : #2b2b2b;
-    TouchArea {
-        clicked => { if (enabled) { root.activate(); } }
-    }
-    Text {
-        text: root.label;
-        color: root.enabled ? (root.active ? white : #cccccc) : #666666;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-        width: 100%;
-        height: 100%;
-        accessible-role: tab;
-        accessible-label: root.label;
-    }
-}
-
-component Field inherits HorizontalLayout {
-    in property <string> label;
-    in property <string> placeholder;
-    // A folder field offers a button that opens the system's folder dialog.
-    in property <bool> browsable: false;
-    in property <bool> browse-enabled: true;
-    in-out property <string> text;
-    callback browse();
-    spacing: 8px;
-    Text {
-        text: root.label;
-        width: 300px;
-        color: #cccccc;
-        vertical-alignment: center;
-    }
-    LineEdit {
-        text <=> root.text;
-        placeholder-text: root.placeholder;
-        accessible-label: root.label;
-    }
-    // Every field ends at the same place, with or without a button.
-    if !root.browsable : Rectangle { width: 100px; }
-    if root.browsable : Button {
-        width: 100px;
-        text: @tr("Browse…");
-        enabled: root.browse-enabled;
-        accessible-label: @tr("Browse for: {}", root.label);
-        clicked => { root.browse(); }
-    }
-}
-
-component ImportView inherits Rectangle {
-    in property <[VolumeEntry]> volumes;
-    in property <string> status;
-    in property <float> progress;
-    in property <bool> importing;
-    in property <bool> finished;
-    in property <bool> picking;
-    in-out property <string> source;
-    in-out property <string> archive;
-    in-out property <string> backup;
-    in-out property <string> template;
-    in-out property <string> shoot;
-    in-out property <string> creator;
-    in-out property <string> rights;
-
-    callback start-import();
-    callback cancel-import();
-    callback refresh-volumes();
-    callback show-photos();
-    callback browse-folder(string);
-
-    background: #1e1e1e;
-    VerticalLayout {
-        padding: 16px;
-        spacing: 10px;
-        alignment: start;
-
-        Text {
-            text: @tr("Cards and drives");
-            color: #cccccc;
-            font-weight: 700;
-        }
-        HorizontalLayout {
-            spacing: 8px;
-            alignment: start;
-            for v in root.volumes : Button {
-                text: v.label;
-                clicked => { root.source = v.path; }
-            }
-            if root.volumes.length == 0 : Text {
-                text: @tr("No card detected");
-                color: #888888;
-                vertical-alignment: center;
-            }
-            Button {
-                text: @tr("Refresh");
-                clicked => { root.refresh-volumes(); }
-            }
-        }
-        Field {
-            label: @tr("Import from (card or folder)");
-            text <=> root.source;
-            browsable: true;
-            browse-enabled: !root.picking;
-            browse => { root.browse-folder("source"); }
-        }
-        Field {
-            label: @tr("Archive folder");
-            placeholder: @tr("Where the photos are copied to");
-            text <=> root.archive;
-            browsable: true;
-            browse-enabled: !root.picking;
-            browse => { root.browse-folder("archive"); }
-        }
-        Field {
-            label: @tr("Backup folder (optional)");
-            text <=> root.backup;
-            browsable: true;
-            browse-enabled: !root.picking;
-            browse => { root.browse-folder("backup"); }
-        }
-        Field { label: @tr("Folders and file names"); placeholder: "{year}/{date}/{original}.{ext}"; text <=> root.template; }
-        Field { label: @tr("Shoot name (optional)"); text <=> root.shoot; }
-        Field { label: @tr("Creator"); text <=> root.creator; }
-        Field { label: @tr("Copyright"); text <=> root.rights; }
-        HorizontalLayout {
-            spacing: 8px;
-            alignment: start;
-            Button {
-                text: @tr("Import");
-                enabled: !root.importing;
-                primary: true;
-                clicked => { root.start-import(); }
-            }
-            Button {
-                text: @tr("Cancel");
-                enabled: root.importing;
-                clicked => { root.cancel-import(); }
-            }
-            if root.finished : Button {
-                text: @tr("Show photos");
-                clicked => { root.show-photos(); }
-            }
-        }
-        if root.importing : ProgressIndicator {
-            progress: root.progress;
-        }
-        Text {
-            text: root.status;
-            color: #99cc99;
-            wrap: word-wrap;
-            accessible-role: text;
-        }
-    }
-}
+export { Cell, GridRow, VolumeEntry, KnownEntry, Texts }
 
 export component MainWindow inherits Window {
-    title: @tr("Auroraw");
+    property <string> app-name: @tr("Auroraw");
+    title: root.workspace-name == "" ? root.app-name : root.workspace-name + " — " + root.app-name;
     background: #1e1e1e;
     width: 1400px;
     height: 900px;
@@ -225,6 +20,18 @@ export component MainWindow inherits Window {
     in property <string> selected-summary;
     in-out property <length> grid-scroll: 0px;
     in-out property <string> current-task: "cull";
+    // "welcome" (no workspace open) or "workspace".
+    in property <string> screen: "welcome";
+    in property <string> workspace-name;
+    in property <[KnownEntry]> known;
+    in property <string> welcome-note;
+    // The dialog over the window: "" or "new-workspace".
+    in-out property <string> dialog;
+    in-out property <string> new-name;
+    in-out property <string> new-location;
+    in property <string> dialog-error;
+    // A message over the window (a workspace that could not be opened, a card that was inserted).
+    in-out property <string> notice;
 
     in property <[VolumeEntry]> volumes;
     in property <string> import-status;
@@ -250,8 +57,26 @@ export component MainWindow inherits Window {
     callback refresh-volumes();
     callback show-photos();
     callback browse-folder(string);
+    callback new-workspace();
+    callback open-workspace();
+    callback open-known(int);
+    callback forget-known(int);
+    callback create-workspace();
+    callback close-dialog();
+    callback new-name-edited(string);
+    callback dismiss-notice();
+
+    if root.screen == "welcome" : WelcomeView {
+        known: root.known;
+        note: root.welcome-note;
+        new-workspace => { root.new-workspace(); }
+        open-workspace => { root.open-workspace(); }
+        open-known(i) => { root.open-known(i); }
+        forget-known(i) => { root.forget-known(i); }
+    }
 
     VerticalLayout {
+        visible: root.screen == "workspace";
         // The task bar (spec §3: "workflows, not panels"): every task is present; Import and Cull
         // have a view so far, Develop and Publish come with later milestones.
         Rectangle {
@@ -383,6 +208,46 @@ export component MainWindow inherits Window {
                     vertical-alignment: center;
                     height: 100%;
                 }
+            }
+        }
+    }
+
+    if root.dialog == "new-workspace" : NewWorkspaceDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        error: root.dialog-error;
+        browse-enabled: !root.picking;
+        name <=> root.new-name;
+        location <=> root.new-location;
+        close => { root.close-dialog(); }
+        create => { root.create-workspace(); }
+        browse => { root.browse-folder("workspace"); }
+        name-edited(text) => { root.new-name-edited(text); }
+    }
+
+    if root.notice != "" : Rectangle {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: 40px;
+        background: #4a3f1e;
+        border-color: #7a6a30;
+        border-width: 1px;
+        HorizontalLayout {
+            padding: 6px;
+            spacing: 8px;
+            Text {
+                text: root.notice;
+                color: white;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: text;
+            }
+            Button {
+                text: @tr("Dismiss");
+                clicked => { root.dismiss-notice(); }
             }
         }
     }
