@@ -107,6 +107,7 @@ fn run(job: RemoveJob) {
         source_id: job.source_id,
         removed,
         kept,
+        announce: true,
     });
     let _ = job
         .inbound

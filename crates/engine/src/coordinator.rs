@@ -98,12 +98,15 @@ pub(crate) enum Inbound {
         filename: String,
         fingerprint: auroraw_types::Fingerprint,
     },
-    /// A remove job is done with a source's photos: take the source itself out.
+    /// A remove job is done with a source's photos (or an index job merged them into another
+    /// source): take the source itself out. `announce` is whether `Event::SourceRemoved` is
+    /// reported: a removal is one, a merge is part of an index job that reports its own end.
     SourceGone {
         job: JobId,
         source_id: SourceId,
         removed: usize,
         kept: usize,
+        announce: bool,
     },
     /// The last [`crate::Engine`] handle was dropped: cancel what runs in the background and stop.
     /// (The coordinator holds a sender to its own queue for the jobs it starts, so a closed queue
@@ -207,7 +210,8 @@ impl Coordinator {
                     source_id,
                     removed,
                     kept,
-                } => self.finish_remove_source(job, source_id, removed, kept),
+                    announce,
+                } => self.finish_remove_source(job, source_id, removed, kept, announce),
                 Inbound::Command { command, reply } => self.handle_command(command, reply),
                 Inbound::Refreshed {
                     photo,
@@ -999,18 +1003,21 @@ impl Coordinator {
         source_id: SourceId,
         removed: usize,
         kept: usize,
+        announce: bool,
     ) {
         if let Ok(mut sources) = self.read_sources() {
             sources.sources.retain(|entry| entry.id != source_id);
             sources.updated = Timestamp::now();
             if self.workspace.write_sources(&sources).is_ok() {
                 let _ = self.catalogue.remove_source(&source_id);
-                let _ = self.events.send(Event::SourceRemoved {
-                    job,
-                    source_id,
-                    removed,
-                    kept,
-                });
+                if announce {
+                    let _ = self.events.send(Event::SourceRemoved {
+                        job,
+                        source_id,
+                        removed,
+                        kept,
+                    });
+                }
             }
         }
     }

@@ -320,6 +320,7 @@ fn merge_sources(job: &IndexJob, catalogue: &Catalogue) -> Vec<String> {
             source_id: *inner,
             removed: 0,
             kept: moved,
+            announce: false,
         });
     }
     paths
