@@ -186,8 +186,12 @@ translation can fail unnoticed. What is checked:
   sees), clicks are real pointer events at an element's centre, keys are dispatched to the
   window, and time is advanced by hand. `ui/src/headless_tests.rs` drives an import end to end
   (fill the form, click Import, watch the progress, "Show photos", thumbnails in the grid), the
-  refusal messages, the remembered form, rating from the keyboard and the run-time translations
-  with their plural forms, on every CI platform. With the software rasteriser it also draws each
+  welcome list and workspace lifecycle (first launch, new workspace, last workspace reopened or lost),
+  every menu command and shortcut, the Edit items on a focused field, the catalogue panel (add, scan,
+  refuse, merge, remove, restore), the import dialog (destination kinds, plain copy, card folders) and
+  the card banner (the folder dialog and the mounted cards are injected, so nothing touches the
+  machine), the refusal messages, rating from the keyboard and the run-time translations with their
+  plural forms, on every CI platform. With the software rasteriser it also draws each
   view to a PNG (`AUR_SNAPSHOT_DIR=<folder> cargo test -p auroraw-ui headless`), which is how
   layout, clipping and French text are looked at without touching anyone's desktop.
 - **What only a real machine shows**, checked by a person before a release: GPU rendering, the

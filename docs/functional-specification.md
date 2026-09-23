@@ -79,8 +79,9 @@ that development depends on. How originals on online storage reach the machine i
 2. **Nothing is trapped in the catalogue** [proposed]. The catalogue is an index and a working
    area that can be rebuilt. Metadata and versions are also written to open files in the
    workspace (see §5.1 and §5.4).
-3. **Workflows, not panels** [proposed]. The interface is organised around tasks (Import, Cull,
-   Develop, Publish), not a stack of tools.
+3. **Workflows, not panels** [proposed]. The interface is organised around tasks (Catalogue,
+   Cull, Develop, Publish), not a stack of tools. Import is a function, not a task: it opens as a
+   dialog from the File menu or from a card's notification (D-090).
 4. **Keyboard first** [proposed]. All routine culling and navigation works without a mouse.
 5. **Local AI by default** [decided, D-061]. The core calls no external AI service. A plugin that
    does is off by default, needs consent per plugin and shows what leaves the machine.
@@ -96,7 +97,11 @@ that development depends on. How originals on online storage reach the machine i
 
 ## 4. Reference workflow [proposed]
 
-1. **Import**: from a card or a folder, with duplicate backup, renaming and metadata applied.
+0. **Catalogue** (D-090): the sources whose photos are in the catalogue are added and removed
+   here. Adding a folder copies nothing; it scans the folder and builds the sidecars.
+1. **Import** (a function of the File menu, not a task): copies the photos of a card or a folder
+   to another folder, verified, with an optional second destination, renaming and metadata
+   applied when the destination is in the catalogue.
 2. **Cull**: ratings, flags, labels, comparison, resolving series and duplicates.
 3. **Develop**: one or more versions of the kept photos; styles and settings sync.
 4. **Publish**: a client gallery (Prooftide or another), with selections returned to the
@@ -117,9 +122,10 @@ The milestone of each feature (M1 to M5) is described in §8.
 - A photographer can have **several catalogues, all equal**, and picks one when opening the
   application. The intended use is separate areas of activity (family versus professional, for
   example).
-- The application must be **fully functional with a single catalogue**. The first launch creates
-  one silently; switching and creating catalogues is available from a menu but never required
-  [proposed].
+- The application must be **fully functional with a single catalogue**. The first launch offers
+  to create a workspace or to pick a known one, JetBrains-style (D-090, amending D-017's "creates
+  one silently"); later launches reopen the last one, and offer the same choice when it cannot be
+  found. Switching and creating catalogues is available from the File menu.
 - Catalogues are isolated: search, collections, keyword lists and duplicate detection work within
   the open catalogue [proposed].
 - Auroraw writes nothing into sources (see below), so catalogues do not need to claim source
@@ -241,8 +247,8 @@ offline, those photos cannot be displayed until the source returns [proposed].
 
 | Way | What happens |
 | --- | --- |
-| Copy from a card or a folder | Files are copied to a destination folder in the photographer's archive, then added to the catalogue. Besides this, Auroraw writes into a source only for the explicit XMP export and for exports the photographer places there (§5.1). |
-| Add in place | An existing folder becomes a source. Nothing is copied or written. |
+| Copy from a card or a folder | Files are copied, verified, to a destination folder of the photographer's choosing (with an optional second destination). The destination need not be a source of the catalogue: when it is, or is added as one (offered, D-090), the copied photos also enter the catalogue; otherwise it is only a copy. A card is never registered. The card's own camera folders can be kept and merged, or the template used (D-093). Besides this, Auroraw writes into a source only for the explicit XMP export and for exports the photographer places there (§5.1). |
+| Add in place | An existing folder becomes a source, from the Catalogue panel. Nothing is copied or written: the folder is scanned in the background and each photo's sidecar built from what its file says. A folder inside a source is already covered; one containing sources can merge them (D-092). |
 | Other | Cameras and phones connected directly, cloud services and so on, through source plugins (§5.10). |
 
 **Import profiles** [decided, D-029]
@@ -1007,7 +1013,9 @@ Sorted by when they need an answer. No question is left to decide before the tec
     to keep results stable across CPU and GPU (see 22).
 39. ~~Export before M4~~: resolved by D-062.
 40. ~~Rating level while culling~~: resolved by D-063.
-41. **Originals on online storage without a round trip** (follows D-089): for an original on an
+41. **Originals on online storage without a round trip** (follows D-089; partly answered by
+    D-090: an original on a network or cloud source is copied to the machine **on demand, when it
+    is developed**, and the copy is the working file): for an original on an
     online source (S3, WebDAV, Google Drive, Dropbox; §5.1, §5.10), how development and export
     obtain its bytes with no manual download step: fetched once on demand into a cache with a
     rule the photographer sets, what is shown while it is fetched, and how this sits with D-021

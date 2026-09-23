@@ -673,6 +673,42 @@ remembered by the next launch; the arrow and rating keys reach the catalogue; th
 forms; and the views are drawn to PNG files for a look at the layout. `ui::build` (the window and
 its timers, without `run`) exists for this.
 
+**Workflow revision (D-090 to D-093), the third and fourth passes.** Patrick's use of the shell
+changed the workflow, and the Import view and the "open a folder given on the command line" launch
+were replaced. What is built: **the launcher** (`ui::app`): the last workspace, or a welcome list of the
+workspaces this machine knows (`catalogue::Registry`, with last-opened and a recent-first order), New
+workspace (name, folder proposed as `<Pictures>/Auroraw/<name>` following the name until edited) and
+Open workspace (folder dialog); the catalogue database and previews moved out of the workspace into the
+machine's data and cache folders (`engine::LocalDirs`, `Engine::create_workspace`/`open_workspace`, a
+missing database is rebuilt from the workspace's files); **the hamburger menu** (File, Edit, Help; the
+`commands.rs` table cross-checked against `menu.slint` and the shell's key handling; Edit reaches the
+focused text field by delivering the platform's own shortcut; the top bar stays reachable over
+dialogs), Settings (language) and About; **the catalogue panel**: sources listed with counts, added
+(background `IndexSource` job reading each file's metadata into its sidecar, RAW+JPEG paired within a
+folder), rescanned and removed (`RemoveSource`, recoverable, with a confirmation that gives the
+numbers), adding a removed folder again offers to restore its photos, a folder inside a source is
+refused, one containing sources merges them; **Import as a dialog** (File > Import, or a banner when a
+card is inserted): the card is never registered, the destination is inside a source, becomes one, or is
+only copied to, the card's camera folders can be kept (`{path}`) and merged, files keep their case, a
+second import adds nothing, only still images are copied; `engine::paths::resolve` makes every typed
+path canonical.
+
+**Bugs the workflow work found in earlier packages, each fixed with a test:** the coordinator thread
+never stopped (it held a sender to its own queue), so a closed workspace stayed locked and a thread
+leaked per workspace switch (WP3); EXIF capture times were kept as `2016:09:02 10:28:00`, which the
+catalogue and the import planner could not parse, so real RAW files sorted at the epoch and date
+folders rendered empty (WP5, WP7); `{ext}` lower-cased every extension (WP7); RAW+JPEG pairing crossed
+folders (WP7); an import registered the card as a source and the destination as a fixed "Archive";
+a completion event could reach a listener before the catalogue writes it followed (all jobs now report
+through the coordinator's queue). A typed `~/Images/Photos` had created a folder named `~`.
+
+**Still open in WP8:** the keywords, collections and metadata panels, undo of photo actions (the Edit
+items work on text fields only), the 4K/laptop layout check, the pseudo-locale, thumbnails during the
+scan, GPX in the import dialog, a CLI `import`, importing individual files rather than a folder, source
+plugins for network and cloud kinds (`Engine::source_kinds` is ready for them), and the copy-on-demand
+of a non-local original when it is developed (M2). **Not verified on a real machine:** the native
+folder dialogs, a real card insertion, the hamburger's look, typing with an input method.
+
 ### WP9 Culling (XL). Needs WP5, WP8
 
 Single-image view (zoom and pan on the preview, the 100 % view of the preview), **cull mode**
