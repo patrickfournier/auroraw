@@ -180,6 +180,23 @@ translation can fail unnoticed. What is checked:
 - **Responsiveness**: an instrumented build reports the longest interface-thread stall; the
   interface test scenarios fail if it exceeds a frame budget with the engine under load
   (spike 2: nothing heavy on the interface thread).
+- **The interface is tested without a display first, on a real machine second.** Slint's testing
+  backend (`i-slint-backend-testing`, pinned to Slint's exact version) runs the whole shell with
+  no window and no display: elements are found by their accessible labels (what a screen reader
+  sees), clicks are real pointer events at an element's centre, keys are dispatched to the
+  window, and time is advanced by hand. `ui/src/headless_tests.rs` drives an import end to end
+  (fill the form, click Import, watch the progress, "Show photos", thumbnails in the grid), the
+  refusal messages, the remembered form, rating from the keyboard and the run-time translations
+  with their plural forms, on every CI platform. With the software rasteriser it also draws each
+  view to a PNG (`AUR_SNAPSHOT_DIR=<folder> cargo test -p auroraw-ui headless`), which is how
+  layout, clipping and French text are looked at without touching anyone's desktop.
+- **What only a real machine shows**, checked by a person before a release: GPU rendering, the
+  platform's input methods (ibus, IME), real fonts and scaling, frame rate, AT-SPI/NVDA/VoiceOver.
+  **An automated session never drives a person's own desktop with synthetic input**: on
+  2026-09-23 `xdotool type` into the import view froze that display twice and forced a restart
+  each time (`xdotool type` hanging GNOME/X11 desktops on long strings is a known upstream
+  problem, and a Slint text field with ibus was never ruled out). The person runs the application
+  and types in its fields by hand, and a window is captured alone, never the whole screen.
 
 ## 7. Performance [proposed]
 
@@ -200,16 +217,6 @@ translation can fail unnoticed. What is checked:
 - **How.** The harness writes the JSON files that the spikes already produce, with the machine,
   the adapter and the commit. A script compares a run with a **stored baseline for that machine**
   and reports any budget exceeded or any stage more than 20 % slower.
-- **Interface work packages are verified on a real display, and that step has an owner.** An
-  agent-driven session cannot see a screen unless a person's own desktop session is active for it.
-  Each interface work package therefore ends with a short visual pass (launch, capture the window,
-  drive it with synthetic keys and clicks) done **while Patrick has that session open**, and
-  says in its status paragraph which parts were and were not verified that way. Capture one window,
-  never the whole screen (a root capture also records whatever else is on the display). The
-  session found this way (M1 WP8): visible clipping of a long French label, a light widget style
-  on a dark shell, focus not on the grid at start. It also ended with a frozen display and a
-  restart that has no established cause: run the application under test sparingly, and stop it by
-  its process id when done.
 - **When.** Before each release, and on demand for a change that touches the pipeline or the
   catalogue. A run takes minutes, not hours (the spikes' full run did).
 - **Counts before times.** Where a performance property can be stated as a count (the number of

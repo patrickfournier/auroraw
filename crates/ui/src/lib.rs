@@ -9,6 +9,8 @@
 pub mod commands;
 mod grid;
 #[cfg(test)]
+mod headless_tests;
+#[cfg(test)]
 mod i18n_check;
 mod settings;
 
@@ -143,12 +145,29 @@ fn reload(engine: &Engine, state: &GridState, ui: &MainWindow) {
     state.set_items(items);
 }
 
+/// The shell's window and the timers that feed it; dropping the timers would stop the window from
+/// ever hearing about a thumbnail or an import's progress.
+struct Shell {
+    ui: MainWindow,
+    _timers: [Timer; 2],
+}
+
 /// Runs the shell until its window is closed.
 pub fn run(
     engine: Engine,
     events: EventReceiver,
     paths: &LocalPaths,
 ) -> Result<(), slint::PlatformError> {
+    build(engine, events, paths)?.ui.run()
+}
+
+/// Builds the window and connects it to the engine, without showing it: what `run` does, and what
+/// the tests without a display drive directly.
+fn build(
+    engine: Engine,
+    events: EventReceiver,
+    paths: &LocalPaths,
+) -> Result<Shell, slint::PlatformError> {
     let ui = MainWindow::new()?;
 
     let state = Rc::new(GridState::default());
@@ -385,7 +404,10 @@ pub fn run(
         });
     }
 
-    ui.run()
+    Ok(Shell {
+        ui,
+        _timers: [thumbnail_timer, event_timer],
+    })
 }
 
 /// The flat index arrow navigation lands on, clamped to the list's bounds.

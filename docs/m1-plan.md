@@ -647,11 +647,21 @@ resumed import's final report now also counts the files an earlier run settled.
 panels, undo, general settings, the 4K/laptop layout check, the pseudo-locale, a native folder
 picker (Slint has none: adding one, `rfd` for instance, is a dependency decision to take with
 Patrick), thumbnails generated during the import rather than on first display, GPX wiring, and a
-CLI `import`. **Verified on a real display** (Patrick's local session, X11): the shell renders,
-French is applied, clicking selects, `0`-`5` rate, arrows move; the Import view renders in the dark
-scheme and its labels fit in French. The typed-import path itself (filling the fields and running
-one) was **not** visually completed: the display froze during the session (cause not established,
-see the testing strategy note) and the machine was restarted.
+CLI `import`. **Verified on a real display** (Patrick's local session, X11), before the freezes
+below: the shell renders, French is applied, clicking selects, `0`-`5` rate, arrows move, Tab moves
+between the fields, the Import view renders in the dark scheme and its labels fit in French. Filling the form
+with synthetic typing then froze that display twice (`xdotool type`, a known hazard; a Slint text
+field with ibus was not ruled out) and each time the machine had to be restarted: **no further
+synthetic input is sent to a person's desktop** (testing strategy §6). The typed path of the
+first field is left to Patrick, by hand.
+
+**Tested without a display instead** (`ui/src/headless_tests.rs`, Slint's testing backend, on every
+CI platform): filling the form and clicking Import copies, verifies and registers the photos, the
+state is cleaned, "Show photos" fills the grid and its thumbnails arrive; a second import says
+"0 copied, N already in the library"; a refused import says why and creates nothing; the form is
+remembered by the next launch; the arrow and rating keys reach the catalogue; the French plural
+forms; and the views are drawn to PNG files for a look at the layout. `ui::build` (the window and
+its timers, without `run`) exists for this.
 
 ### WP9 Culling (XL). Needs WP5, WP8
 

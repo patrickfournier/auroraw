@@ -25,5 +25,9 @@ slint = "1.18"
 slint-build = "1.18"
 
 [dev-dependencies]
+# Runs the interface without a window or a display (testing strategy §6). Its API is preliminary
+# and its version must equal Slint's exactly: bump the two together.
+image = { version = "0.25", default-features = false, features = ["png"] }
+i-slint-backend-testing = { version = "=1.18.1", features = ["renderer-software"] }
 auroraw-testkit = { path = "../testkit" }
 auroraw-workspace = { path = "../workspace" }

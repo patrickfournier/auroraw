@@ -655,6 +655,7 @@ dependencies = [
  "auroraw-testkit",
  "auroraw-types",
  "auroraw-workspace",
+ "i-slint-backend-testing",
  "image",
  "serde",
  "serde_json",
