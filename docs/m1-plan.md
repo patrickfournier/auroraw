@@ -477,6 +477,68 @@ second import of the same card copies nothing; the import of a 2,000-photo card 
 interface does not stall the interface thread; cards with several cameras and clashing numbers
 behave as designed (§6 item 6).
 
+**Status: done for the "done when" above; three things this paragraph's own text names are
+scoped out, honestly, below.** Built: `import` (catalogue-agnostic, like `sources` and `imaging`
+beside it): `Profile` (D-029's schema, a plain JSON file at whatever path its caller gives it,
+D-052's "importable and exportable as files"; a style slot is not carried, since nothing exists
+to apply one to before the develop pipeline, M2), a small `{token}` destination-template renderer
+(`{year}`, `{date}`, `{seq:04}`, `{camera}`, `{original}`, `{ext}`, `{shoot}`, §6 item 6),
+RAW+JPEG pairing (D-032), planning (several cameras' files sorted together by capture time,
+numbered from 1, a name collision given a unique suffix -- the case two cameras' own same-numbered
+shots produce when a template is built from the original name, which is exactly what "clashing
+numbers" in this section's own heading means), verified copy (design note 004 §6.3, items 4-5:
+read once, fingerprint and whole-file hash both free since the read already happened, write to
+every destination, read each one back and compare hashes before trusting it), resumable per-job
+state (JSON, one entry per **photo**, not per file: a pair interrupted between its two writes
+retries the whole pair, D-032, never registers a photo with only one of its files), and GPX
+matching (`parse_gpx`, `position_at` interpolating between the two nearest points, `corrected_time`
+applying a time zone then a clock offset). `catalogue` gained the whole-file hash it was missing
+(design note 002 §6.2 already asked for it; a `hash` column and index, `find_by_fingerprint`,
+`apply_hash`) and `sources::volumes::has_dcim` (§6 item 6's card detection). `engine` gained
+`Command::Import`: a background job (`import_job`, the same split `refresh` already uses for a
+keyword rename -- the sidecar write is self-contained and safe from any thread, the catalogue
+write is not) that lists the source, reads each file's metadata, plans, then for each photo reads
+and hashes its original, checks the catalogue for a hash match among candidates a fingerprint
+lookup narrowed down (re-hashing a candidate's own file on demand when the catalogue only has its
+fingerprint, since an already-imported file is local and cheap to re-read), skips only on a hash
+match (**never on a fingerprint alone**, the rule that protects the card), copies and verifies
+otherwise, and registers the finished photo. The coordinator itself never touches a file: it
+resolves the source and destination roots and the metadata template's keywords once (creating any
+that do not exist yet, `resolve_keyword_path`) before handing everything to the background
+thread, which is what keeps a 2,000-file card from blocking it at all.
+
+**Not built, each for a stated reason, not a silent gap.** **Thumbnails and the previews
+database** (D-075): `imaging::process` would give one for free alongside the metadata this work
+package already reads, but `imaging::PreviewsDb::open` has no WAL mode or busy timeout yet, so
+several import workers writing thumbnails to the same file concurrently is not safe as the crate
+stands today, and a full preview decode is, per WP5's own findings, a real, separate, sometimes
+large cost this import job would otherwise inherit for free. Neither this section's own text nor
+its "done when" names thumbnails; architecture §9.2's own pipeline already lists "make thumbnails"
+as its own stage, after registration, not inside it, so a follow-up background job (the same
+shape as `refresh`) is the natural place, once `PreviewsDb` is made safe for concurrent writers.
+**Series detection**: this section's prose never lists it despite the crate's original WP0 doc
+comment once saying so (corrected here); WP9 ("Culling") does. **GPX matching is built and
+tested in `import` but not wired into `Command::Import`**: the specification itself allows
+applying it "at import or afterwards," and wiring it needs a design decision this paragraph
+should not smuggle in unremarked -- where a track file and its clock-offset/time-zone correction
+come from in the command's own shape. `plugin-host` (WP6) is not used here at all despite this
+section's own "uses WP6": nothing in this work package's scope needs a full RAW decode (only
+structured metadata, `imaging::read_metadata`, native, exactly as WP5 already reads it), so there
+was nothing for the sandboxed decoder to do. A CLI subcommand is not added either: the engine-level
+tests below exercise every "done when" case directly, and a real `import` command needs a profile
+file format decision (a bare JSON path, for now) that belongs with whatever first needs it for
+real, rather than a placeholder syntax invented to have something to type.
+
+Tested end to end through `engine`, not just `import`'s own unit tests: a real two-file import
+lands both files unmodified in the archive, registers two photos and leaves the card's own bytes
+untouched (D-031); a second, independent import job (a fresh state file, as a re-inserted card
+would be) copies nothing, confirmed by the catalogue's hash, not by the first job's own memory of
+doing it; a state file pre-marked as if interrupted after one file leaves that file alone and only
+finishes the other; two same-named files from two different source folders (two cameras) land
+under `IMG_0001.raw` and `IMG_0001_2.raw`; and a 20-file import submitted through `submit_and_wait`
+still lets an unrelated command run to completion right after, before the import job itself has
+necessarily finished, proving the coordinator's own queue was never blocked on it.
+
 ### WP8 Interface shell and library (XL). Needs WP2, WP3; grows all along
 
 The Slint application: shell organised by task, the **library grid** built on spike 3's virtualised

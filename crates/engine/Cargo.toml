@@ -23,6 +23,7 @@ auroraw-plugin-host = { path = "../plugin-host" }
 auroraw-types = { path = "../types" }
 thiserror.workspace = true
 serde_json.workspace = true
+time = { workspace = true, features = ["parsing"] }
 
 [dev-dependencies]
 auroraw-testkit = { path = "../testkit" }

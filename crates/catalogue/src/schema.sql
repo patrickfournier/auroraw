@@ -74,6 +74,10 @@ CREATE TABLE photo(
   path TEXT,
   filename TEXT NOT NULL,
   fingerprint TEXT,
+  -- The whole-file hash, known once the file was imported or a background job computes it later
+  -- (design note 004 §6.1, §6.2). Absent otherwise: never a substitute for `fingerprint` in a
+  -- decision that could lose data (§6.3, items 4 and 5 -- import's job, WP7).
+  hash TEXT,
   capture_time INTEGER NOT NULL,
   camera_id INTEGER REFERENCES camera(id),
   lens_id INTEGER REFERENCES lens(id),
@@ -112,6 +116,11 @@ CREATE TABLE photo(
 -- key does not help either.
 CREATE INDEX idx_photo_fingerprint ON photo(fingerprint);
 CREATE INDEX idx_photo_source ON photo(source_id);
+-- Import's skip decision looks up candidates by fingerprint (above) and, once found, compares
+-- hashes; this index is for the rarer reverse lookup (has this exact whole file been seen before,
+-- regardless of its fingerprint bucket -- not used by WP7 but cheap to keep in step with the
+-- fingerprint index rather than added later against a populated column).
+CREATE INDEX idx_photo_hash ON photo(hash);
 
 CREATE TABLE version(
   id TEXT PRIMARY KEY,

@@ -3,7 +3,7 @@
 //! the same at the start or the end of a 100,000-photo catalogue, spike 3), counts, a full-text
 //! search, and a lookup by keyword. See `docs/spikes/03-catalogue-and-grid.md` for the budgets.
 
-use auroraw_types::{Fingerprint, KeywordId, PhotoId, SeriesId, SourceId};
+use auroraw_types::{ContentHash, Fingerprint, KeywordId, PhotoId, SeriesId, SourceId};
 use rusqlite::{OptionalExtension, Row, params};
 
 use crate::error::Result;
@@ -350,6 +350,59 @@ impl Catalogue {
         }
         Ok(out)
     }
+
+    /// Every existing photo whose original's fingerprint matches `fingerprint` (design note 004
+    /// §6.3, item 4): candidates for import's skip decision. A fingerprint match alone never
+    /// decides anything by itself (the whole-file hash does, WP7); this only narrows the search.
+    /// `hash` is `None` when this photo has never had its whole file read (added in place, WP4);
+    /// the caller re-reads that photo's own file, at `source_id`/`path` if both are known, to get
+    /// a hash to compare against before concluding anything.
+    pub fn find_by_fingerprint(
+        &self,
+        fingerprint: &Fingerprint,
+    ) -> Result<Vec<FingerprintCandidate>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, hash, source_id, path FROM photo WHERE fingerprint = ?1")?;
+        let rows = stmt.query_map([fingerprint.to_string()], |r| {
+            let id: String = r.get(0)?;
+            let hash: Option<String> = r.get(1)?;
+            let source_id: Option<String> = r.get(2)?;
+            let path: Option<String> = r.get(3)?;
+            Ok((id, hash, source_id, path))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (id, hash, source_id, path) = row?;
+            let photo_id = id.parse().map_err(|_| {
+                rusqlite::Error::InvalidColumnType(0, "id".into(), rusqlite::types::Type::Text)
+            })?;
+            let hash = hash.and_then(|h| h.parse().ok());
+            let source_id = source_id.and_then(|s| s.parse().ok());
+            out.push(FingerprintCandidate {
+                photo_id,
+                hash,
+                source_id,
+                path,
+            });
+        }
+        Ok(out)
+    }
+}
+
+/// One candidate [`Catalogue::find_by_fingerprint`] found: an existing photo whose original's
+/// fingerprint matches the one being looked up.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FingerprintCandidate {
+    /// The existing photo.
+    pub photo_id: PhotoId,
+    /// Its whole-file hash, if already known.
+    pub hash: Option<ContentHash>,
+    /// Where its file was last seen: enough to re-read it and compute the hash on demand, when
+    /// `hash` is `None`.
+    pub source_id: Option<SourceId>,
+    /// Its path inside that source.
+    pub path: Option<String>,
 }
 
 /// One row of the `source` table.

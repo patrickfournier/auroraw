@@ -152,6 +152,7 @@ dependencies = [
  "auroraw-workspace",
  "serde_json",
  "thiserror 2.0.20",
+ "time",
 ]
 
 [[package]]
@@ -187,9 +188,16 @@ dependencies = [
 name = "auroraw-import"
 version = "0.0.0"
 dependencies = [
- "auroraw-imaging",
+ "auroraw-format",
+ "auroraw-plugin-api",
  "auroraw-sources",
+ "auroraw-testkit",
  "auroraw-types",
+ "quick-xml",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
 ]
 
 [[package]]

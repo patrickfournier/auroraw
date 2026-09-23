@@ -11,16 +11,18 @@ use std::time::SystemTime;
 
 use auroraw_catalogue::{Catalogue, SidecarStat};
 use auroraw_format::sidecar::{FileEntry, FileRole, Location, PhotoSidecar, VersionSidecar};
-use auroraw_format::state::{KeywordEntry, SourceEntry};
+use auroraw_format::state::{KeywordEntry, SourceEntry, Vocabulary};
+use auroraw_import::Profile;
 use auroraw_plugin_api::source::{Source, SourceState};
 use auroraw_sources::filesystem::FilesystemSource;
 use auroraw_sources::relink::{self, FoundFile, KnownFile, ScanOutcome};
-use auroraw_types::{KeywordId, PhotoId, SourceId, Timestamp};
+use auroraw_types::{ContentHash, KeywordId, PhotoId, SourceId, Timestamp};
 use auroraw_workspace::{FileStat, Workspace};
 
 use crate::command::Command;
 use crate::error::{EngineError, Result};
 use crate::event::Event;
+use crate::import_job::{self, ImportJob};
 use crate::job::{CancelToken, JobId};
 
 /// What a command that waits for its result (`Engine::submit_and_wait`) gets back.
@@ -59,6 +61,11 @@ pub enum Outcome {
     },
     /// `AddNewPhotos`'s new identifiers, in the order their paths were given.
     PhotosAdded(Vec<PhotoId>),
+    /// `Import`'s background job.
+    ImportStarted {
+        /// The job doing the import.
+        job: JobId,
+    },
 }
 
 pub(crate) type Reply = mpsc::Sender<Result<Outcome>>;
@@ -74,6 +81,15 @@ pub(crate) enum Inbound {
         photo: Box<PhotoSidecar>,
         stat: SidecarStat,
         main_version: Option<Box<VersionSidecar>>,
+    },
+    /// An import job (`crate::import_job`) landed one photo, or discovered (while checking a
+    /// fingerprint match) the whole-file hash of a photo that only had a fingerprint recorded:
+    /// `photo` and `stat` are `None` for a check that found nothing to register, `backfill` is
+    /// `Some` whenever a hash was discovered either way.
+    Imported {
+        photo: Option<Box<PhotoSidecar>>,
+        stat: Option<SidecarStat>,
+        backfill: Option<(PhotoId, ContentHash)>,
     },
 }
 
@@ -124,6 +140,11 @@ impl Coordinator {
                     stat,
                     main_version,
                 } => self.handle_refreshed(*photo, stat, main_version.as_deref()),
+                Inbound::Imported {
+                    photo,
+                    stat,
+                    backfill,
+                } => self.handle_imported(photo.map(|p| *p), stat, backfill),
             }
         }
         let _ = self.events.send(Event::Stopped);
@@ -175,6 +196,21 @@ impl Coordinator {
             Command::AddSource { name, root, kind } => self.add_source(name, root, kind),
             Command::ScanSource { source_id } => self.scan_source(source_id),
             Command::AddNewPhotos { source_id, paths } => self.add_new_photos(source_id, paths),
+            Command::Import {
+                source_id,
+                destination_source_id,
+                profile,
+                shoot,
+                backup_roots,
+                state_path,
+            } => self.start_import(
+                source_id,
+                destination_source_id,
+                profile,
+                shoot,
+                backup_roots,
+                state_path,
+            ),
         }
     }
 
@@ -521,18 +557,23 @@ impl Coordinator {
     }
 
     /// The real path on this machine (design note 002 §6.6: never stored anywhere but the
-    /// workspace's `hint` and, once registered, the catalogue). Every M1 source is a folder here
-    /// or a removable volume's mount point, read the same way (`sources::filesystem`).
-    fn open_source(entry: &SourceEntry) -> Result<FilesystemSource> {
-        let path = entry
+    /// workspace's `hint` and, once registered, the catalogue).
+    fn source_root(entry: &SourceEntry) -> Result<PathBuf> {
+        entry
             .hint
             .get("path")
             .and_then(|v| v.as_str())
+            .map(PathBuf::from)
             .ok_or_else(|| EngineError::NotFound {
                 kind: "source path (hint)",
                 id: entry.id.to_string(),
-            })?;
-        Ok(FilesystemSource::new(path))
+            })
+    }
+
+    /// Every M1 source is a folder here or a removable volume's mount point, read the same way
+    /// (`sources::filesystem`).
+    fn open_source(entry: &SourceEntry) -> Result<FilesystemSource> {
+        Ok(FilesystemSource::new(Self::source_root(entry)?))
     }
 
     fn add_source(&mut self, name: String, root: PathBuf, kind: String) -> Result<Outcome> {
@@ -692,6 +733,114 @@ impl Coordinator {
             count: added.len(),
         });
         Ok(Outcome::PhotosAdded(added))
+    }
+
+    /// Resolves `path` (`"Family|Wedding"`) against `vocabulary`, creating whatever segment does
+    /// not exist yet, and returns the leaf's identifier. Mutates `vocabulary` in place; the
+    /// caller writes it and applies every touched keyword to the catalogue once, after resolving
+    /// every path a profile's metadata template names, not once per segment.
+    fn resolve_keyword_path(vocabulary: &mut Vocabulary, path: &str) -> Option<KeywordId> {
+        let mut parent: Option<KeywordId> = None;
+        for segment in path.split('|').filter(|s| !s.is_empty()) {
+            let existing = vocabulary
+                .keywords
+                .iter()
+                .find(|k| k.name == segment && k.parent == parent)
+                .map(|k| k.id);
+            parent = Some(existing.unwrap_or_else(|| {
+                let id = KeywordId::random();
+                vocabulary.keywords.push(KeywordEntry {
+                    id,
+                    name: segment.to_string(),
+                    parent,
+                    synonyms: Vec::new(),
+                    export: true,
+                    extra: Default::default(),
+                });
+                id
+            }));
+        }
+        parent
+    }
+
+    fn start_import(
+        &mut self,
+        source_id: SourceId,
+        destination_source_id: SourceId,
+        profile: Profile,
+        shoot: Option<String>,
+        backup_roots: Vec<PathBuf>,
+        state_path: PathBuf,
+    ) -> Result<Outcome> {
+        let entry = self.source_entry(&source_id)?;
+        let source = Self::open_source(&entry)?;
+        let dest_entry = self.source_entry(&destination_source_id)?;
+        let dest_root = Self::source_root(&dest_entry)?;
+
+        // Every keyword the profile's template names is resolved (and created if needed) once,
+        // here, before the background job starts: per-photo would mean racing to create "the
+        // same" new keyword from several photos at once, and the vocabulary is small enough that
+        // there is no cost to doing it all up front.
+        let mut vocabulary = self.read_vocabulary()?;
+        let mut template_keywords = Vec::new();
+        for path in &profile.metadata_template.keyword_paths {
+            if let Some(id) = Self::resolve_keyword_path(&mut vocabulary, path) {
+                template_keywords.push((id, path.clone()));
+            }
+        }
+        vocabulary.updated = Timestamp::now();
+        self.workspace.write_vocabulary(&vocabulary)?;
+        let paths = auroraw_catalogue::keyword_paths(&vocabulary.keywords);
+        for (id, _) in &template_keywords {
+            if let (Some(entry), Some(path)) = (
+                vocabulary.keywords.iter().find(|k| k.id == *id),
+                paths.get(id),
+            ) {
+                self.catalogue.apply_keyword(entry, path)?;
+            }
+        }
+
+        let job = self.spawn_job();
+        let catalogue_path = self
+            .catalogue
+            .path()
+            .expect("the engine's catalogue is always a file")
+            .to_path_buf();
+        import_job::spawn(ImportJob {
+            job,
+            workspace: self.workspace.clone(),
+            source,
+            dest_root,
+            dest_source_id: destination_source_id,
+            profile,
+            shoot,
+            backup_roots,
+            state_path,
+            catalogue_path,
+            template_keywords,
+            events: self.events.clone(),
+            inbound: self.inbound.clone(),
+            cancel: self.jobs[&job].clone(),
+        });
+        let _ = self.events.send(Event::ImportStarted { job, source_id });
+        Ok(Outcome::ImportStarted { job })
+    }
+
+    fn handle_imported(
+        &mut self,
+        photo: Option<PhotoSidecar>,
+        stat: Option<SidecarStat>,
+        backfill: Option<(PhotoId, ContentHash)>,
+    ) {
+        if let Some((id, hash)) = backfill {
+            let _ = self.catalogue.apply_hash(&id, &hash);
+        }
+        if let (Some(photo), Some(stat)) = (photo, stat) {
+            let id = photo.photo_id;
+            if self.catalogue.apply_new_photo(&photo, stat).is_ok() {
+                let _ = self.events.send(Event::PhotoChanged(id));
+            }
+        }
     }
 }
 

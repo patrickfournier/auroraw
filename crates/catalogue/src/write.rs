@@ -9,7 +9,7 @@
 
 use auroraw_format::sidecar::{PhotoSidecar, VersionSidecar};
 use auroraw_format::state::{KeywordEntry, SourceEntry};
-use auroraw_types::{Fingerprint, PhotoId, SourceId};
+use auroraw_types::{ContentHash, Fingerprint, PhotoId, SourceId};
 use rusqlite::{OptionalExtension, params};
 
 use crate::SidecarStat;
@@ -177,6 +177,23 @@ impl Catalogue {
     /// matching it at all. Never removes the photo (D-019, D-031).
     pub fn mark_missing(&mut self, photo_id: &PhotoId, missing: bool) -> Result<()> {
         self.set_reconcile_flag("original_missing", photo_id, missing)
+    }
+
+    /// Records a photo's whole-file hash, once known (design note 004 §6.1): at import, or when
+    /// import's skip decision reads an existing candidate's file to settle a fingerprint match
+    /// that had none recorded yet (WP7).
+    pub fn apply_hash(&mut self, photo_id: &PhotoId, hash: &ContentHash) -> Result<()> {
+        let changed = self.conn.execute(
+            "UPDATE photo SET hash = ?1 WHERE id = ?2",
+            params![hash.to_string(), photo_id.to_string()],
+        )?;
+        if changed == 0 {
+            return Err(CatalogueError::NotFound {
+                kind: "photo",
+                id: photo_id.to_string(),
+            });
+        }
+        Ok(())
     }
 
     fn set_reconcile_flag(
@@ -491,5 +508,50 @@ mod tests {
             cat.mark_missing(&PhotoId::random(), true),
             Err(CatalogueError::NotFound { kind: "photo", .. })
         ));
+    }
+
+    #[test]
+    fn apply_hash_is_found_by_a_later_fingerprint_lookup() {
+        use auroraw_types::ContentHash;
+
+        let mut cat = Catalogue::open_in_memory(WorkspaceId::random()).unwrap();
+        let source_id = SourceId::random();
+        let fp = Fingerprint::from_bytes([3; 32]);
+        let photo = photo_with_file(source_id, "a.raw", fp);
+        cat.apply_new_photo(
+            &photo,
+            SidecarStat {
+                size: 1,
+                modified: Some(1),
+            },
+        )
+        .unwrap();
+
+        let candidates = cat.find_by_fingerprint(&fp).unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].photo_id, photo.photo_id);
+        assert_eq!(
+            candidates[0].hash, None,
+            "not imported yet: no hash recorded"
+        );
+        assert_eq!(candidates[0].source_id, Some(source_id));
+        assert_eq!(candidates[0].path.as_deref(), Some("a.raw"));
+
+        let hash = ContentHash::from_bytes([9; 32]);
+        cat.apply_hash(&photo.photo_id, &hash).unwrap();
+        let candidates = cat.find_by_fingerprint(&fp).unwrap();
+        assert_eq!(candidates[0].hash, Some(hash));
+
+        assert!(matches!(
+            cat.apply_hash(&PhotoId::random(), &hash),
+            Err(CatalogueError::NotFound { kind: "photo", .. })
+        ));
+    }
+
+    #[test]
+    fn find_by_fingerprint_is_empty_for_an_unknown_fingerprint() {
+        let cat = Catalogue::open_in_memory(WorkspaceId::random()).unwrap();
+        let fp = Fingerprint::from_bytes([1; 32]);
+        assert!(cat.find_by_fingerprint(&fp).unwrap().is_empty());
     }
 }

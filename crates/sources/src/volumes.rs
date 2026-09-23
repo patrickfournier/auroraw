@@ -31,6 +31,26 @@ pub fn list_removable_volumes() -> Vec<Volume> {
     imp::list_removable_volumes()
 }
 
+/// Whether `root` looks like a camera's storage (M1 plan §6, item 6: "card detection from the
+/// mounted volumes with a DCIM folder"), the DCF standard every camera and phone that writes
+/// directly to a card or exposes one as mass storage follows. Checked case-insensitively (FAT and
+/// exFAT, what cards almost always carry, are case-insensitive; a card reformatted by a computer
+/// could still be told apart on a case-sensitive filesystem otherwise) and without reading
+/// anything inside it, so an empty or write-protected card still counts. Never an error: a
+/// vanished mount point (unplugged between listing and checking) simply does not look like one.
+pub fn has_dcim(root: &std::path::Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return false;
+    };
+    entries.flatten().any(|entry| {
+        entry
+            .file_name()
+            .to_str()
+            .is_some_and(|n| n.eq_ignore_ascii_case("DCIM"))
+            && entry.path().is_dir()
+    })
+}
+
 #[cfg(target_os = "linux")]
 mod imp {
     use super::Volume;
@@ -283,5 +303,32 @@ mod tests {
         // Whatever this CI runner or the developer's machine has attached, this must not panic
         // or error; an empty result (the common case, no removable media plugged in) is fine.
         let _ = list_removable_volumes();
+    }
+
+    #[test]
+    fn a_folder_with_a_dcim_subfolder_looks_like_a_card() {
+        let dir = auroraw_testkit::temp_dir();
+        std::fs::create_dir_all(dir.path().join("DCIM")).unwrap();
+        assert!(has_dcim(dir.path()));
+    }
+
+    #[test]
+    fn the_check_is_case_insensitive() {
+        let dir = auroraw_testkit::temp_dir();
+        std::fs::create_dir_all(dir.path().join("dcim")).unwrap();
+        assert!(has_dcim(dir.path()));
+    }
+
+    #[test]
+    fn a_plain_folder_and_a_dcim_file_do_not_look_like_a_card() {
+        let dir = auroraw_testkit::temp_dir();
+        assert!(!has_dcim(dir.path()));
+        std::fs::write(dir.path().join("DCIM"), b"not a folder").unwrap();
+        assert!(!has_dcim(dir.path()));
+    }
+
+    #[test]
+    fn a_missing_root_does_not_look_like_a_card() {
+        assert!(!has_dcim(std::path::Path::new("/does/not/exist")));
     }
 }

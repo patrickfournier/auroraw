@@ -2,6 +2,7 @@
 use std::path::PathBuf;
 
 use auroraw_format::sidecar::Flag;
+use auroraw_import::Profile;
 use auroraw_types::{KeywordId, PhotoId, SourceId};
 
 /// A change the engine's single writer applies, in the order it receives them (architecture
@@ -93,5 +94,29 @@ pub enum Command {
         source_id: SourceId,
         /// Their paths inside the source, as `Event::SourceScanned` (or a fresh scan) reported.
         paths: Vec<String>,
+    },
+    /// Imports every file `source_id` has (D-030: no pre-selection) that is not already in the
+    /// catalogue (design note 004 §6.3, item 4), copying it (and a companion JPEG, per the
+    /// profile's pair rule, D-032) into `destination_source_id`'s folder, verified by whole-file
+    /// hash (item 5), with the profile's metadata template applied (D-029). Listing the source,
+    /// reading each file's metadata, planning destinations and copying all run on a background
+    /// worker (`Event::JobProgress`, one `Event::PhotoChanged` per photo as it lands): the
+    /// coordinator itself never blocks on a large card (spec §5.2, "does not stall the interface
+    /// thread"). `state_path` is where this job's resumable progress is kept (an interrupted
+    /// import, resubmitted with the same path, picks up where it stopped); `backup_roots` are
+    /// resolved host paths, one per entry of `profile.backup_templates`, in order.
+    Import {
+        /// The source being imported from (a card or a folder).
+        source_id: SourceId,
+        /// The already-registered source files are copied into.
+        destination_source_id: SourceId,
+        /// Destination templates, pairing, and the metadata template.
+        profile: Profile,
+        /// A session name for the `{shoot}` template token.
+        shoot: Option<String>,
+        /// Extra verified-copy destinations, resolved to real paths.
+        backup_roots: Vec<PathBuf>,
+        /// Where this job's resumable state is kept.
+        state_path: PathBuf,
     },
 }

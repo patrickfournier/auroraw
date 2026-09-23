@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+use auroraw_import::ItemOutcome;
 use auroraw_types::{KeywordId, PhotoId, SourceId};
 
 use crate::command::Command;
@@ -92,5 +93,35 @@ pub enum Event {
         source_id: SourceId,
         /// How many.
         count: usize,
+    },
+    /// An import started, on the background job that runs it.
+    ImportStarted {
+        /// The job doing the work.
+        job: JobId,
+        /// The source being imported from.
+        source_id: SourceId,
+    },
+    /// One file the import job looked at was resolved: copied, skipped (design note 004 §6.3,
+    /// item 4), or failed (retried on the next resume).
+    ImportItem {
+        /// The job.
+        job: JobId,
+        /// Its path inside the source.
+        source_path: String,
+        /// The new photo, when one was registered (absent for a skip or a failure).
+        photo_id: Option<PhotoId>,
+        /// What happened.
+        outcome: ItemOutcome,
+    },
+    /// An import job finished (every file it found has a settled outcome).
+    ImportFinished {
+        /// The job.
+        job: JobId,
+        /// How many files were copied and verified.
+        copied: usize,
+        /// How many were already in the catalogue (design note 004 §6.3, item 4).
+        skipped: usize,
+        /// How many failed and would be retried on the next resume.
+        failed: usize,
     },
 }

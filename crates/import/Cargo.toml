@@ -6,12 +6,21 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
-description = "Import profiles, verified copy, series detection"
+description = "Import profiles, verified copy, RAW+JPEG pairing, GPX matching"
 
 [lints]
 workspace = true
 
 [dependencies]
-auroraw-imaging = { path = "../imaging" }
+auroraw-format = { path = "../format" }
+auroraw-plugin-api = { path = "../plugin-api" }
 auroraw-sources = { path = "../sources" }
 auroraw-types = { path = "../types" }
+quick-xml.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time = { workspace = true, features = ["macros"] }
+
+[dev-dependencies]
+auroraw-testkit = { path = "../testkit" }

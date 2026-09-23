@@ -145,14 +145,14 @@ pub(crate) fn insert_photo(
 
     tx.execute(
         "INSERT INTO photo(
-            id, source_id, path, filename, fingerprint, capture_time, camera_id, lens_id,
+            id, source_id, path, filename, fingerprint, hash, capture_time, camera_id, lens_id,
             iso, aperture, shutter, focal_length, width, height,
             rating, flag, label, title, caption, gps_lat, gps_lon,
             series_id, main_version_id, version_count, effective_rating, effective_flag,
             rating_overridden, imported, sidecar_size, sidecar_modified
         ) VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-            ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
+            ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31
         )",
         params![
             photo.photo_id.to_string(),
@@ -160,6 +160,9 @@ pub(crate) fn insert_photo(
             location.map(|l| l.path.as_str()),
             original_file.map(|f| f.name.as_str()).unwrap_or_default(),
             original_file.map(|f| f.fingerprint.to_string()),
+            original_file
+                .and_then(|f| f.hash.as_ref())
+                .map(|h| h.to_string()),
             photo
                 .meta
                 .original

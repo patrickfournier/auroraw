@@ -18,6 +18,7 @@ mod command;
 mod coordinator;
 mod error;
 mod event;
+mod import_job;
 mod job;
 mod refresh;
 
@@ -184,7 +185,7 @@ mod tests {
 
     use auroraw_format::sidecar::PhotoSidecar;
     use auroraw_testkit::temp_dir;
-    use auroraw_types::{KeywordId, PhotoId};
+    use auroraw_types::{KeywordId, PhotoId, SourceId};
 
     use super::*;
     use crate::command::Command;
@@ -802,5 +803,275 @@ mod tests {
         assert!(reachable);
         assert_eq!(confirmed, 1);
         assert_eq!(missing, 0);
+    }
+
+    fn simple_profile(template: &str) -> auroraw_import::Profile {
+        auroraw_import::Profile {
+            name: "Test".into(),
+            destination_template: template.into(),
+            backup_templates: Vec::new(),
+            pair_rule: auroraw_import::PairRule::Both,
+            metadata_template: auroraw_import::MetadataTemplate::default(),
+        }
+    }
+
+    fn import_and_wait(
+        engine: &Engine,
+        events: &EventReceiver,
+        source_id: SourceId,
+        destination_source_id: SourceId,
+        profile: auroraw_import::Profile,
+        state_path: std::path::PathBuf,
+    ) -> Event {
+        let Outcome::ImportStarted { job } = engine
+            .submit_and_wait(Command::Import {
+                source_id,
+                destination_source_id,
+                profile,
+                shoot: None,
+                backup_roots: Vec::new(),
+                state_path,
+            })
+            .unwrap()
+        else {
+            panic!("expected ImportStarted");
+        };
+        wait_for(
+            events,
+            |e| matches!(e, Event::ImportFinished { job: j, .. } if *j == job),
+            Duration::from_secs(10),
+        )
+    }
+
+    #[test]
+    fn importing_copies_verifies_and_registers_every_file_leaving_the_card_untouched() {
+        let (engine, events, dir) = new_engine();
+        let card = dir.path().join("Card");
+        std::fs::create_dir_all(&card).unwrap();
+        std::fs::write(card.join("a.raw"), b"photo a").unwrap();
+        std::fs::write(card.join("b.raw"), b"photo b").unwrap();
+        let archive = dir.path().join("Archive");
+        std::fs::create_dir_all(&archive).unwrap();
+
+        let card_id = add_source(&engine, &card);
+        let archive_id = add_source(&engine, &archive);
+        events.drain();
+
+        let finished = import_and_wait(
+            &engine,
+            &events,
+            card_id,
+            archive_id,
+            simple_profile("{original}.{ext}"),
+            dir.path().join("job.json"),
+        );
+        assert!(matches!(
+            finished,
+            Event::ImportFinished {
+                copied: 2,
+                skipped: 0,
+                failed: 0,
+                ..
+            }
+        ));
+
+        assert_eq!(
+            std::fs::read(card.join("a.raw")).unwrap(),
+            b"photo a",
+            "the card is never modified (D-031)"
+        );
+        assert_eq!(std::fs::read(card.join("b.raw")).unwrap(), b"photo b");
+        assert_eq!(std::fs::read(archive.join("a.raw")).unwrap(), b"photo a");
+        assert_eq!(std::fs::read(archive.join("b.raw")).unwrap(), b"photo b");
+
+        // Every imported photo is findable by its archived file's own fingerprint and points at
+        // the archive, not the card, with its hash already known.
+        let catalogue = engine.read_catalogue().unwrap();
+        for name in ["a.raw", "b.raw"] {
+            let bytes = std::fs::read(archive.join(name)).unwrap();
+            let (_, fingerprint) =
+                auroraw_format::fingerprint::fingerprint(&mut std::io::Cursor::new(bytes)).unwrap();
+            let matches = catalogue.find_by_fingerprint(&fingerprint).unwrap();
+            assert_eq!(matches.len(), 1, "{name} registered exactly once");
+            assert_eq!(matches[0].source_id, Some(archive_id));
+            assert!(
+                matches[0].hash.is_some(),
+                "the hash is known at import time"
+            );
+        }
+    }
+
+    #[test]
+    fn a_second_import_of_the_same_card_copies_nothing() {
+        let (engine, events, dir) = new_engine();
+        let card = dir.path().join("Card");
+        std::fs::create_dir_all(&card).unwrap();
+        std::fs::write(card.join("a.raw"), b"only photo").unwrap();
+        let archive = dir.path().join("Archive");
+        std::fs::create_dir_all(&archive).unwrap();
+        let card_id = add_source(&engine, &card);
+        let archive_id = add_source(&engine, &archive);
+        events.drain();
+
+        let first = import_and_wait(
+            &engine,
+            &events,
+            card_id,
+            archive_id,
+            simple_profile("{original}.{ext}"),
+            dir.path().join("job1.json"),
+        );
+        assert!(matches!(first, Event::ImportFinished { copied: 1, .. }));
+
+        // A second, independent import job (a fresh state file, as if the card were pulled and
+        // reinserted): the file is skipped on the catalogue's own hash, not because this job
+        // remembers doing it before.
+        let second = import_and_wait(
+            &engine,
+            &events,
+            card_id,
+            archive_id,
+            simple_profile("{original}.{ext}"),
+            dir.path().join("job2.json"),
+        );
+        assert!(matches!(
+            second,
+            Event::ImportFinished {
+                copied: 0,
+                skipped: 1,
+                failed: 0,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn an_interrupted_import_resumes_only_the_unfinished_files() {
+        let (engine, events, dir) = new_engine();
+        let card = dir.path().join("Card");
+        std::fs::create_dir_all(&card).unwrap();
+        std::fs::write(card.join("a.raw"), b"already done").unwrap();
+        std::fs::write(card.join("b.raw"), b"not done yet").unwrap();
+        let archive = dir.path().join("Archive");
+        std::fs::create_dir_all(&archive).unwrap();
+        let card_id = add_source(&engine, &card);
+        let archive_id = add_source(&engine, &archive);
+        events.drain();
+
+        // Simulate an import that was interrupted right after `a.raw` landed: its own state file
+        // already marks it done, as the job itself would have left it.
+        let state_path = dir.path().join("job.json");
+        let mut state = auroraw_import::ImportState::new();
+        state.record("a.raw", auroraw_import::ItemOutcome::Copied);
+        state.save(&state_path).unwrap();
+        // `a.raw` is not actually in the archive or the catalogue yet in this test (the
+        // interruption is simulated, not a real prior run): resuming must still leave it alone,
+        // proving the decision is state-file-driven and not a fresh catalogue check.
+        assert!(!archive.join("a.raw").exists());
+
+        let finished = import_and_wait(
+            &engine,
+            &events,
+            card_id,
+            archive_id,
+            simple_profile("{original}.{ext}"),
+            state_path,
+        );
+        assert!(matches!(
+            finished,
+            Event::ImportFinished {
+                copied: 1,
+                skipped: 0,
+                failed: 0,
+                ..
+            }
+        ));
+        assert!(
+            !archive.join("a.raw").exists(),
+            "already-settled in the state file: not retried"
+        );
+        assert_eq!(
+            std::fs::read(archive.join("b.raw")).unwrap(),
+            b"not done yet"
+        );
+    }
+
+    #[test]
+    fn two_cameras_with_the_same_file_name_do_not_collide_at_the_destination() {
+        let (engine, events, dir) = new_engine();
+        let card = dir.path().join("Card");
+        std::fs::create_dir_all(card.join("CameraA")).unwrap();
+        std::fs::create_dir_all(card.join("CameraB")).unwrap();
+        std::fs::write(card.join("CameraA/IMG_0001.raw"), b"from camera A").unwrap();
+        std::fs::write(card.join("CameraB/IMG_0001.raw"), b"from camera B").unwrap();
+        let archive = dir.path().join("Archive");
+        std::fs::create_dir_all(&archive).unwrap();
+        let card_id = add_source(&engine, &card);
+        let archive_id = add_source(&engine, &archive);
+        events.drain();
+
+        let finished = import_and_wait(
+            &engine,
+            &events,
+            card_id,
+            archive_id,
+            simple_profile("{original}.{ext}"),
+            dir.path().join("job.json"),
+        );
+        assert!(matches!(finished, Event::ImportFinished { copied: 2, .. }));
+
+        assert_eq!(
+            std::fs::read(archive.join("IMG_0001.raw")).unwrap(),
+            b"from camera A"
+        );
+        assert_eq!(
+            std::fs::read(archive.join("IMG_0001_2.raw")).unwrap(),
+            b"from camera B",
+            "the second file to land on the same name gets a unique suffix"
+        );
+    }
+
+    #[test]
+    fn importing_does_not_block_the_coordinators_command_queue() {
+        let (engine, events, dir) = new_engine();
+        let card = dir.path().join("Card");
+        std::fs::create_dir_all(&card).unwrap();
+        for i in 0..20 {
+            std::fs::write(card.join(format!("{i}.raw")), format!("photo {i}")).unwrap();
+        }
+        let archive = dir.path().join("Archive");
+        std::fs::create_dir_all(&archive).unwrap();
+        let card_id = add_source(&engine, &card);
+        let archive_id = add_source(&engine, &archive);
+        events.drain();
+
+        let Outcome::ImportStarted { job } = engine
+            .submit_and_wait(Command::Import {
+                source_id: card_id,
+                destination_source_id: archive_id,
+                profile: simple_profile("{original}.{ext}"),
+                shoot: None,
+                backup_roots: Vec::new(),
+                state_path: dir.path().join("job.json"),
+            })
+            .unwrap()
+        else {
+            panic!("expected ImportStarted");
+        };
+        // The import is still running (or, at worst, racing to finish) in the background: an
+        // unrelated command submitted right after still gets a prompt answer from the
+        // coordinator, which never waited for the import job itself.
+        let photo_id = PhotoId::random();
+        engine
+            .workspace()
+            .write_photo(&PhotoSidecar::new(photo_id))
+            .unwrap();
+        engine.submit_and_wait(Command::Rebuild).unwrap();
+
+        wait_for(
+            &events,
+            |e| matches!(e, Event::ImportFinished { job: j, .. } if *j == job),
+            Duration::from_secs(10),
+        );
     }
 }
