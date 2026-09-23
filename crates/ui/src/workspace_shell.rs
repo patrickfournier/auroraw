@@ -7,13 +7,16 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use auroraw_engine::{Command, Engine, Event, ImportRequest, JobId, OpenedWorkspace};
+use auroraw_engine::{
+    AddPlan, AddSourceRequest, Command, Engine, Event, ImportRequest, JobId, OpenedWorkspace,
+    SourceInfo, paths,
+};
 use auroraw_types::PhotoId;
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 
 use crate::Platform;
 use crate::app::{Launcher, Shell};
-use crate::generated::{MainWindow, Texts, VolumeEntry};
+use crate::generated::{MainWindow, SourceEntry, Texts, VolumeEntry};
 use crate::grid::{self, GridState, Item, RowModel};
 use crate::settings::Settings;
 
@@ -65,6 +68,33 @@ fn summary_of(engine: &Engine, id: PhotoId) -> String {
         }
         _ => String::new(),
     }
+}
+
+/// What the catalogue panel is doing: the sources it lists, and the scan or removal in progress.
+#[derive(Default)]
+struct CatalogueState {
+    sources: Vec<SourceInfo>,
+    /// The scan or removal in progress: told apart from the import's own jobs.
+    job: Option<JobId>,
+    /// The source a removal is confirmed for, and its name for the closing message.
+    removing: Option<(auroraw_types::SourceId, String)>,
+    removing_name: String,
+}
+
+fn refresh_sources(engine: &Engine, ui: &MainWindow, state: &Rc<RefCell<CatalogueState>>) {
+    let sources = engine.sources().unwrap_or_default();
+    let entries: Vec<SourceEntry> = sources
+        .iter()
+        .map(|s| SourceEntry {
+            name: s.name.as_str().into(),
+            path: s.path.to_string_lossy().as_ref().into(),
+            online: s.online,
+            photos: s.photos as i32,
+            worked_on: s.worked_on as i32,
+        })
+        .collect();
+    ui.set_sources(ModelRc::new(VecModel::from(entries)));
+    state.borrow_mut().sources = sources;
 }
 
 /// The import in progress, if any: which job, so its events are told apart from anything else.
@@ -163,9 +193,11 @@ pub(crate) fn attach(
     ui.set_import_rights(saved.rights.into());
     ui.set_import_source(saved.source.into());
     refresh_volumes(&launcher.platform, &ui);
-    // A workspace with nothing in it yet opens on what fills it.
+    // A workspace with nothing in it yet opens on what fills it: the catalogue's sources.
+    let catalogue = Rc::new(RefCell::new(CatalogueState::default()));
+    refresh_sources(&engine, &ui, &catalogue);
     if created || state.len() == 0 {
-        ui.set_current_task("import".into());
+        ui.set_current_task("catalogue".into());
     }
 
     // Thumbnails and engine events both arrive off the UI thread; a short repeating timer drains
@@ -189,13 +221,72 @@ pub(crate) fn attach(
     {
         let (state, engine, weak) = (state.clone(), engine.clone(), ui.as_weak());
         let (run, new_photos) = (run.clone(), new_photos.clone());
+        let catalogue = catalogue.clone();
         let mut last_reload = Instant::now();
         event_timer.start(TimerMode::Repeated, Duration::from_millis(50), move || {
             let Some(ui) = weak.upgrade() else { return };
             let texts = ui.global::<Texts>();
             while let Some(event) = events.try_recv() {
                 let ours = |job: &JobId| run.borrow().job.as_ref() == Some(job);
+                let scanning = |job: &JobId| catalogue.borrow().job.as_ref() == Some(job);
                 match event {
+                    Event::IndexPlanned {
+                        job,
+                        new_files,
+                        restorable,
+                        ..
+                    } if scanning(&job) => {
+                        if restorable > 0 {
+                            ui.set_restore_count(restorable as i32);
+                            ui.set_restore_total(new_files as i32);
+                            ui.set_dialog("restore".into());
+                        }
+                    }
+                    Event::JobProgress { job, done, total } if scanning(&job) && total > 0 => {
+                        ui.set_catalogue_progress(done as f32 / total as f32);
+                        ui.set_catalogue_status(texts.invoke_indexing(done as i32, total as i32));
+                    }
+                    Event::IndexFinished {
+                        job,
+                        added,
+                        restored,
+                        known,
+                        failed,
+                        ..
+                    } if scanning(&job) => {
+                        catalogue.borrow_mut().job = None;
+                        ui.set_catalogue_busy(false);
+                        ui.set_catalogue_status(texts.invoke_index_done(
+                            added as i32,
+                            restored as i32,
+                            known as i32,
+                            failed as i32,
+                        ));
+                        refresh_sources(&engine, &ui, &catalogue);
+                        new_photos.set(true);
+                    }
+                    Event::IndexAborted { job, reason } if scanning(&job) => {
+                        catalogue.borrow_mut().job = None;
+                        ui.set_catalogue_busy(false);
+                        ui.set_catalogue_status(texts.invoke_index_stopped(reason.into()));
+                    }
+                    Event::SourceRemoved { job, removed, .. } if scanning(&job) => {
+                        let name = std::mem::take(&mut catalogue.borrow_mut().removing_name);
+                        catalogue.borrow_mut().job = None;
+                        ui.set_catalogue_busy(false);
+                        ui.set_catalogue_status(
+                            texts.invoke_source_removed(name.into(), removed as i32),
+                        );
+                        refresh_sources(&engine, &ui, &catalogue);
+                        new_photos.set(true);
+                    }
+                    Event::JobCancelled(job) if scanning(&job) => {
+                        catalogue.borrow_mut().job = None;
+                        ui.set_catalogue_busy(false);
+                        ui.set_catalogue_status(texts.invoke_scan_cancelled());
+                        refresh_sources(&engine, &ui, &catalogue);
+                        new_photos.set(true);
+                    }
                     Event::PhotoChanged(id) => {
                         if let Some(row) = photo_row(&engine, id) {
                             state.set_rating(id, row.effective_rating);
@@ -331,6 +422,145 @@ pub(crate) fn attach(
             let Some(ui) = weak.upgrade() else { return };
             reload(&engine, &state, &ui);
             ui.set_current_task("cull".into());
+        });
+    }
+
+    // The catalogue panel: adding, removing and rescanning sources.
+    {
+        let weak = ui.as_weak();
+        ui.on_add_source(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            ui.set_source_folder(SharedString::new());
+            ui.set_source_name(SharedString::new());
+            ui.set_add_source_error(SharedString::new());
+            ui.set_add_source_merge_question(SharedString::new());
+            ui.set_dialog("add-source".into());
+        });
+    }
+    {
+        let (engine, catalogue, weak) = (engine.clone(), catalogue.clone(), ui.as_weak());
+        let add = move |merge: bool| {
+            let Some(ui) = weak.upgrade() else { return };
+            let texts = ui.global::<Texts>();
+            let root = match paths::resolve(ui.get_source_folder().as_str()) {
+                Ok(root) => root,
+                Err(e) => {
+                    ui.set_add_source_error(texts.invoke_cannot_add_source(e.to_string().into()));
+                    return;
+                }
+            };
+            // The dialog shows back what was understood.
+            ui.set_source_folder(root.to_string_lossy().as_ref().into());
+            ui.set_add_source_error(SharedString::new());
+            if !merge && let Ok(AddPlan::ContainsExisting(inner)) = engine.plan_add_source(&root) {
+                let names: Vec<String> = inner.iter().map(|s| format!("\"{}\"", s.name)).collect();
+                ui.set_add_source_merge_question(
+                    texts.invoke_merge_question(names.join(", ").into()),
+                );
+                return;
+            }
+            let name = ui.get_source_name().trim().to_string();
+            match engine.add_source(AddSourceRequest {
+                root,
+                name: Some(name).filter(|n| !n.is_empty()),
+                merge,
+            }) {
+                Ok(added) => {
+                    catalogue.borrow_mut().job = Some(added.job);
+                    ui.set_catalogue_busy(true);
+                    ui.set_catalogue_progress(0.0);
+                    ui.set_catalogue_status(texts.invoke_indexing(0, 0));
+                    ui.set_dialog(SharedString::new());
+                    refresh_sources(&engine, &ui, &catalogue);
+                }
+                Err(e) => {
+                    ui.set_add_source_merge_question(SharedString::new());
+                    ui.set_add_source_error(texts.invoke_cannot_add_source(e.to_string().into()));
+                }
+            }
+        };
+        let add = Rc::new(add);
+        {
+            let add = add.clone();
+            ui.on_add_source_confirm(move || add(false));
+        }
+        ui.on_add_source_merge(move || add(true));
+    }
+    {
+        let (catalogue, weak, engine) = (catalogue.clone(), ui.as_weak(), engine.clone());
+        ui.on_remove_source(move |index| {
+            let Some(ui) = weak.upgrade() else { return };
+            let source = usize::try_from(index)
+                .ok()
+                .and_then(|i| catalogue.borrow().sources.get(i).cloned());
+            let Some(source) = source else { return };
+            let counts = engine.source_counts(source.id).ok();
+            ui.set_remove_name(source.name.as_str().into());
+            ui.set_remove_photos(counts.map_or(source.photos, |c| c.photos) as i32);
+            ui.set_remove_worked_on(counts.map_or(source.worked_on, |c| c.worked_on) as i32);
+            let mut state = catalogue.borrow_mut();
+            state.removing_name = source.name.clone();
+            state.removing = Some((source.id, source.name));
+            ui.set_dialog("remove-source".into());
+        });
+    }
+    {
+        let (catalogue, weak, engine) = (catalogue.clone(), ui.as_weak(), engine.clone());
+        ui.on_remove_source_confirm(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            let Some((source_id, _)) = catalogue.borrow().removing.clone() else {
+                return;
+            };
+            if let Ok(auroraw_engine::Outcome::RemoveStarted { job }) =
+                engine.submit_and_wait(Command::RemoveSource { source_id })
+            {
+                catalogue.borrow_mut().job = Some(job);
+                ui.set_catalogue_busy(true);
+                ui.set_catalogue_progress(0.0);
+                ui.set_catalogue_status(SharedString::new());
+            }
+            ui.set_dialog(SharedString::new());
+        });
+    }
+    {
+        let (catalogue, weak, engine) = (catalogue.clone(), ui.as_weak(), engine.clone());
+        ui.on_rescan_source(move |index| {
+            let Some(ui) = weak.upgrade() else { return };
+            let source = usize::try_from(index)
+                .ok()
+                .and_then(|i| catalogue.borrow().sources.get(i).cloned());
+            let Some(source) = source else { return };
+            if let Ok(auroraw_engine::Outcome::IndexStarted { job }) =
+                engine.submit_and_wait(Command::IndexSource {
+                    source_id: source.id,
+                    merge: Vec::new(),
+                })
+            {
+                catalogue.borrow_mut().job = Some(job);
+                ui.set_catalogue_busy(true);
+                ui.set_catalogue_progress(0.0);
+                ui.set_catalogue_status(ui.global::<Texts>().invoke_indexing(0, 0));
+            }
+        });
+    }
+    {
+        let (catalogue, weak, engine) = (catalogue.clone(), ui.as_weak(), engine.clone());
+        ui.on_restore_choice(move |restore| {
+            let Some(ui) = weak.upgrade() else { return };
+            if let Some(job_id) = catalogue.borrow().job {
+                let _ = engine.submit(Command::ContinueIndex { job_id, restore });
+            }
+            ui.set_dialog(SharedString::new());
+        });
+    }
+    {
+        let (catalogue, weak, engine) = (catalogue.clone(), ui.as_weak(), engine.clone());
+        ui.on_restore_cancelled(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            if let Some(job_id) = catalogue.borrow().job {
+                let _ = engine.submit(Command::CancelJob { job_id });
+            }
+            ui.set_dialog(SharedString::new());
         });
     }
 

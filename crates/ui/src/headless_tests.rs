@@ -153,6 +153,14 @@ fn import_state(fixture: &Fixture) -> PathBuf {
     fixture.dirs.workspace_data(id).join("import")
 }
 
+/// Goes to the import view (File > Import; until the import dialog replaces it): where the import
+/// tests start.
+fn to_import(app: App) -> App {
+    app.launcher.run_command(&app.ui(), "file.import");
+    assert_eq!(app.ui().get_current_task(), "import");
+    app
+}
+
 /// The catalogue of the workspace the fixture's machine opened last, for reading.
 fn catalogue(fixture: &Fixture) -> Catalogue {
     let id = Engine::last_opened_workspace(&fixture.dirs)
@@ -216,7 +224,8 @@ fn a_workspace_that_is_empty_opens_on_what_fills_it_and_one_with_photos_on_the_g
     let f = fixture(2);
     {
         let shell = open(&f);
-        assert_eq!(shell.ui().get_current_task(), "import");
+        assert_eq!(shell.ui().get_current_task(), "catalogue");
+        let shell = to_import(shell);
         fill_import_form(&shell, &f);
         click(&shell, "Import");
         settle("the import", || shell.ui().get_import_finished());
@@ -232,7 +241,7 @@ fn a_workspace_that_is_empty_opens_on_what_fills_it_and_one_with_photos_on_the_g
 fn filling_the_form_and_clicking_import_copies_verifies_and_shows_the_photos() {
     init();
     let f = fixture(3);
-    let shell = open(&f);
+    let shell = to_import(open(&f));
     fill_import_form(&shell, &f);
     type_into(&shell, "Creator", "Patrick Fournier");
     assert_eq!(shell.ui().get_import_archive(), f.archive.to_string_lossy());
@@ -277,7 +286,7 @@ fn filling_the_form_and_clicking_import_copies_verifies_and_shows_the_photos() {
 fn a_second_import_of_the_same_card_says_so_and_copies_nothing() {
     init();
     let f = fixture(2);
-    let shell = open(&f);
+    let shell = to_import(open(&f));
     fill_import_form(&shell, &f);
     click(&shell, "Import");
     settle("the first import", || shell.ui().get_import_finished());
@@ -297,7 +306,7 @@ fn a_second_import_of_the_same_card_says_so_and_copies_nothing() {
 fn an_import_that_cannot_start_says_why_and_starts_nothing() {
     init();
     let f = fixture(1);
-    let shell = open(&f);
+    let shell = to_import(open(&f));
 
     click(&shell, "Import");
     assert!(!shell.ui().get_importing());
@@ -326,7 +335,7 @@ fn the_form_is_remembered_the_next_time_the_workspace_opens() {
     init();
     let f = fixture(1);
     {
-        let shell = open(&f);
+        let shell = to_import(open(&f));
         fill_import_form(&shell, &f);
         type_into(&shell, "Creator", "Patrick Fournier");
         type_into(&shell, "Copyright", "© Patrick Fournier");
@@ -344,7 +353,7 @@ fn the_form_is_remembered_the_next_time_the_workspace_opens() {
 fn rating_from_the_keyboard_reaches_the_catalogue() {
     init();
     let f = fixture(2);
-    let shell = open(&f);
+    let shell = to_import(open(&f));
     fill_import_form(&shell, &f);
     click(&shell, "Import");
     settle("the import", || shell.ui().get_import_finished());
@@ -489,7 +498,7 @@ fn the_views_render_and_can_be_written_out_as_pictures() {
     welcome.launcher.run_command(&welcome.ui(), "help.about");
     snapshot(&welcome, "about");
     drop(welcome);
-    let shell = open_in(&f, "fr");
+    let shell = to_import(open_in(&f, "fr"));
     snapshot(&shell, "import-empty");
 
     // The labels are French here, so the fields are set directly rather than found by label.
@@ -542,7 +551,7 @@ fn browsing_fills_the_field_and_opens_the_dialog_where_the_field_points() {
     init();
     let f = fixture(0);
     let dialogs = Rc::new(RefCell::new(Dialogs::default()));
-    let shell = open_with(&f, "en", platform(stand_in(&dialogs)));
+    let shell = to_import(open_with(&f, "en", platform(stand_in(&dialogs))));
 
     // An empty field opens the system's default place; the answer fills the field.
     dialogs.borrow_mut().answer = Some(f.archive.clone());
@@ -585,7 +594,7 @@ fn cancelling_the_dialog_leaves_the_field_alone() {
     init();
     let f = fixture(0);
     let dialogs = Rc::new(RefCell::new(Dialogs::default()));
-    let shell = open_with(&f, "en", platform(stand_in(&dialogs)));
+    let shell = to_import(open_with(&f, "en", platform(stand_in(&dialogs))));
     type_into(&shell, "Archive folder", "/kept/as/typed");
 
     dialogs.borrow_mut().answer = None;
@@ -602,7 +611,7 @@ fn while_a_dialog_is_open_another_one_cannot_be_started() {
         hold: true,
         ..Dialogs::default()
     }));
-    let shell = open_with(&f, "en", platform(stand_in(&dialogs)));
+    let shell = to_import(open_with(&f, "en", platform(stand_in(&dialogs))));
 
     click(&shell, "Browse for: Archive folder");
     assert!(shell.ui().get_picking());
@@ -695,7 +704,7 @@ fn creating_a_workspace_from_the_dialog_opens_it_and_remembers_it() {
     assert_eq!(ui.get_workspace_name(), "Main");
     assert_eq!(
         ui.get_current_task(),
-        "import",
+        "catalogue",
         "a new workspace opens on what fills it"
     );
     assert!(f.pictures.join("Auroraw/Main/workspace.json").is_file());
@@ -1083,7 +1092,7 @@ fn escape_closes_the_menu_and_the_dialogs() {
 fn the_edit_menu_acts_on_the_text_field_that_has_the_keyboard() {
     init();
     let f = fixture(0);
-    let app = open(&f);
+    let app = to_import(open(&f));
     // The import fields are on screen while the menu is used (a dialog would sit over the menu).
     assert_eq!(app.ui().get_current_task(), "import");
     type_into(&app, "Creator", "Patrick");
@@ -1135,4 +1144,227 @@ fn the_language_is_chosen_in_settings_and_remembered() {
         app.ui().global::<Texts>().invoke_default_workspace_name(),
         "Main"
     );
+}
+
+/// Clicks a tab of the top bar.
+fn click_tab(app: &App, label: &str) {
+    let ui = app.ui();
+    let tab = ElementQuery::from_root(&ui)
+        .match_descendants()
+        .match_accessible_role(AccessibleRole::Tab)
+        .match_predicate({
+            let label = label.to_string();
+            move |element| element.accessible_label().is_some_and(|l| l == label)
+        })
+        .find_first()
+        .unwrap_or_else(|| panic!("no tab labelled {label:?}"));
+    tab.mock_single_click(PointerEventButton::Left);
+}
+
+/// Adds `folder` as a source through the catalogue panel and waits for its scan to end.
+fn add_source_through_the_panel(app: &App, folder: &Path) {
+    click(app, "Add a source…");
+    assert_eq!(app.ui().get_dialog(), "add-source");
+    type_into(app, "Folder", &folder.to_string_lossy());
+    click(app, "Add");
+}
+
+fn wait_for_the_scan(app: &App) {
+    settle("the scan to end", || !app.ui().get_catalogue_busy());
+}
+
+#[test]
+fn adding_a_folder_from_the_catalogue_panel_scans_it_and_lists_it_without_copying() {
+    init();
+    let f = fixture(3);
+    let app = open(&f);
+    assert_eq!(app.ui().get_current_task(), "catalogue");
+    assert_eq!(app.ui().get_sources().row_count(), 0);
+
+    add_source_through_the_panel(&app, &f.card);
+    assert_eq!(
+        app.ui().get_dialog(),
+        "",
+        "the dialog closes and the scan runs"
+    );
+    wait_for_the_scan(&app);
+    assert_eq!(
+        app.ui().get_catalogue_status(),
+        "Done: 3 added, 0 restored, 0 already known, 0 not readable."
+    );
+    let sources = app.ui().get_sources();
+    assert_eq!(sources.row_count(), 1);
+    let row = sources.row_data(0).unwrap();
+    assert_eq!(
+        (row.name.as_str(), row.photos, row.online),
+        ("Card", 3, true)
+    );
+    assert!(!f.archive.exists(), "nothing was copied anywhere");
+
+    // The photos are in the grid.
+    click_tab(&app, "Cull");
+    assert_eq!(app.ui().get_status(), "3 photos");
+}
+
+#[test]
+fn the_dialog_says_why_a_folder_cannot_be_added() {
+    init();
+    let f = fixture(2);
+    let app = open(&f);
+    add_source_through_the_panel(&app, &f.card);
+    wait_for_the_scan(&app);
+
+    // Inside a source: already covered. Not a folder, and not absolute: refused with the reason.
+    std::fs::create_dir_all(f.card.join("September")).unwrap();
+    click(&app, "Add a source…");
+    type_into(&app, "Folder", &f.card.join("September").to_string_lossy());
+    click(&app, "Add");
+    assert!(
+        app.ui().get_add_source_error().contains("already part of"),
+        "{}",
+        app.ui().get_add_source_error()
+    );
+    assert_eq!(app.ui().get_dialog(), "add-source");
+
+    type_into(&app, "Folder", "photos/relative");
+    click(&app, "Add");
+    assert!(app.ui().get_add_source_error().contains("absolute"));
+    assert_eq!(
+        app.ui().get_sources().row_count(),
+        1,
+        "nothing else was registered"
+    );
+}
+
+#[test]
+fn a_folder_that_contains_a_source_asks_before_merging_it() {
+    init();
+    let f = fixture(2);
+    let parent = f.card.parent().unwrap().join("Photos");
+    std::fs::create_dir_all(&parent).unwrap();
+    std::fs::rename(&f.card, parent.join("Card")).unwrap();
+    write_jpeg(&parent.join("top.jpg"), 9);
+    let inner = parent.join("Card");
+
+    let app = open(&f);
+    add_source_through_the_panel(&app, &inner);
+    wait_for_the_scan(&app);
+
+    click(&app, "Add a source…");
+    type_into(&app, "Folder", &parent.to_string_lossy());
+    click(&app, "Add");
+    assert!(
+        app.ui()
+            .get_add_source_merge_question()
+            .contains("\"Card\""),
+        "{}",
+        app.ui().get_add_source_merge_question()
+    );
+    assert_eq!(app.ui().get_sources().row_count(), 1, "nothing changed yet");
+
+    click(&app, "Merge and add");
+    wait_for_the_scan(&app);
+    let sources = app.ui().get_sources();
+    assert_eq!(
+        sources.row_count(),
+        1,
+        "the inner source was merged into the new one"
+    );
+    let row = sources.row_data(0).unwrap();
+    assert_eq!((row.name.as_str(), row.photos), ("Photos", 3));
+}
+
+#[test]
+fn removing_a_source_confirms_with_the_numbers_and_can_be_undone_by_adding_it_again() {
+    init();
+    let f = fixture(2);
+    let app = open(&f);
+    add_source_through_the_panel(&app, &f.card);
+    wait_for_the_scan(&app);
+
+    // Rate one photo, so that there is work to lose.
+    click_tab(&app, "Cull");
+    click_cell(&app, 0);
+    press(&app, "4");
+    settle("the rating", || {
+        catalogue(&f).list_by_min_rating(4, None, 10).unwrap().len() == 1
+    });
+    click_tab(&app, "Catalogue");
+
+    click(&app, "Remove: Card");
+    assert_eq!(app.ui().get_dialog(), "remove-source");
+    assert_eq!(
+        (
+            app.ui().get_remove_photos(),
+            app.ui().get_remove_worked_on()
+        ),
+        (2, 1)
+    );
+    click(&app, "Remove");
+    wait_for_the_scan(&app);
+    assert_eq!(
+        app.ui().get_catalogue_status(),
+        "Source \"Card\" removed; 2 photos left the catalogue."
+    );
+    assert_eq!(app.ui().get_sources().row_count(), 0);
+    assert_eq!(catalogue(&f).count_all().unwrap(), 0);
+    assert!(
+        f.card.join("IMG_0000.jpg").is_file(),
+        "the originals are untouched"
+    );
+
+    // Adding it again offers to bring the photos back, with their rating.
+    add_source_through_the_panel(&app, &f.card);
+    settle("the question", || app.ui().get_dialog() == "restore");
+    assert_eq!(
+        (app.ui().get_restore_count(), app.ui().get_restore_total()),
+        (2, 2)
+    );
+    click(&app, "Restore them");
+    wait_for_the_scan(&app);
+    assert_eq!(
+        app.ui().get_catalogue_status(),
+        "Done: 0 added, 2 restored, 0 already known, 0 not readable."
+    );
+    assert_eq!(
+        catalogue(&f).list_by_min_rating(4, None, 10).unwrap().len(),
+        1
+    );
+    assert_eq!(app.ui().get_sources().row_data(0).unwrap().photos, 2);
+}
+
+#[test]
+fn a_source_can_be_rescanned_to_pick_up_new_photos() {
+    init();
+    let f = fixture(1);
+    let app = open(&f);
+    add_source_through_the_panel(&app, &f.card);
+    wait_for_the_scan(&app);
+    write_jpeg(&f.card.join("IMG_new.jpg"), 42);
+
+    click(&app, "Rescan: Card");
+    wait_for_the_scan(&app);
+    assert_eq!(
+        app.ui().get_catalogue_status(),
+        "Done: 1 added, 0 restored, 1 already known, 0 not readable."
+    );
+    assert_eq!(app.ui().get_sources().row_data(0).unwrap().photos, 2);
+}
+
+#[test]
+fn the_catalogue_panel_and_its_dialogs_render() {
+    init_rendering();
+    let f = fixture(6);
+    let app = open_in(&f, "fr");
+    snapshot(&app, "catalogue-empty");
+
+    click(&app, "Ajouter une source…");
+    type_into(&app, "Dossier", &f.card.to_string_lossy());
+    snapshot(&app, "add-source-dialog");
+    click(&app, "Ajouter");
+    wait_for_the_scan(&app);
+    snapshot(&app, "catalogue-with-a-source");
+
+    click(&app, "Retirer : Card");
+    snapshot(&app, "remove-source-dialog");
 }

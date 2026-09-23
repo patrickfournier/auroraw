@@ -464,6 +464,7 @@ impl Launcher {
             "source" => ui.get_import_source(),
             "archive" => ui.get_import_archive(),
             "backup" => ui.get_import_backup(),
+            "add-source" => ui.get_source_folder(),
             _ if new_workspace_dialog => ui.get_new_location(),
             _ => SharedString::new(),
         };
@@ -483,6 +484,7 @@ impl Launcher {
                     "source" => ui.set_import_source(text),
                     "archive" => ui.set_import_archive(text),
                     "backup" => ui.set_import_backup(text),
+                    "add-source" => ui.set_source_folder(text),
                     _ if new_workspace_dialog => ui.set_new_location(text),
                     _ => {
                         if let Err(message) = launcher.open_typed(&text) {

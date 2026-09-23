@@ -262,3 +262,100 @@ msgstr "Logiciel libre, licence publique générale GNU version 3.0 ou ultérieu
 
 msgid "Made with Slint."
 msgstr "Réalisé avec Slint."
+
+msgid "Catalogue"
+msgstr "Catalogue"
+
+msgid "Sources"
+msgstr "Sources"
+
+msgid "Add a source…"
+msgstr "Ajouter une source…"
+
+msgid "A source is a folder whose photos are in the catalogue. Adding one copies nothing: the photos stay where they are."
+msgstr "Une source est un dossier dont les photos sont dans le catalogue. En ajouter une ne copie rien : les photos restent où elles sont."
+
+msgid "No source yet. Add the folder your photos are in."
+msgstr "Aucune source pour l'instant. Ajoutez le dossier où sont vos photos."
+
+msgid "Offline"
+msgstr "Hors ligne"
+
+msgid "Rescan"
+msgstr "Réanalyser"
+
+msgid "Rescan: {}"
+msgstr "Réanalyser : {}"
+
+msgid "Remove"
+msgstr "Retirer"
+
+msgid "Remove: {}"
+msgstr "Retirer : {}"
+
+msgid "Add a source"
+msgstr "Ajouter une source"
+
+msgid "Kind: Folder (local, or a network share that is mounted)"
+msgstr "Type : dossier (local, ou partage réseau monté)"
+
+msgid "Name (optional)"
+msgstr "Nom (facultatif)"
+
+msgid "Add"
+msgstr "Ajouter"
+
+msgid "Merge and add"
+msgstr "Fusionner et ajouter"
+
+msgid "Remove the source \"{}\"?"
+msgstr "Retirer la source « {} » ?"
+
+msgid "Their data is kept in the workspace's removed folder and comes back if you add this folder again. The photo files themselves are never touched."
+msgstr "Leurs données sont conservées dans le dossier « removed » du workspace et reviennent si vous ajoutez de nouveau ce dossier. Les fichiers photo eux-mêmes ne sont jamais touchés."
+
+msgid "Photos removed earlier"
+msgstr "Photos retirées auparavant"
+
+msgid "{} of the {} photos in this folder were in the catalogue before, with their ratings, keywords and versions."
+msgstr "{} des {} photos de ce dossier étaient déjà dans le catalogue, avec leurs cotes, mots-clés et versions."
+
+msgid "Add them as new photos"
+msgstr "Les ajouter comme nouvelles photos"
+
+msgid "Restore them"
+msgstr "Les restaurer"
+
+msgid "Reading photos: {} of {}…"
+msgstr "Lecture des photos : {} sur {}…"
+
+msgid "Done: {} added, {} restored, {} already known, {} not readable."
+msgstr "Terminé : {} ajoutées, {} restaurées, {} déjà connues, {} illisibles."
+
+msgid "The scan stopped: {}"
+msgstr "L'analyse s'est arrêtée : {}"
+
+msgid "Source \"{}\" removed; {} photos left the catalogue."
+msgstr "Source « {} » retirée ; {} photos ont quitté le catalogue."
+
+msgid "Cannot add the source: {}"
+msgstr "Impossible d'ajouter la source : {}"
+
+msgid "Choose the folder to add to the catalogue"
+msgstr "Choisir le dossier à ajouter au catalogue"
+
+msgid "This folder contains the sources {}. Merge them into the new one? Their photos are kept, with their ratings and versions."
+msgstr "Ce dossier contient les sources {}. Les fusionner dans la nouvelle ? Leurs photos sont conservées, avec leurs cotes et versions."
+
+msgid "Scan cancelled. Rescanning the source picks up where it stopped."
+msgstr "Analyse annulée. Réanalyser la source reprend là où elle s'était arrêtée."
+
+msgid "{n} photo leaves the catalogue."
+msgid_plural "{n} photos leave the catalogue."
+msgstr[0] "{n} photo quitte le catalogue."
+msgstr[1] "{n} photos quittent le catalogue."
+
+msgid "{n} of them has a rating, keywords, a title or a version."
+msgid_plural "{n} of them have a rating, keywords, a title or a version."
+msgstr[0] "{n} d'entre elles a une cote, des mots-clés, un titre ou une version."
+msgstr[1] "{n} d'entre elles ont une cote, des mots-clés, un titre ou une version."

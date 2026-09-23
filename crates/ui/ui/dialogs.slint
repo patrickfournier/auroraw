@@ -119,3 +119,100 @@ export component AboutDialog inherits Modal {
         Button { text: @tr("Close"); primary: true; clicked => { root.close(); } }
     }
 }
+
+export component AddSourceDialog inherits Modal {
+    in property <string> error;
+    // A folder that contains other sources: the dialog asks whether to merge them.
+    in property <string> merge-question;
+    in property <bool> browse-enabled: true;
+    in-out property <string> folder;
+    in-out property <string> name;
+    callback confirm();
+    callback merge();
+    callback browse();
+    title: @tr("Add a source");
+    Text {
+        text: @tr("Kind: Folder (local, or a network share that is mounted)");
+        color: #aaaaaa;
+    }
+    Field {
+        label-width: 110px;
+        label: @tr("Folder");
+        text <=> root.folder;
+        browsable: true;
+        browse-enabled: root.browse-enabled;
+        browse => { root.browse(); }
+    }
+    Field {
+        label-width: 110px;
+        label: @tr("Name (optional)");
+        text <=> root.name;
+    }
+    if root.error != "" : Text {
+        text: root.error;
+        color: #e08070;
+        wrap: word-wrap;
+        accessible-role: text;
+    }
+    if root.merge-question != "" : Text {
+        text: root.merge-question;
+        color: #e0b050;
+        wrap: word-wrap;
+        accessible-role: text;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: end;
+        Button { text: @tr("Cancel"); clicked => { root.close(); } }
+        if root.merge-question == "" : Button { text: @tr("Add"); primary: true; clicked => { root.confirm(); } }
+        if root.merge-question != "" : Button { text: @tr("Merge and add"); primary: true; clicked => { root.merge(); } }
+    }
+}
+
+export component RemoveSourceDialog inherits Modal {
+    in property <string> source-name;
+    in property <int> photos;
+    in property <int> worked-on;
+    callback confirm();
+    title: @tr("Remove the source \"{}\"?", root.source-name);
+    Text {
+        text: @tr("{n} photo leaves the catalogue." | "{n} photos leave the catalogue." % root.photos);
+        color: white;
+        wrap: word-wrap;
+    }
+    if root.worked-on > 0 : Text {
+        text: @tr("{n} of them has a rating, keywords, a title or a version." | "{n} of them have a rating, keywords, a title or a version." % root.worked-on);
+        color: #e0b050;
+        wrap: word-wrap;
+    }
+    Text {
+        text: @tr("Their data is kept in the workspace's removed folder and comes back if you add this folder again. The photo files themselves are never touched.");
+        color: #aaaaaa;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: end;
+        Button { text: @tr("Cancel"); clicked => { root.close(); } }
+        Button { text: @tr("Remove"); primary: true; clicked => { root.confirm(); } }
+    }
+}
+
+export component RestoreDialog inherits Modal {
+    in property <int> restorable;
+    in property <int> total;
+    callback choose(bool);
+    title: @tr("Photos removed earlier");
+    card-width: 560px;
+    Text {
+        text: @tr("{} of the {} photos in this folder were in the catalogue before, with their ratings, keywords and versions.", root.restorable, root.total);
+        color: white;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: end;
+        Button { text: @tr("Add them as new photos"); clicked => { root.choose(false); } }
+        Button { text: @tr("Restore them"); primary: true; clicked => { root.choose(true); } }
+    }
+}

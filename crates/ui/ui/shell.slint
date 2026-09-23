@@ -1,11 +1,12 @@
 import { Button, ListView, Palette } from "std-widgets.slint";
-import { Cell, GridRow, VolumeEntry, KnownEntry, MenuEntry, Texts, Editing, Task } from "common.slint";
+import { Cell, GridRow, VolumeEntry, KnownEntry, MenuEntry, SourceEntry, Texts, Editing, Task } from "common.slint";
 import { ImportView } from "import.slint";
 import { WelcomeView } from "welcome.slint";
-import { NewWorkspaceDialog, SettingsDialog, AboutDialog } from "dialogs.slint";
+import { NewWorkspaceDialog, SettingsDialog, AboutDialog, AddSourceDialog, RemoveSourceDialog, RestoreDialog } from "dialogs.slint";
+import { CataloguePanel } from "catalogue.slint";
 import { MenuOverlay } from "menu.slint";
 
-export { Cell, GridRow, VolumeEntry, KnownEntry, MenuEntry, Texts, Editing }
+export { Cell, GridRow, VolumeEntry, KnownEntry, MenuEntry, SourceEntry, Texts, Editing }
 
 export component MainWindow inherits Window {
     property <string> app-name: @tr("Auroraw");
@@ -37,6 +38,20 @@ export component MainWindow inherits Window {
     // "system", "en" or "fr" (Settings).
     in property <string> language: "system";
     in property <string> about-version;
+    // The catalogue panel: the sources, what a scan is doing, and the dialogs over it.
+    in property <[SourceEntry]> sources;
+    in property <string> catalogue-status;
+    in property <float> catalogue-progress;
+    in property <bool> catalogue-busy;
+    in-out property <string> source-folder;
+    in-out property <string> source-name;
+    in property <string> add-source-error;
+    in property <string> add-source-merge-question;
+    in property <string> remove-name;
+    in property <int> remove-photos;
+    in property <int> remove-worked-on;
+    in property <int> restore-count;
+    in property <int> restore-total;
     in property <string> modifier-name: "Ctrl";
     in property <string> redo-shortcut: "Ctrl+Y";
 
@@ -75,6 +90,14 @@ export component MainWindow inherits Window {
     // Every action of the menus and their shortcuts, by the id of `commands.rs`.
     callback command(string);
     callback language-chosen(string);
+    callback add-source();
+    callback add-source-confirm();
+    callback add-source-merge();
+    callback remove-source(int);
+    callback remove-source-confirm();
+    callback rescan-source(int);
+    callback restore-choice(bool);
+    callback restore-cancelled();
 
     scope := FocusScope {
         init => { self.focus(); }
@@ -120,7 +143,7 @@ export component MainWindow inherits Window {
                             vertical-alignment: center;
                         }
                     }
-                    if root.screen == "workspace" : Task { label: @tr("Import"); active: root.current-task == "import"; activate => { root.current-task = "import"; } }
+                    if root.screen == "workspace" : Task { label: @tr("Catalogue"); active: root.current-task == "catalogue"; activate => { root.current-task = "catalogue"; } }
                     if root.screen == "workspace" : Task { label: @tr("Cull"); active: root.current-task == "cull"; activate => { root.show-photos(); } }
                     if root.screen == "workspace" : Task { label: @tr("Develop"); enabled: false; }
                     if root.screen == "workspace" : Task { label: @tr("Publish"); enabled: false; }
@@ -137,6 +160,16 @@ export component MainWindow inherits Window {
             }
 
             if root.screen == "workspace" : VerticalLayout {
+            if root.current-task == "catalogue" : CataloguePanel {
+                sources: root.sources;
+                status: root.catalogue-status;
+                progress: root.catalogue-progress;
+                busy: root.catalogue-busy;
+                add-source => { root.add-source(); }
+                remove-source(i) => { root.remove-source(i); }
+                rescan-source(i) => { root.rescan-source(i); }
+            }
+
             if root.current-task == "import" : ImportView {
                 volumes: root.volumes;
                 status: root.import-status;
@@ -270,6 +303,42 @@ export component MainWindow inherits Window {
         redo-shortcut: root.redo-shortcut;
         close => { root.menu-open = false; }
         command(id) => { root.command(id); }
+    }
+    if root.dialog == "add-source" : AddSourceDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        error: root.add-source-error;
+        merge-question: root.add-source-merge-question;
+        browse-enabled: !root.picking;
+        folder <=> root.source-folder;
+        name <=> root.source-name;
+        close => { root.close-dialog(); }
+        confirm => { root.add-source-confirm(); }
+        merge => { root.add-source-merge(); }
+        browse => { root.browse-folder("add-source"); }
+    }
+    if root.dialog == "remove-source" : RemoveSourceDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        source-name: root.remove-name;
+        photos: root.remove-photos;
+        worked-on: root.remove-worked-on;
+        close => { root.close-dialog(); }
+        confirm => { root.remove-source-confirm(); }
+    }
+    if root.dialog == "restore" : RestoreDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        restorable: root.restore-count;
+        total: root.restore-total;
+        close => { root.restore-cancelled(); }
+        choose(restore) => { root.restore-choice(restore); }
     }
     if root.dialog == "settings" : SettingsDialog {
         x: 0px;

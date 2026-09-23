@@ -61,6 +61,27 @@ export global Texts {
     public pure function rebuilt-note(name: string) -> string {
         return @tr("The catalogue of \"{}\" was rebuilt from its files on this machine.", name);
     }
+    public pure function indexing(done: int, total: int) -> string {
+        return @tr("Reading photos: {} of {}…", done, total);
+    }
+    public pure function index-done(added: int, restored: int, known: int, failed: int) -> string {
+        return @tr("Done: {} added, {} restored, {} already known, {} not readable.", added, restored, known, failed);
+    }
+    public pure function index-stopped(reason: string) -> string {
+        return @tr("The scan stopped: {}", reason);
+    }
+    public pure function source-removed(name: string, removed: int) -> string {
+        return @tr("Source \"{}\" removed; {} photos left the catalogue.", name, removed);
+    }
+    public pure function merge-question(names: string) -> string {
+        return @tr("This folder contains the sources {}. Merge them into the new one? Their photos are kept, with their ratings and versions.", names);
+    }
+    public pure function scan-cancelled() -> string {
+        return @tr("Scan cancelled. Rescanning the source picks up where it stopped.");
+    }
+    public pure function cannot-add-source(reason: string) -> string {
+        return @tr("Cannot add the source: {}", reason);
+    }
     // The title of the folder dialog: `which` is "source", "archive" or "backup".
     public pure function pick-title(which: string) -> string {
         if (which == "source") {
@@ -75,6 +96,9 @@ export global Texts {
         if (which == "workspace") {
             return @tr("Choose the workspace folder");
         }
+        if (which == "add-source") {
+            return @tr("Choose the folder to add to the catalogue");
+        }
         return @tr("Choose the folder");
     }
 }
@@ -87,6 +111,9 @@ export global Editing {
 
 // One item of the hamburger menu (its id is a command of `commands.rs`).
 export struct MenuEntry { id: string, label: string, shortcut: string, enabled: bool }
+
+// One source of the catalogue, as the catalogue panel lists it.
+export struct SourceEntry { name: string, path: string, online: bool, photos: int, worked-on: int }
 
 // One line of the welcome list: a workspace this machine knows.
 export struct KnownEntry { name: string, path: string, opened: string, found: bool }
