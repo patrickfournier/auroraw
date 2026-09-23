@@ -31,6 +31,7 @@ allow = [
     "LGPL-2.1",
     "LGPL-2.1-or-later",
     "LGPL-3.0-or-later",
+    "IJG", # jpeg-encoder: the Independent JPEG Group License, permissive
 ]
 confidence-threshold = 0.9
 
