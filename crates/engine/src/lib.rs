@@ -35,7 +35,10 @@ pub use command::Command;
 pub use coordinator::Outcome;
 pub use error::{EngineError, Result};
 pub use event::Event;
-pub use import_flow::{ImportRequest, VolumeInfo};
+pub use import_flow::{
+    DestinationKind, ImportRequest, ImportSourceInfo, ImportStarted, VolumeInfo,
+};
+pub use import_job::Registration;
 pub use job::JobId;
 pub use sources_api::{AddPlan, AddSourceRequest, AddedSource, SourceInfo, SourceKind};
 pub use thumbnails::ThumbnailService;
@@ -859,15 +862,20 @@ mod tests {
     fn import_and_wait(
         engine: &Engine,
         events: &EventReceiver,
-        source_id: SourceId,
-        destination_source_id: SourceId,
+        card: &std::path::Path,
+        archive: &std::path::Path,
+        archive_id: SourceId,
         profile: auroraw_import::Profile,
         state_path: std::path::PathBuf,
     ) -> Event {
         let Outcome::ImportStarted { job } = engine
             .submit_and_wait(Command::Import {
-                source_id,
-                destination_source_id,
+                source_root: card.to_path_buf(),
+                destination_root: archive.to_path_buf(),
+                registration: Some(Registration {
+                    source_id: archive_id,
+                    prefix: String::new(),
+                }),
                 profile,
                 shoot: None,
                 backup_roots: Vec::new(),
@@ -894,14 +902,14 @@ mod tests {
         let archive = dir.path().join("Archive");
         std::fs::create_dir_all(&archive).unwrap();
 
-        let card_id = add_source(&engine, &card);
         let archive_id = add_source(&engine, &archive);
         events.drain();
 
         let finished = import_and_wait(
             &engine,
             &events,
-            card_id,
+            &card,
+            &archive,
             archive_id,
             simple_profile("{original}.{ext}"),
             dir.path().join("job.json"),
@@ -950,14 +958,14 @@ mod tests {
         std::fs::write(card.join("a.raw"), b"only photo").unwrap();
         let archive = dir.path().join("Archive");
         std::fs::create_dir_all(&archive).unwrap();
-        let card_id = add_source(&engine, &card);
         let archive_id = add_source(&engine, &archive);
         events.drain();
 
         let first = import_and_wait(
             &engine,
             &events,
-            card_id,
+            &card,
+            &archive,
             archive_id,
             simple_profile("{original}.{ext}"),
             dir.path().join("job1.json"),
@@ -970,7 +978,8 @@ mod tests {
         let second = import_and_wait(
             &engine,
             &events,
-            card_id,
+            &card,
+            &archive,
             archive_id,
             simple_profile("{original}.{ext}"),
             dir.path().join("job2.json"),
@@ -995,7 +1004,6 @@ mod tests {
         std::fs::write(card.join("b.raw"), b"not done yet").unwrap();
         let archive = dir.path().join("Archive");
         std::fs::create_dir_all(&archive).unwrap();
-        let card_id = add_source(&engine, &card);
         let archive_id = add_source(&engine, &archive);
         events.drain();
 
@@ -1013,7 +1021,8 @@ mod tests {
         let finished = import_and_wait(
             &engine,
             &events,
-            card_id,
+            &card,
+            &archive,
             archive_id,
             simple_profile("{original}.{ext}"),
             state_path,
@@ -1050,14 +1059,14 @@ mod tests {
         std::fs::write(card.join("CameraB/IMG_0001.raw"), b"from camera B").unwrap();
         let archive = dir.path().join("Archive");
         std::fs::create_dir_all(&archive).unwrap();
-        let card_id = add_source(&engine, &card);
         let archive_id = add_source(&engine, &archive);
         events.drain();
 
         let finished = import_and_wait(
             &engine,
             &events,
-            card_id,
+            &card,
+            &archive,
             archive_id,
             simple_profile("{original}.{ext}"),
             dir.path().join("job.json"),
@@ -1085,14 +1094,17 @@ mod tests {
         }
         let archive = dir.path().join("Archive");
         std::fs::create_dir_all(&archive).unwrap();
-        let card_id = add_source(&engine, &card);
         let archive_id = add_source(&engine, &archive);
         events.drain();
 
         let Outcome::ImportStarted { job } = engine
             .submit_and_wait(Command::Import {
-                source_id: card_id,
-                destination_source_id: archive_id,
+                source_root: card.clone(),
+                destination_root: archive.clone(),
+                registration: Some(Registration {
+                    source_id: archive_id,
+                    prefix: String::new(),
+                }),
                 profile: simple_profile("{original}.{ext}"),
                 shoot: None,
                 backup_roots: Vec::new(),
@@ -1124,11 +1136,12 @@ mod tests {
     fn request(dir: &std::path::Path, card: &std::path::Path) -> ImportRequest {
         ImportRequest {
             source_root: card.to_path_buf(),
-            archive_root: dir.join("Archive"),
+            destination_root: dir.join("Archive"),
             profile: simple_profile("{original}.{ext}"),
             shoot: None,
             backup_root: None,
             state_dir: dir.join("state"),
+            add_destination_as_source: true,
         }
     }
 
@@ -1141,13 +1154,13 @@ mod tests {
     }
 
     #[test]
-    fn importing_by_folder_registers_both_sources_once_and_reuses_them() {
+    fn importing_by_folder_registers_the_archive_once_and_never_the_card() {
         let (engine, events, dir) = new_engine();
         let card = dir.path().join("Card");
         std::fs::create_dir_all(&card).unwrap();
         std::fs::write(card.join("a.raw"), b"photo a").unwrap();
 
-        let job = engine.import(request(dir.path(), &card)).unwrap();
+        let job = engine.import(request(dir.path(), &card)).unwrap().job;
         assert!(matches!(
             finished(&events, job),
             Event::ImportFinished { copied: 1, .. }
@@ -1157,10 +1170,14 @@ mod tests {
             b"photo a"
         );
         let sources = engine.read_catalogue().unwrap().list_sources().unwrap();
-        assert_eq!(sources.len(), 2, "the card and the archive");
+        assert_eq!(
+            sources.len(),
+            1,
+            "the archive: the card is never registered"
+        );
 
         std::fs::write(card.join("b.raw"), b"photo b").unwrap();
-        let job = engine.import(request(dir.path(), &card)).unwrap();
+        let job = engine.import(request(dir.path(), &card)).unwrap().job;
         assert!(matches!(
             finished(&events, job),
             Event::ImportFinished {
@@ -1176,8 +1193,8 @@ mod tests {
                 .list_sources()
                 .unwrap()
                 .len(),
-            2,
-            "the same two sources, not two more"
+            1,
+            "the same source again, not a second one"
         );
     }
 
@@ -1187,7 +1204,7 @@ mod tests {
         let card = dir.path().join("Card");
         std::fs::create_dir_all(&card).unwrap();
         std::fs::write(card.join("IMG_0001.raw"), b"first shoot").unwrap();
-        let job = engine.import(request(dir.path(), &card)).unwrap();
+        let job = engine.import(request(dir.path(), &card)).unwrap().job;
         finished(&events, job);
         assert!(
             std::fs::read_dir(dir.path().join("state"))
@@ -1199,7 +1216,7 @@ mod tests {
 
         // The card was reformatted and the camera started again at 0001.
         std::fs::write(card.join("IMG_0001.raw"), b"second shoot").unwrap();
-        let job = engine.import(request(dir.path(), &card)).unwrap();
+        let job = engine.import(request(dir.path(), &card)).unwrap().job;
         assert!(matches!(
             finished(&events, job),
             Event::ImportFinished {
@@ -1226,7 +1243,7 @@ mod tests {
         std::fs::write(card.join("a.raw"), b"photo a").unwrap();
         let mut req = request(dir.path(), &card);
         req.backup_root = Some(dir.path().join("Backup"));
-        let job = engine.import(req).unwrap();
+        let job = engine.import(req).unwrap().job;
         assert!(matches!(
             finished(&events, job),
             Event::ImportFinished {
@@ -1253,7 +1270,7 @@ mod tests {
                 .is_err()
         );
         let mut into_itself = request(dir.path(), &card);
-        into_itself.archive_root = card.clone();
+        into_itself.destination_root = card.clone();
         assert!(engine.import(into_itself).is_err());
         assert!(
             engine
@@ -1276,7 +1293,7 @@ mod tests {
         std::fs::write(card.join("a.raw"), b"photo a").unwrap();
         let mut req = request(dir.path(), &card);
         req.profile = simple_profile("{year}/{date}/{original}.{ext}");
-        let job = engine.import(req).unwrap();
+        let job = engine.import(req).unwrap().job;
         assert!(matches!(
             finished(&events, job),
             Event::ImportFinished {

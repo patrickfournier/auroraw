@@ -279,15 +279,17 @@ impl Coordinator {
             }
             Command::RemoveSource { source_id } => self.start_remove(source_id),
             Command::Import {
-                source_id,
-                destination_source_id,
+                source_root,
+                destination_root,
+                registration,
                 profile,
                 shoot,
                 backup_roots,
                 state_path,
             } => self.start_import(
-                source_id,
-                destination_source_id,
+                source_root,
+                destination_root,
+                registration,
                 profile,
                 shoot,
                 backup_roots,
@@ -845,19 +847,23 @@ impl Coordinator {
         parent
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn start_import(
         &mut self,
-        source_id: SourceId,
-        destination_source_id: SourceId,
-        profile: Profile,
+        source_root: PathBuf,
+        destination_root: PathBuf,
+        registration: Option<crate::import_job::Registration>,
+        mut profile: Profile,
         shoot: Option<String>,
         backup_roots: Vec<PathBuf>,
         state_path: PathBuf,
     ) -> Result<Outcome> {
-        let entry = self.source_entry(&source_id)?;
-        let source = Self::open_source(&entry)?;
-        let dest_entry = self.source_entry(&destination_source_id)?;
-        let dest_root = Self::source_root(&dest_entry)?;
+        let source = FilesystemSource::new(source_root);
+        let dest_root = destination_root;
+        // A plain copy writes no sidecar, so there is nowhere for the metadata template to go.
+        if registration.is_none() {
+            profile.metadata_template = Default::default();
+        }
 
         // Every keyword the profile's template names is resolved (and created if needed) once,
         // here, before the background job starts: per-photo would mean racing to create "the
@@ -893,7 +899,7 @@ impl Coordinator {
             workspace: self.workspace.clone(),
             source,
             dest_root,
-            dest_source_id: destination_source_id,
+            registration,
             profile,
             shoot,
             backup_roots,
@@ -904,7 +910,7 @@ impl Coordinator {
             inbound: self.inbound.clone(),
             cancel: self.jobs[&job].clone(),
         });
-        let _ = self.events.send(Event::ImportStarted { job, source_id });
+        let _ = self.events.send(Event::ImportStarted { job });
         Ok(Outcome::ImportStarted { job })
     }
 

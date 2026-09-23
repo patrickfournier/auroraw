@@ -55,8 +55,6 @@ msgstr "Refresh"
 msgid "Import from (card or folder)"
 msgstr "Import from (card or folder)"
 
-msgid "Archive folder"
-msgstr "Archive folder"
 
 msgid "Backup folder (optional)"
 msgstr "Backup folder (optional)"
@@ -359,3 +357,42 @@ msgid "{n} of them has a rating, keywords, a title or a version."
 msgid_plural "{n} of them have a rating, keywords, a title or a version."
 msgstr[0] "{n} of them has a rating, keywords, a title or a version."
 msgstr[1] "{n} of them have a rating, keywords, a title or a version."
+
+msgid "Cancel import"
+msgstr "Cancel import"
+
+msgid "Ignore"
+msgstr "Ignore"
+
+msgid "Card detected: {}"
+msgstr "Card detected: {}"
+
+msgid "Destination folder"
+msgstr "Destination folder"
+
+msgid "This card keeps its photos in camera folders ({})."
+msgstr "This card keeps its photos in camera folders ({})."
+
+msgid "Layout"
+msgstr "Layout"
+
+msgid "Use the template"
+msgstr "Use the template"
+
+msgid "Keep the card's folders"
+msgstr "Keep the card's folders"
+
+msgid "Add this folder to the catalogue's sources"
+msgstr "Add this folder to the catalogue's sources"
+
+msgid "This folder is part of the source \"{}\": the photos also enter the catalogue."
+msgstr "This folder is part of the source \"{}\": the photos also enter the catalogue."
+
+msgid "This folder becomes a source: the photos also enter the catalogue."
+msgstr "This folder becomes a source: the photos also enter the catalogue."
+
+msgid "This folder is not in the catalogue: the photos are only copied."
+msgstr "This folder is not in the catalogue: the photos are only copied."
+
+msgid "This folder contains the sources {}: the photos are only copied."
+msgstr "This folder contains the sources {}: the photos are only copied."

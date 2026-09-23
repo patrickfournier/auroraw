@@ -10,11 +10,12 @@ use auroraw_engine::{MetadataTemplate, PairRule, Profile};
 use serde::{Deserialize, Serialize};
 
 /// The folders and names an import needs, as a person typed them.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
     /// The folder photos are copied into.
-    pub archive: String,
+    #[serde(alias = "archive")]
+    pub destination: String,
     /// A second folder every photo is also copied into, or empty for none.
     pub backup: String,
     /// The folders-and-names template; empty means [`DEFAULT_TEMPLATE`].
@@ -25,10 +26,33 @@ pub struct Settings {
     pub rights: String,
     /// The last card or folder imported from.
     pub source: String,
+    /// `template`, or `folders` to keep a card's own camera folders.
+    pub layout: String,
+    /// Whether to add a destination that is not in the catalogue as a source (the checkbox's
+    /// last state).
+    pub add_destination: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            destination: String::new(),
+            backup: String::new(),
+            template: String::new(),
+            creator: String::new(),
+            rights: String::new(),
+            source: String::new(),
+            layout: "template".into(),
+            add_destination: true,
+        }
+    }
 }
 
 /// Year folder, then a day folder, then the camera's own file name (M1 plan §6 item 6).
 pub const DEFAULT_TEMPLATE: &str = "{year}/{date}/{original}.{ext}";
+
+/// Keeps the card's folders below `DCIM` and every name as it was.
+pub const KEEP_FOLDERS_TEMPLATE: &str = "{path}";
 
 impl Settings {
     /// Reads `path`, or the defaults if it is missing or not readable as settings.
@@ -49,10 +73,13 @@ impl Settings {
         let _ = std::fs::write(path, bytes);
     }
 
-    /// The template to import with.
+    /// The template to import with: `{path}` (the card's own folders, names as found) when that
+    /// layout is chosen, else the person's own, else the default.
     pub fn template_or_default(&self) -> &str {
         let template = self.template.trim();
-        if template.is_empty() {
+        if self.layout == "folders" {
+            KEEP_FOLDERS_TEMPLATE
+        } else if template.is_empty() {
             DEFAULT_TEMPLATE
         } else {
             template
@@ -102,14 +129,15 @@ mod tests {
         let dir = auroraw_testkit::temp_dir();
         let path = dir.path().join("nested/settings.json");
         let settings = Settings {
-            archive: "/photos".into(),
+            destination: "/photos".into(),
             creator: "Patrick".into(),
             ..Settings::default()
         };
         settings.save(&path);
         assert_eq!(Settings::load(&path), settings);
         std::fs::write(&path, br#"{"archive": "/a", "somethingNew": 1}"#).unwrap();
-        assert_eq!(Settings::load(&path).archive, "/a");
+        // A file written when the folder was still called the archive keeps working.
+        assert_eq!(Settings::load(&path).destination, "/a");
     }
 
     #[test]
@@ -121,6 +149,9 @@ mod tests {
         settings.rights = "© Patrick".into();
         settings.template = "{year}/{original}.{ext}".into();
         let profile = settings.profile();
+        settings.layout = "folders".into();
+        assert_eq!(settings.profile().destination_template, "{path}");
+        settings.layout = "template".into();
         assert_eq!(profile.destination_template, "{year}/{original}.{ext}");
         assert_eq!(profile.metadata_template.creator, vec!["Patrick"]);
         assert_eq!(

@@ -8,6 +8,9 @@ use auroraw_types::{KeywordId, PhotoId, SourceId};
 /// A change the engine's single writer applies, in the order it receives them (architecture
 /// §4.3). Sent with [`crate::Engine::submit`] (fire and forget) or
 /// [`crate::Engine::submit_and_wait`] (blocks for the outcome).
+// `Import` carries a whole profile and several paths; commands are built one at a time by a person's
+// gesture, so the size of the largest variant costs nothing worth a `Box` in every match.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
     /// Rebuilds the catalogue from the workspace (architecture §5.4).
@@ -95,21 +98,29 @@ pub enum Command {
         /// Their paths inside the source, as `Event::SourceScanned` (or a fresh scan) reported.
         paths: Vec<String>,
     },
-    /// Imports every file `source_id` has (D-030: no pre-selection) that is not already in the
-    /// catalogue (design note 004 §6.3, item 4), copying it (and a companion JPEG, per the
-    /// profile's pair rule, D-032) into `destination_source_id`'s folder, verified by whole-file
-    /// hash (item 5), with the profile's metadata template applied (D-029). Listing the source,
-    /// reading each file's metadata, planning destinations and copying all run on a background
-    /// worker (`Event::JobProgress`, one `Event::PhotoChanged` per photo as it lands): the
-    /// coordinator itself never blocks on a large card (spec §5.2, "does not stall the interface
-    /// thread"). `state_path` is where this job's resumable progress is kept (an interrupted
-    /// import, resubmitted with the same path, picks up where it stopped); `backup_roots` are
-    /// resolved host paths, one per entry of `profile.backup_templates`, in order.
+    /// Copies every photo file `source_root` holds (a card or a folder; it is not a source of the
+    /// catalogue and nothing is written to it, D-031) into `destination_root`, laid out by the
+    /// profile's template (RAW and JPEG of one shot travel together, D-032), verified by whole-file
+    /// hash (design note 004 §6.3, item 5), and to each of `backup_roots` too. A file that is already
+    /// at its planned place with the same content is skipped, and one whose name is taken by
+    /// something else is numbered: nothing is ever overwritten.
+    ///
+    /// With a `registration` (the destination is inside one of the catalogue's sources) each photo
+    /// also becomes a photo of the catalogue, with the profile's metadata template written to its
+    /// sidecar, and a photo the catalogue already has (by whole-file hash) is skipped. Without one it
+    /// is a plain copy.
+    ///
+    /// Everything runs on a background worker (`Event::JobProgress`, one `Event::PhotoChanged` per
+    /// registered photo): the coordinator never blocks on a large card (spec §5.2, "does not stall
+    /// the interface thread"). `state_path` is where this job's resumable progress is kept: an
+    /// interrupted import, resubmitted with the same path, picks up where it stopped.
     Import {
-        /// The source being imported from (a card or a folder).
-        source_id: SourceId,
-        /// The already-registered source files are copied into.
-        destination_source_id: SourceId,
+        /// The card or folder to copy from.
+        source_root: PathBuf,
+        /// The folder to copy into.
+        destination_root: PathBuf,
+        /// Where the photos are registered, or `None` for a plain copy.
+        registration: Option<crate::import_job::Registration>,
         /// Destination templates, pairing, and the metadata template.
         profile: Profile,
         /// A session name for the `{shoot}` template token.

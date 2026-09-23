@@ -14,7 +14,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use auroraw_catalogue::Catalogue;
-use auroraw_engine::{Engine, LocalDirs};
+use auroraw_engine::{Engine, LocalDirs, VolumeInfo};
 use i_slint_backend_testing::{
     AccessibleRole, ElementHandle, ElementQuery, TestingBackend, TestingBackendOptions,
     init_no_event_loop, mock_elapsed_time,
@@ -40,6 +40,7 @@ struct Fixture {
 }
 
 fn write_jpeg(path: &Path, seed: u8) {
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let img = ImageBuffer::from_fn(64, 48, |x, y| {
         Rgb([(x * 4) as u8 ^ seed, (y * 5) as u8, seed.wrapping_mul(7)])
     });
@@ -157,7 +158,7 @@ fn import_state(fixture: &Fixture) -> PathBuf {
 /// tests start.
 fn to_import(app: App) -> App {
     app.launcher.run_command(&app.ui(), "file.import");
-    assert_eq!(app.ui().get_current_task(), "import");
+    assert_eq!(app.ui().get_dialog(), "import");
     app
 }
 
@@ -215,7 +216,7 @@ fn fill_import_form(shell: &App, f: &Fixture) {
         "Import from (card or folder)",
         &f.card.to_string_lossy(),
     );
-    type_into(shell, "Archive folder", &f.archive.to_string_lossy());
+    type_into(shell, "Destination folder", &f.archive.to_string_lossy());
 }
 
 #[test]
@@ -244,7 +245,10 @@ fn filling_the_form_and_clicking_import_copies_verifies_and_shows_the_photos() {
     let shell = to_import(open(&f));
     fill_import_form(&shell, &f);
     type_into(&shell, "Creator", "Patrick Fournier");
-    assert_eq!(shell.ui().get_import_archive(), f.archive.to_string_lossy());
+    assert_eq!(
+        shell.ui().get_import_destination(),
+        f.archive.to_string_lossy()
+    );
 
     click(&shell, "Import");
     assert!(shell.ui().get_importing(), "the import started");
@@ -320,7 +324,7 @@ fn an_import_that_cannot_start_says_why_and_starts_nothing() {
     );
 
     type_into(&shell, "Import from (card or folder)", "/nowhere/at/all");
-    type_into(&shell, "Archive folder", &f.archive.to_string_lossy());
+    type_into(&shell, "Destination folder", &f.archive.to_string_lossy());
     click(&shell, "Import");
     assert!(!shell.ui().get_importing());
     assert!(shell.ui().get_import_status().contains("is not a folder"));
@@ -343,7 +347,10 @@ fn the_form_is_remembered_the_next_time_the_workspace_opens() {
         settle("the import", || shell.ui().get_import_finished());
     }
     let shell = launch(&f);
-    assert_eq!(shell.ui().get_import_archive(), f.archive.to_string_lossy());
+    assert_eq!(
+        shell.ui().get_import_destination(),
+        f.archive.to_string_lossy()
+    );
     assert_eq!(shell.ui().get_import_source(), f.card.to_string_lossy());
     assert_eq!(shell.ui().get_import_creator(), "Patrick Fournier");
     assert_eq!(shell.ui().get_import_rights(), "© Patrick Fournier");
@@ -507,7 +514,7 @@ fn the_views_render_and_can_be_written_out_as_pictures() {
         .set_import_source(f.card.to_string_lossy().as_ref().into());
     shell
         .ui()
-        .set_import_archive(f.archive.to_string_lossy().as_ref().into());
+        .set_import_destination(f.archive.to_string_lossy().as_ref().into());
     click(&shell, "Import");
     settle("the import", || shell.ui().get_import_finished());
     snapshot(&shell, "import-done");
@@ -555,8 +562,11 @@ fn browsing_fills_the_field_and_opens_the_dialog_where_the_field_points() {
 
     // An empty field opens the system's default place; the answer fills the field.
     dialogs.borrow_mut().answer = Some(f.archive.clone());
-    click(&shell, "Browse for: Archive folder");
-    assert_eq!(shell.ui().get_import_archive(), f.archive.to_string_lossy());
+    click(&shell, "Browse for: Destination folder");
+    assert_eq!(
+        shell.ui().get_import_destination(),
+        f.archive.to_string_lossy()
+    );
     assert_eq!(
         dialogs.borrow().asked[0],
         ("Choose the archive folder".to_string(), None)
@@ -595,11 +605,11 @@ fn cancelling_the_dialog_leaves_the_field_alone() {
     let f = fixture(0);
     let dialogs = Rc::new(RefCell::new(Dialogs::default()));
     let shell = to_import(open_with(&f, "en", platform(stand_in(&dialogs))));
-    type_into(&shell, "Archive folder", "/kept/as/typed");
+    type_into(&shell, "Destination folder", "/kept/as/typed");
 
     dialogs.borrow_mut().answer = None;
-    click(&shell, "Browse for: Archive folder");
-    assert_eq!(shell.ui().get_import_archive(), "/kept/as/typed");
+    click(&shell, "Browse for: Destination folder");
+    assert_eq!(shell.ui().get_import_destination(), "/kept/as/typed");
     assert!(!shell.ui().get_picking(), "the buttons are usable again");
 }
 
@@ -613,7 +623,7 @@ fn while_a_dialog_is_open_another_one_cannot_be_started() {
     }));
     let shell = to_import(open_with(&f, "en", platform(stand_in(&dialogs))));
 
-    click(&shell, "Browse for: Archive folder");
+    click(&shell, "Browse for: Destination folder");
     assert!(shell.ui().get_picking());
     click(&shell, "Browse for: Import from (card or folder)");
     assert_eq!(
@@ -625,7 +635,10 @@ fn while_a_dialog_is_open_another_one_cannot_be_started() {
     let done = dialogs.borrow_mut().held.take().unwrap();
     done(Some(f.archive.clone()));
     assert!(!shell.ui().get_picking());
-    assert_eq!(shell.ui().get_import_archive(), f.archive.to_string_lossy());
+    assert_eq!(
+        shell.ui().get_import_destination(),
+        f.archive.to_string_lossy()
+    );
 }
 
 #[test]
@@ -1027,7 +1040,7 @@ fn importing_is_available_in_the_menu_once_a_workspace_is_open() {
     menu_open(&app);
     assert!(menu_row_enabled(&app, "Import…"));
     click_on_top(&app, "Import…");
-    assert_eq!(app.ui().get_current_task(), "import");
+    assert_eq!(app.ui().get_dialog(), "import");
 }
 
 #[test]
@@ -1094,10 +1107,10 @@ fn the_edit_menu_acts_on_the_text_field_that_has_the_keyboard() {
     let f = fixture(0);
     let app = to_import(open(&f));
     // The import fields are on screen while the menu is used (a dialog would sit over the menu).
-    assert_eq!(app.ui().get_current_task(), "import");
-    type_into(&app, "Creator", "Patrick");
-    focus_field(&app, "Creator");
-    let creator = |app: &App| app.ui().get_import_creator().to_string();
+    assert_eq!(app.ui().get_dialog(), "import");
+    type_into(&app, "Shoot name (optional)", "Patrick");
+    focus_field(&app, "Shoot name (optional)");
+    let creator = |app: &App| app.ui().get_import_shoot().to_string();
 
     // A field has the keyboard: Edit's items are usable, and act on it.
     menu_open(&app);
@@ -1367,4 +1380,223 @@ fn the_catalogue_panel_and_its_dialogs_render() {
 
     click(&app, "Retirer : Card");
     snapshot(&app, "remove-source-dialog");
+}
+
+fn wait_for_the_import(app: &App) {
+    settle("the import to end", || app.ui().get_import_finished());
+}
+
+#[test]
+fn the_import_dialog_says_what_the_destination_is_to_the_catalogue() {
+    init();
+    let f = fixture(2);
+    let app = open(&f);
+    let app = to_import(app);
+    type_into(
+        &app,
+        "Import from (card or folder)",
+        &f.card.to_string_lossy(),
+    );
+
+    // A folder that is not in the catalogue: a copy, unless it is added as a source (the default).
+    type_into(&app, "Destination folder", &f.archive.to_string_lossy());
+    app.ui().invoke_import_fields_changed();
+    assert_eq!(app.ui().get_import_destination_kind(), "not-covered");
+    assert!(app.ui().get_import_add_destination());
+    assert!(app.ui().get_import_registering());
+    assert!(
+        app.ui()
+            .get_import_destination_note()
+            .contains("becomes a source")
+    );
+
+    app.ui().set_import_add_destination(false);
+    app.ui().invoke_import_fields_changed();
+    assert!(!app.ui().get_import_registering());
+    assert!(
+        app.ui()
+            .get_import_destination_note()
+            .contains("only copied")
+    );
+
+    // A folder inside a source of the catalogue: the photos enter it, whatever the checkbox says.
+    app.ui().set_dialog("".into());
+    click_tab(&app, "Catalogue");
+    let library = f.archive.parent().unwrap().join("Library");
+    std::fs::create_dir_all(&library).unwrap();
+    add_source_through_the_panel(&app, &library);
+    wait_for_the_scan(&app);
+    app.launcher.run_command(&app.ui(), "file.import");
+    type_into(
+        &app,
+        "Destination folder",
+        &library.join("2026").to_string_lossy(),
+    );
+    app.ui().invoke_import_fields_changed();
+    assert_eq!(app.ui().get_import_destination_kind(), "covered");
+    assert!(app.ui().get_import_registering());
+    assert!(
+        app.ui()
+            .get_import_destination_note()
+            .contains("part of the source")
+    );
+}
+
+#[test]
+fn a_plain_copy_from_the_dialog_registers_nothing_and_shows_no_photos_to_go_to() {
+    init();
+    let f = fixture(3);
+    let app = to_import(open(&f));
+    fill_import_form(&app, &f);
+    app.ui().set_import_add_destination(false);
+    click(&app, "Import");
+    wait_for_the_import(&app);
+
+    assert_eq!(
+        app.ui().get_import_status(),
+        "All 3 files copied and verified."
+    );
+    assert!(f.archive.join("IMG_0002.jpg").is_file());
+    assert_eq!(
+        catalogue(&f).count_all().unwrap(),
+        0,
+        "nothing entered the catalogue"
+    );
+    assert!(app.ui().get_sources().row_count() == 0);
+    assert!(
+        ElementQuery::from_root(&app.ui())
+            .match_descendants()
+            .match_accessible_role(AccessibleRole::Button)
+            .match_predicate(|e| e.accessible_label().is_some_and(|l| l == "Show photos"))
+            .find_first()
+            .is_none(),
+        "a plain copy has no photos to show"
+    );
+}
+
+#[test]
+fn importing_into_a_new_folder_can_add_it_to_the_catalogue_in_the_same_gesture() {
+    init();
+    let f = fixture(2);
+    let app = to_import(open(&f));
+    fill_import_form(&app, &f);
+    app.ui().invoke_import_fields_changed();
+    click(&app, "Import");
+    wait_for_the_import(&app);
+    settle("the destination to be scanned", || {
+        !app.ui().get_catalogue_busy()
+    });
+    assert_eq!(catalogue(&f).count_all().unwrap(), 2);
+    let sources = app.ui().get_sources();
+    assert_eq!(sources.row_count(), 1, "the destination became a source");
+    assert_eq!(sources.row_data(0).unwrap().name.as_str(), "Archive");
+    assert_eq!(sources.row_data(0).unwrap().photos, 2);
+}
+
+#[test]
+fn a_card_with_camera_folders_offers_to_keep_them() {
+    init();
+    let f = fixture(0);
+    let card = f.card.clone();
+    write_jpeg(&card.join("DCIM/100CANON/IMG_0001.JPG"), 1);
+    write_jpeg(&card.join("DCIM/101CANON/IMG_0002.JPG"), 2);
+    let app = to_import(open(&f));
+    fill_import_form(&app, &f);
+    app.ui().set_import_add_destination(false);
+    app.ui().invoke_import_fields_changed();
+    assert!(app.ui().get_import_source_has_folders());
+    assert_eq!(app.ui().get_import_source_folders(), "100CANON, 101CANON");
+
+    // The template is proposed; the card's folders are one click away.
+    assert_eq!(app.ui().get_import_layout(), "template");
+    click(&app, "Keep the card's folders");
+    assert_eq!(app.ui().get_import_layout(), "folders");
+    click(&app, "Import");
+    wait_for_the_import(&app);
+    assert!(
+        f.archive.join("100CANON/IMG_0001.JPG").is_file(),
+        "folders and case kept"
+    );
+    assert!(f.archive.join("101CANON/IMG_0002.JPG").is_file());
+}
+
+/// Cards the stand-in machine has mounted, changed by a test as a person would insert one.
+fn cards_platform(cards: &Rc<RefCell<Vec<VolumeInfo>>>) -> Platform {
+    let cards = cards.clone();
+    Platform {
+        pick_folder: no_dialog(),
+        volumes: Rc::new(move || cards.borrow().clone()),
+    }
+}
+
+fn camera_card(name: &str, mount: &Path) -> VolumeInfo {
+    VolumeInfo {
+        name: name.to_string(),
+        mount_point: mount.to_path_buf(),
+        has_dcim: true,
+    }
+}
+
+#[test]
+fn a_card_inserted_while_the_application_runs_is_offered_for_import() {
+    init();
+    let f = fixture(1);
+    let cards = Rc::new(RefCell::new(Vec::new()));
+    let app = open_with(&f, "en", cards_platform(&cards));
+    assert_eq!(app.ui().get_card_banner(), "");
+
+    cards.borrow_mut().push(camera_card("EOS_DIGITAL", &f.card));
+    settle("the card to be noticed", || {
+        app.ui().get_card_banner() != ""
+    });
+    assert_eq!(app.ui().get_card_banner(), "Card detected: EOS_DIGITAL");
+
+    // Import… opens the dialog on that card.
+    click_on_top(&app, "Import…");
+    assert_eq!(app.ui().get_dialog(), "import");
+    assert_eq!(app.ui().get_import_source(), f.card.to_string_lossy());
+    assert_eq!(app.ui().get_card_banner(), "");
+
+    // The same card does not come back; another inserted later does, and Ignore dismisses it.
+    for _ in 0..5 {
+        mock_elapsed_time(Duration::from_secs(2));
+    }
+    assert_eq!(app.ui().get_card_banner(), "");
+    let second = f.card.parent().unwrap().join("Second");
+    cards.borrow_mut().push(camera_card("NIKON_D850", &second));
+    settle("the second card", || app.ui().get_card_banner() != "");
+    click_on_top(&app, "Ignore");
+    assert_eq!(app.ui().get_card_banner(), "");
+}
+
+#[test]
+fn a_card_that_was_already_in_when_the_workspace_opened_is_not_announced() {
+    init();
+    let f = fixture(1);
+    let cards = Rc::new(RefCell::new(vec![camera_card("EOS_DIGITAL", &f.card)]));
+    let app = open_with(&f, "en", cards_platform(&cards));
+    for _ in 0..5 {
+        mock_elapsed_time(Duration::from_secs(2));
+    }
+    assert_eq!(app.ui().get_card_banner(), "");
+    // It is listed in the dialog all the same.
+    let app = to_import(app);
+    assert_eq!(app.ui().get_volumes().row_count(), 1);
+}
+
+#[test]
+fn the_import_dialog_and_the_card_banner_render() {
+    init_rendering();
+    let f = fixture(0);
+    write_jpeg(&f.card.join("DCIM/100CANON/IMG_0001.JPG"), 1);
+    write_jpeg(&f.card.join("DCIM/101CANON/IMG_0002.JPG"), 2);
+    let cards = Rc::new(RefCell::new(Vec::new()));
+    let app = open_with(&f, "fr", cards_platform(&cards));
+    cards.borrow_mut().push(camera_card("EOS_DIGITAL", &f.card));
+    settle("the card", || app.ui().get_card_banner() != "");
+    snapshot(&app, "card-banner");
+    click_on_top(&app, "Importer…");
+    type_into(&app, "Dossier de destination", &f.archive.to_string_lossy());
+    app.ui().invoke_import_fields_changed();
+    snapshot(&app, "import-dialog");
 }

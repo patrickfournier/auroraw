@@ -76,6 +76,21 @@ export global Texts {
     public pure function merge-question(names: string) -> string {
         return @tr("This folder contains the sources {}. Merge them into the new one? Their photos are kept, with their ratings and versions.", names);
     }
+    public pure function card-detected(name: string) -> string {
+        return @tr("Card detected: {}", name);
+    }
+    public pure function destination-covered(name: string) -> string {
+        return @tr("This folder is part of the source \"{}\": the photos also enter the catalogue.", name);
+    }
+    public pure function destination-not-covered(adding: bool) -> string {
+        if (adding) {
+            return @tr("This folder becomes a source: the photos also enter the catalogue.");
+        }
+        return @tr("This folder is not in the catalogue: the photos are only copied.");
+    }
+    public pure function destination-contains(names: string) -> string {
+        return @tr("This folder contains the sources {}: the photos are only copied.", names);
+    }
     public pure function scan-cancelled() -> string {
         return @tr("Scan cancelled. Rescanning the source picks up where it stopped.");
     }

@@ -8,8 +8,8 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use auroraw_engine::{
-    AddPlan, AddSourceRequest, Command, Engine, Event, ImportRequest, JobId, OpenedWorkspace,
-    SourceInfo, paths,
+    AddPlan, AddSourceRequest, Command, DestinationKind, Engine, Event, ImportRequest, JobId,
+    OpenedWorkspace, SourceInfo, paths,
 };
 use auroraw_types::PhotoId;
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
@@ -101,6 +101,8 @@ fn refresh_sources(engine: &Engine, ui: &MainWindow, state: &Rc<RefCell<Catalogu
 #[derive(Default)]
 struct ImportRun {
     job: Option<JobId>,
+    /// A destination that was made a source for this import: scanned once the copy is done.
+    added_source: Option<auroraw_types::SourceId>,
 }
 
 fn volume_entries(platform: &Platform) -> Vec<VolumeEntry> {
@@ -130,12 +132,14 @@ fn field(text: SharedString) -> String {
 /// from).
 fn settings_from(ui: &MainWindow) -> Settings {
     Settings {
-        archive: field(ui.get_import_archive()),
+        destination: field(ui.get_import_destination()),
         backup: field(ui.get_import_backup()),
         template: field(ui.get_import_template()),
         creator: field(ui.get_import_creator()),
         rights: field(ui.get_import_rights()),
         source: field(ui.get_import_source()),
+        layout: ui.get_import_layout().to_string(),
+        add_destination: ui.get_import_add_destination(),
     }
 }
 
@@ -186,7 +190,9 @@ pub(crate) fn attach(
     )));
 
     let saved = Settings::load(&settings_path);
-    ui.set_import_archive(saved.archive.into());
+    ui.set_import_destination(saved.destination.into());
+    ui.set_import_layout(saved.layout.as_str().into());
+    ui.set_import_add_destination(saved.add_destination);
     ui.set_import_backup(saved.backup.into());
     ui.set_import_template(saved.template.into());
     ui.set_import_creator(saved.creator.into());
@@ -323,6 +329,21 @@ pub(crate) fn attach(
                             )
                         });
                         new_photos.set(true);
+                        // A destination made a source for this import: its other photos, if any,
+                        // are scanned now (the imported ones are known already).
+                        let added = run.borrow_mut().added_source.take();
+                        if let Some(source_id) = added
+                            && let Ok(auroraw_engine::Outcome::IndexStarted { job }) = engine
+                                .submit_and_wait(Command::IndexSource {
+                                    source_id,
+                                    merge: Vec::new(),
+                                })
+                        {
+                            catalogue.borrow_mut().job = Some(job);
+                            ui.set_catalogue_busy(true);
+                            ui.set_catalogue_progress(0.0);
+                        }
+                        refresh_sources(&engine, &ui, &catalogue);
                     }
                     Event::ImportAborted { job, reason } if ours(&job) => {
                         run.borrow_mut().job = None;
@@ -421,6 +442,7 @@ pub(crate) fn attach(
         ui.on_show_photos(move || {
             let Some(ui) = weak.upgrade() else { return };
             reload(&engine, &state, &ui);
+            ui.set_dialog(SharedString::new());
             ui.set_current_task("cull".into());
         });
     }
@@ -567,31 +589,154 @@ pub(crate) fn attach(
     {
         let (engine, run, weak) = (engine.clone(), run.clone(), ui.as_weak());
         let (settings_path, state_dir) = (settings_path.clone(), state_dir.clone());
+        let catalogue = catalogue.clone();
         ui.on_start_import(move || {
             let Some(ui) = weak.upgrade() else { return };
             let texts = ui.global::<Texts>();
+            ui.invoke_import_fields_changed();
             let fields = settings_from(&ui);
             fields.save(&settings_path);
-            let request = ImportRequest {
-                source_root: PathBuf::from(&fields.source),
-                archive_root: PathBuf::from(&fields.archive),
-                profile: fields.profile(),
-                shoot: Some(field(ui.get_import_shoot())).filter(|s| !s.is_empty()),
-                backup_root: Some(fields.backup.clone())
-                    .filter(|b| !b.is_empty())
-                    .map(PathBuf::from),
-                state_dir: state_dir.clone(),
+            let resolve = |typed: &str| paths::resolve(typed).map_err(|e| e.to_string());
+            let request = (|| -> Result<ImportRequest, String> {
+                Ok(ImportRequest {
+                    source_root: resolve(&fields.source)?,
+                    destination_root: resolve(&fields.destination)?,
+                    profile: fields.profile(),
+                    shoot: Some(field(ui.get_import_shoot())).filter(|s| !s.is_empty()),
+                    backup_root: match fields.backup.as_str() {
+                        "" => None,
+                        backup => Some(resolve(backup)?),
+                    },
+                    state_dir: state_dir.clone(),
+                    add_destination_as_source: fields.add_destination,
+                })
+            })();
+            let request = match request {
+                Ok(request) => request,
+                Err(reason) => {
+                    ui.set_import_status(texts.invoke_import_refused(reason.into()));
+                    return;
+                }
             };
+            // The dialog shows back what was understood.
+            ui.set_import_source(request.source_root.to_string_lossy().as_ref().into());
+            ui.set_import_destination(request.destination_root.to_string_lossy().as_ref().into());
             match engine.import(request) {
-                Ok(job) => {
-                    run.borrow_mut().job = Some(job);
+                Ok(started) => {
+                    let mut run = run.borrow_mut();
+                    run.job = Some(started.job);
+                    run.added_source = started.added_source;
                     ui.set_importing(true);
                     ui.set_import_finished(false);
                     ui.set_import_progress(0.0);
                     ui.set_import_status(texts.invoke_reading_card());
+                    if started.added_source.is_some() {
+                        refresh_sources(&engine, &ui, &catalogue);
+                    }
                 }
                 Err(e) => ui.set_import_status(texts.invoke_import_refused(e.to_string().into())),
             }
+        });
+    }
+
+    // What the import dialog's fields mean for the catalogue: whether the card keeps camera folders,
+    // and what the destination is to the catalogue (which decides what is offered).
+    {
+        let (engine, weak) = (engine.clone(), ui.as_weak());
+        ui.on_import_fields_changed(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            let texts = ui.global::<Texts>();
+            let info = paths::resolve(ui.get_import_source().as_str())
+                .map(|source| Engine::inspect_import_source(&source))
+                .unwrap_or_default();
+            ui.set_import_source_has_folders(!info.camera_folders.is_empty());
+            ui.set_import_source_folders(info.camera_folders.join(", ").into());
+            let kind = paths::resolve(ui.get_import_destination().as_str())
+                .ok()
+                .and_then(|destination| engine.import_destination(&destination).ok());
+            let (kind, note, registering) = match kind {
+                None => ("", String::new(), false),
+                Some(DestinationKind::Covered(source)) => (
+                    "covered",
+                    texts
+                        .invoke_destination_covered(source.name.as_str().into())
+                        .to_string(),
+                    true,
+                ),
+                Some(DestinationKind::NotCovered) => {
+                    let adding = ui.get_import_add_destination();
+                    (
+                        "not-covered",
+                        texts.invoke_destination_not_covered(adding).to_string(),
+                        adding,
+                    )
+                }
+                Some(DestinationKind::ContainsSources(sources)) => {
+                    let names: Vec<String> =
+                        sources.iter().map(|s| format!("\"{}\"", s.name)).collect();
+                    (
+                        "contains",
+                        texts
+                            .invoke_destination_contains(names.join(", ").into())
+                            .to_string(),
+                        false,
+                    )
+                }
+            };
+            ui.set_import_destination_kind(kind.into());
+            ui.set_import_destination_note(note.into());
+            ui.set_import_registering(registering);
+        });
+    }
+    // A card inserted while the application runs (one with a DCIM folder) is offered for import.
+    let card_timer = Timer::default();
+    {
+        let platform = launcher.platform.clone();
+        let known: Rc<RefCell<std::collections::HashSet<PathBuf>>> = Rc::new(RefCell::new(
+            (platform.volumes)()
+                .into_iter()
+                .map(|v| v.mount_point)
+                .collect(),
+        ));
+        let pending: Rc<RefCell<Option<PathBuf>>> = Rc::new(RefCell::new(None));
+        {
+            let (pending, weak) = (pending.clone(), ui.as_weak());
+            ui.on_card_import(move || {
+                let Some(ui) = weak.upgrade() else { return };
+                if let Some(card) = pending.borrow_mut().take() {
+                    ui.set_import_source(card.to_string_lossy().as_ref().into());
+                    ui.invoke_refresh_volumes();
+                    ui.invoke_import_fields_changed();
+                    ui.set_dialog("import".into());
+                }
+                ui.set_card_banner(SharedString::new());
+            });
+        }
+        {
+            let (pending, weak) = (pending.clone(), ui.as_weak());
+            ui.on_card_dismiss(move || {
+                pending.borrow_mut().take();
+                if let Some(ui) = weak.upgrade() {
+                    ui.set_card_banner(SharedString::new());
+                }
+            });
+        }
+        let weak = ui.as_weak();
+        card_timer.start(TimerMode::Repeated, Duration::from_secs(2), move || {
+            let Some(ui) = weak.upgrade() else { return };
+            let volumes = (platform.volumes)();
+            let mut known = known.borrow_mut();
+            if let Some(card) = volumes
+                .iter()
+                .find(|v| v.has_dcim && !known.contains(&v.mount_point))
+            {
+                *pending.borrow_mut() = Some(card.mount_point.clone());
+                ui.set_card_banner(
+                    ui.global::<Texts>()
+                        .invoke_card_detected(card.name.as_str().into()),
+                );
+            }
+            *known = volumes.into_iter().map(|v| v.mount_point).collect();
         });
     }
 
@@ -604,7 +749,10 @@ pub(crate) fn attach(
         });
     }
 
-    Ok(Shell::new(ui, vec![thumbnail_timer, event_timer]))
+    Ok(Shell::new(
+        ui,
+        vec![thumbnail_timer, event_timer, card_timer],
+    ))
 }
 
 /// The flat index arrow navigation lands on, clamped to the list's bounds.

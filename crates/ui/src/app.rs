@@ -390,7 +390,9 @@ impl Launcher {
             }
             "file.import" => {
                 if ui.get_screen() == "workspace" {
-                    ui.set_current_task("import".into());
+                    ui.invoke_refresh_volumes();
+                    ui.invoke_import_fields_changed();
+                    ui.set_dialog("import".into());
                 }
             }
             "file.quit" => {
@@ -462,7 +464,7 @@ impl Launcher {
         let new_workspace_dialog = ui.get_dialog() == "new-workspace";
         let current = match which {
             "source" => ui.get_import_source(),
-            "archive" => ui.get_import_archive(),
+            "archive" => ui.get_import_destination(),
             "backup" => ui.get_import_backup(),
             "add-source" => ui.get_source_folder(),
             _ if new_workspace_dialog => ui.get_new_location(),
@@ -481,8 +483,14 @@ impl Launcher {
                 let Some(folder) = chosen else { return };
                 let text: SharedString = folder.to_string_lossy().as_ref().into();
                 match which.as_str() {
-                    "source" => ui.set_import_source(text),
-                    "archive" => ui.set_import_archive(text),
+                    "source" => {
+                        ui.set_import_source(text);
+                        ui.invoke_import_fields_changed();
+                    }
+                    "archive" => {
+                        ui.set_import_destination(text);
+                        ui.invoke_import_fields_changed();
+                    }
                     "backup" => ui.set_import_backup(text),
                     "add-source" => ui.set_source_folder(text),
                     _ if new_workspace_dialog => ui.set_new_location(text),

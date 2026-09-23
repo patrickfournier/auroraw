@@ -1,6 +1,6 @@
 import { Button, ListView, Palette } from "std-widgets.slint";
 import { Cell, GridRow, VolumeEntry, KnownEntry, MenuEntry, SourceEntry, Texts, Editing, Task } from "common.slint";
-import { ImportView } from "import.slint";
+import { ImportDialog } from "import.slint";
 import { WelcomeView } from "welcome.slint";
 import { NewWorkspaceDialog, SettingsDialog, AboutDialog, AddSourceDialog, RemoveSourceDialog, RestoreDialog } from "dialogs.slint";
 import { CataloguePanel } from "catalogue.slint";
@@ -37,6 +37,8 @@ export component MainWindow inherits Window {
     in-out property <bool> menu-open: false;
     // "system", "en" or "fr" (Settings).
     in property <string> language: "system";
+    // A card that was just inserted: "Card detected: ..." with a way to import from it.
+    in property <string> card-banner;
     in property <string> about-version;
     // The catalogue panel: the sources, what a scan is doing, and the dialogs over it.
     in property <[SourceEntry]> sources;
@@ -62,8 +64,15 @@ export component MainWindow inherits Window {
     in property <bool> import-finished;
     // A folder dialog is open: the browse buttons wait for it.
     in property <bool> picking;
+    in property <string> import-destination-kind;
+    in property <string> import-destination-note;
+    in property <bool> import-source-has-folders;
+    in property <string> import-source-folders;
+    in property <bool> import-registering;
+    in-out property <string> import-layout: "template";
+    in-out property <bool> import-add-destination: true;
     in-out property <string> import-source;
-    in-out property <string> import-archive;
+    in-out property <string> import-destination;
     in-out property <string> import-backup;
     in-out property <string> import-template;
     in-out property <string> import-shoot;
@@ -78,6 +87,9 @@ export component MainWindow inherits Window {
     callback cancel-import();
     callback refresh-volumes();
     callback show-photos();
+    callback import-fields-changed();
+    callback card-import();
+    callback card-dismiss();
     callback browse-folder(string);
     callback new-workspace();
     callback open-workspace();
@@ -168,27 +180,6 @@ export component MainWindow inherits Window {
                 add-source => { root.add-source(); }
                 remove-source(i) => { root.remove-source(i); }
                 rescan-source(i) => { root.rescan-source(i); }
-            }
-
-            if root.current-task == "import" : ImportView {
-                volumes: root.volumes;
-                status: root.import-status;
-                progress: root.import-progress;
-                importing: root.importing;
-                finished: root.import-finished;
-                picking: root.picking;
-                source <=> root.import-source;
-                archive <=> root.import-archive;
-                backup <=> root.import-backup;
-                template <=> root.import-template;
-                shoot <=> root.import-shoot;
-                creator <=> root.import-creator;
-                rights <=> root.import-rights;
-                start-import => { root.start-import(); }
-                cancel-import => { root.cancel-import(); }
-                refresh-volumes => { root.refresh-volumes(); }
-                show-photos => { root.show-photos(); }
-                browse-folder(which) => { root.browse-folder(which); }
             }
 
             if root.current-task == "cull" : VerticalLayout {
@@ -293,22 +284,44 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.menu-open : MenuOverlay {
+    if root.dialog == "import" : ImportDialog {
         x: 0px;
-        y: 0px;
+        y: 36px;
         width: root.width;
-        height: root.height;
-        has-workspace: root.screen == "workspace";
-        modifier: root.modifier-name;
-        redo-shortcut: root.redo-shortcut;
-        close => { root.menu-open = false; }
-        command(id) => { root.command(id); }
+        height: root.height - 36px;
+        volumes: root.volumes;
+        status: root.import-status;
+        progress: root.import-progress;
+        importing: root.importing;
+        finished: root.import-finished;
+        picking: root.picking;
+        destination-kind: root.import-destination-kind;
+        destination-note: root.import-destination-note;
+        source-has-folders: root.import-source-has-folders;
+        source-folders: root.import-source-folders;
+        registering: root.import-registering;
+        source <=> root.import-source;
+        destination <=> root.import-destination;
+        backup <=> root.import-backup;
+        template <=> root.import-template;
+        shoot <=> root.import-shoot;
+        creator <=> root.import-creator;
+        rights <=> root.import-rights;
+        layout <=> root.import-layout;
+        add-destination <=> root.import-add-destination;
+        close => { root.close-dialog(); }
+        start-import => { root.start-import(); }
+        cancel-import => { root.cancel-import(); }
+        refresh-volumes => { root.refresh-volumes(); }
+        show-photos => { root.show-photos(); }
+        browse-folder(which) => { root.browse-folder(which); }
+        fields-changed => { root.import-fields-changed(); }
     }
     if root.dialog == "add-source" : AddSourceDialog {
         x: 0px;
-        y: 0px;
+        y: 36px;
         width: root.width;
-        height: root.height;
+        height: root.height - 36px;
         error: root.add-source-error;
         merge-question: root.add-source-merge-question;
         browse-enabled: !root.picking;
@@ -321,9 +334,9 @@ export component MainWindow inherits Window {
     }
     if root.dialog == "remove-source" : RemoveSourceDialog {
         x: 0px;
-        y: 0px;
+        y: 36px;
         width: root.width;
-        height: root.height;
+        height: root.height - 36px;
         source-name: root.remove-name;
         photos: root.remove-photos;
         worked-on: root.remove-worked-on;
@@ -332,9 +345,9 @@ export component MainWindow inherits Window {
     }
     if root.dialog == "restore" : RestoreDialog {
         x: 0px;
-        y: 0px;
+        y: 36px;
         width: root.width;
-        height: root.height;
+        height: root.height - 36px;
         restorable: root.restore-count;
         total: root.restore-total;
         close => { root.restore-cancelled(); }
@@ -342,26 +355,26 @@ export component MainWindow inherits Window {
     }
     if root.dialog == "settings" : SettingsDialog {
         x: 0px;
-        y: 0px;
+        y: 36px;
         width: root.width;
-        height: root.height;
+        height: root.height - 36px;
         language: root.language;
         close => { root.close-dialog(); }
         language-chosen(code) => { root.language-chosen(code); }
     }
     if root.dialog == "about" : AboutDialog {
         x: 0px;
-        y: 0px;
+        y: 36px;
         width: root.width;
-        height: root.height;
+        height: root.height - 36px;
         version: root.about-version;
         close => { root.close-dialog(); }
     }
     if root.dialog == "new-workspace" : NewWorkspaceDialog {
         x: 0px;
-        y: 0px;
+        y: 36px;
         width: root.width;
-        height: root.height;
+        height: root.height - 36px;
         error: root.dialog-error;
         browse-enabled: !root.picking;
         name <=> root.new-name;
@@ -372,6 +385,17 @@ export component MainWindow inherits Window {
         name-edited(text) => { root.new-name-edited(text); }
     }
 
+    if root.menu-open : MenuOverlay {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        has-workspace: root.screen == "workspace";
+        modifier: root.modifier-name;
+        redo-shortcut: root.redo-shortcut;
+        close => { root.menu-open = false; }
+        command(id) => { root.command(id); }
+    }
     if root.notice != "" : Rectangle {
         x: 0px;
         y: 0px;
@@ -394,6 +418,29 @@ export component MainWindow inherits Window {
                 text: @tr("Dismiss");
                 clicked => { root.dismiss-notice(); }
             }
+        }
+    }
+
+    if root.card-banner != "" : Rectangle {
+        x: 0px;
+        y: 40px;
+        width: root.width;
+        height: 40px;
+        background: #1e3f4a;
+        border-color: #307a8a;
+        border-width: 1px;
+        HorizontalLayout {
+            padding: 6px;
+            spacing: 8px;
+            Text {
+                text: root.card-banner;
+                color: white;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: text;
+            }
+            Button { text: @tr("Import…"); primary: true; clicked => { root.card-import(); } }
+            Button { text: @tr("Ignore"); clicked => { root.card-dismiss(); } }
         }
     }
 }

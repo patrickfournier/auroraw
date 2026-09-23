@@ -98,8 +98,6 @@ pub enum Event {
     ImportStarted {
         /// The job doing the work.
         job: JobId,
-        /// The source being imported from.
-        source_id: SourceId,
     },
     /// One file the import job looked at was resolved: copied, skipped (design note 004 §6.3,
     /// item 4), or failed (retried on the next resume).

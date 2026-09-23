@@ -1,108 +1,177 @@
-import { Button, ProgressIndicator } from "std-widgets.slint";
+import { Button, CheckBox, ProgressIndicator } from "std-widgets.slint";
 import { Field, VolumeEntry } from "common.slint";
+import { Modal } from "dialogs.slint";
 
-export component ImportView inherits Rectangle {
+// Import (spec §5.2): copies the photos of a card or folder to another folder, verified, with an
+// optional second destination. It is separate from the catalogue: the destination need not be one of
+// its sources. When it is (or is added as one) the photos also enter the catalogue.
+export component ImportDialog inherits Modal {
     in property <[VolumeEntry]> volumes;
     in property <string> status;
     in property <float> progress;
     in property <bool> importing;
     in property <bool> finished;
     in property <bool> picking;
+    // What the destination is to the catalogue: "" (unknown), "covered", "not-covered" or "contains".
+    in property <string> destination-kind;
+    in property <string> destination-note;
+    // The card has camera folders (DCIM/100CANON...): offer to keep them.
+    in property <bool> source-has-folders;
+    in property <string> source-folders;
+    // Whether the photos will enter the catalogue (else they are only copied).
+    in property <bool> registering;
     in-out property <string> source;
-    in-out property <string> archive;
+    in-out property <string> destination;
     in-out property <string> backup;
     in-out property <string> template;
     in-out property <string> shoot;
     in-out property <string> creator;
     in-out property <string> rights;
+    // "template" or "folders".
+    in-out property <string> layout: "template";
+    in-out property <bool> add-destination: true;
 
     callback start-import();
     callback cancel-import();
     callback refresh-volumes();
     callback show-photos();
     callback browse-folder(string);
+    callback fields-changed();
 
-    background: #1e1e1e;
-    VerticalLayout {
-        padding: 16px;
-        spacing: 10px;
+    title: @tr("Import");
+    card-width: 780px;
+
+    Text {
+        text: @tr("Cards and drives");
+        color: #cccccc;
+        font-weight: 700;
+    }
+    HorizontalLayout {
+        spacing: 8px;
         alignment: start;
-
-        Text {
-            text: @tr("Cards and drives");
-            color: #cccccc;
-            font-weight: 700;
-        }
-        HorizontalLayout {
-            spacing: 8px;
-            alignment: start;
-            for v in root.volumes : Button {
-                text: v.label;
-                clicked => { root.source = v.path; }
-            }
-            if root.volumes.length == 0 : Text {
-                text: @tr("No card detected");
-                color: #888888;
-                vertical-alignment: center;
-            }
-            Button {
-                text: @tr("Refresh");
-                clicked => { root.refresh-volumes(); }
+        for v in root.volumes : Button {
+            text: v.label;
+            clicked => {
+                root.source = v.path;
+                root.fields-changed();
             }
         }
-        Field {
-            label: @tr("Import from (card or folder)");
-            text <=> root.source;
-            browsable: true;
-            browse-enabled: !root.picking;
-            browse => { root.browse-folder("source"); }
+        if root.volumes.length == 0 : Text {
+            text: @tr("No card detected");
+            color: #888888;
+            vertical-alignment: center;
         }
-        Field {
-            label: @tr("Archive folder");
-            placeholder: @tr("Where the photos are copied to");
-            text <=> root.archive;
-            browsable: true;
-            browse-enabled: !root.picking;
-            browse => { root.browse-folder("archive"); }
+        Button {
+            text: @tr("Refresh");
+            clicked => { root.refresh-volumes(); }
         }
-        Field {
-            label: @tr("Backup folder (optional)");
-            text <=> root.backup;
-            browsable: true;
-            browse-enabled: !root.picking;
-            browse => { root.browse-folder("backup"); }
+    }
+    Field {
+        label-width: 210px;
+        label: @tr("Import from (card or folder)");
+        text <=> root.source;
+        browsable: true;
+        browse-enabled: !root.picking;
+        browse => { root.browse-folder("source"); }
+        edited(text) => { root.fields-changed(); }
+    }
+    if root.source-has-folders : Text {
+        text: @tr("This card keeps its photos in camera folders ({}).", root.source-folders);
+        color: #aaaaaa;
+        wrap: word-wrap;
+    }
+    Field {
+        label-width: 210px;
+        label: @tr("Destination folder");
+        placeholder: @tr("Where the photos are copied to");
+        text <=> root.destination;
+        browsable: true;
+        browse-enabled: !root.picking;
+        browse => { root.browse-folder("archive"); }
+        edited(text) => { root.fields-changed(); }
+    }
+    if root.destination-note != "" : Text {
+        text: root.destination-note;
+        color: root.destination-kind == "covered" ? #99cc99 : #e0b050;
+        wrap: word-wrap;
+        accessible-role: text;
+    }
+    if root.destination-kind == "not-covered" : CheckBox {
+        text: @tr("Add this folder to the catalogue's sources");
+        checked <=> root.add-destination;
+        toggled => { root.fields-changed(); }
+    }
+    Field {
+        label-width: 210px;
+        label: @tr("Backup folder (optional)");
+        text <=> root.backup;
+        browsable: true;
+        browse-enabled: !root.picking;
+        browse => { root.browse-folder("backup"); }
+    }
+    if root.source-has-folders : HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        Text { text: @tr("Layout"); width: 210px; color: #cccccc; vertical-alignment: center; }
+        Button {
+            text: @tr("Use the template");
+            primary: root.layout == "template";
+            clicked => { root.layout = "template"; }
         }
-        Field { label: @tr("Folders and file names"); placeholder: "{year}/{date}/{original}.{ext}"; text <=> root.template; }
-        Field { label: @tr("Shoot name (optional)"); text <=> root.shoot; }
-        Field { label: @tr("Creator"); text <=> root.creator; }
-        Field { label: @tr("Copyright"); text <=> root.rights; }
-        HorizontalLayout {
-            spacing: 8px;
-            alignment: start;
-            Button {
-                text: @tr("Import");
-                enabled: !root.importing;
-                primary: true;
-                clicked => { root.start-import(); }
-            }
-            Button {
-                text: @tr("Cancel");
-                enabled: root.importing;
-                clicked => { root.cancel-import(); }
-            }
-            if root.finished : Button {
-                text: @tr("Show photos");
-                clicked => { root.show-photos(); }
-            }
+        Button {
+            text: @tr("Keep the card's folders");
+            primary: root.layout == "folders";
+            clicked => { root.layout = "folders"; }
         }
-        if root.importing : ProgressIndicator {
-            progress: root.progress;
+    }
+    if !root.source-has-folders || root.layout == "template" : Field {
+        label-width: 210px;
+        label: @tr("Folders and file names");
+        placeholder: "{year}/{date}/{original}.{ext}";
+        text <=> root.template;
+    }
+    Field {
+        label-width: 210px;
+        label: @tr("Shoot name (optional)");
+        text <=> root.shoot;
+    }
+    if root.registering : Field {
+        label-width: 210px;
+        label: @tr("Creator");
+        text <=> root.creator;
+    }
+    if root.registering : Field {
+        label-width: 210px;
+        label: @tr("Copyright");
+        text <=> root.rights;
+    }
+    if root.importing : ProgressIndicator {
+        progress: root.progress;
+    }
+    if root.status != "" : Text {
+        text: root.status;
+        color: #99cc99;
+        wrap: word-wrap;
+        accessible-role: text;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: end;
+        if root.finished && root.registering : Button {
+            text: @tr("Show photos");
+            clicked => { root.show-photos(); }
         }
-        Text {
-            text: root.status;
-            color: #99cc99;
-            wrap: word-wrap;
-            accessible-role: text;
+        Button {
+            text: @tr("Cancel import");
+            enabled: root.importing;
+            clicked => { root.cancel-import(); }
         }
+        Button {
+            text: @tr("Import");
+            primary: true;
+            enabled: !root.importing;
+            clicked => { root.start-import(); }
+        }
+        Button { text: @tr("Close"); clicked => { root.close(); } }
     }
 }

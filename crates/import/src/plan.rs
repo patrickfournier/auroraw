@@ -35,7 +35,7 @@ pub struct PlannedPhoto {
     pub companion: Option<PlannedFile>,
 }
 
-/// A path this run already assigned in the destination, so the next collision (two cameras'
+/// The paths (folded to lower case, see `folded`) this run already assigned in the destination, so the next collision (two cameras'
 /// same-numbered shots rendering to the same destination) gets a suffix instead of silently
 /// landing on top of it. The caller may pre-seed this too; files already on disk are the job of
 /// [`Exists`], which is asked about every candidate.
@@ -55,10 +55,16 @@ pub enum Root {
 /// suffix instead (spec §5.2, D-031's spirit: an import must not destroy what is already kept).
 pub type Exists<'a> = &'a dyn Fn(Root, &Path) -> bool;
 
+/// A path folded for comparison: two names that differ only by case are the same name on Windows
+/// and macOS, so they are never given to two files (the names themselves keep their case).
+fn folded(path: &Path) -> PathBuf {
+    PathBuf::from(path.to_string_lossy().to_lowercase())
+}
+
 fn unique(mut path: PathBuf, used: &mut UsedPaths, root: Root, exists: Exists) -> PathBuf {
-    let taken = |p: &Path, used: &UsedPaths| used.contains(p) || exists(root, p);
+    let taken = |p: &Path, used: &UsedPaths| used.contains(&folded(p)) || exists(root, p);
     if !taken(&path, used) {
-        used.insert(path.clone());
+        used.insert(folded(&path));
         return path;
     }
     let stem = path
@@ -75,7 +81,7 @@ fn unique(mut path: PathBuf, used: &mut UsedPaths, root: Root, exists: Exists) -
         };
         let candidate = parent.join(name);
         if !taken(&candidate, used) {
-            used.insert(candidate.clone());
+            used.insert(folded(&candidate));
             path = candidate;
             break;
         }
@@ -159,6 +165,7 @@ pub fn plan(
             camera: group.original.camera.as_deref(),
             original_stem: stem,
             extension: ext,
+            source_path: &group.original.path,
             shoot,
         };
         let original = namer.planned_file(&group.original.path, group.original.size, &ctx);
@@ -167,6 +174,7 @@ pub fn plan(
             let ctx = TemplateContext {
                 original_stem: stem,
                 extension: ext,
+                source_path: &c.path,
                 ..ctx
             };
             namer.planned_file(&c.path, c.size, &ctx)
@@ -223,12 +231,12 @@ mod tests {
         assert_eq!(planned[0].original.source_path, "B/IMG_0001.CR3");
         assert_eq!(
             planned[0].original.destination,
-            PathBuf::from("01_IMG_0001.cr3")
+            PathBuf::from("01_IMG_0001.CR3")
         );
         assert_eq!(planned[1].original.source_path, "A/IMG_0002.CR3");
         assert_eq!(
             planned[1].original.destination,
-            PathBuf::from("02_IMG_0002.cr3")
+            PathBuf::from("02_IMG_0002.CR3")
         );
     }
 
@@ -247,11 +255,11 @@ mod tests {
         );
         assert_eq!(
             planned[0].original.destination,
-            PathBuf::from("IMG_0001.cr3")
+            PathBuf::from("IMG_0001.CR3")
         );
         assert_eq!(
             planned[1].original.destination,
-            PathBuf::from("IMG_0001_2.cr3"),
+            PathBuf::from("IMG_0001_2.CR3"),
             "the second file to land on the same path gets a suffix, not silently overwritten"
         );
     }
@@ -260,7 +268,7 @@ mod tests {
     fn a_path_already_used_before_planning_starts_is_also_avoided() {
         let a = file("A/IMG_0001.CR3", "Camera A", datetime!(2026-01-01 9:00 UTC));
         let mut used = UsedPaths::new();
-        used.insert(PathBuf::from("IMG_0001.cr3"));
+        used.insert(PathBuf::from("img_0001.cr3"));
         let planned = plan(
             vec![group(a)],
             "{original}.{ext}",
@@ -271,7 +279,7 @@ mod tests {
         );
         assert_eq!(
             planned[0].original.destination,
-            PathBuf::from("IMG_0001_2.cr3")
+            PathBuf::from("IMG_0001_2.CR3")
         );
     }
 
@@ -295,7 +303,7 @@ mod tests {
         );
         assert_eq!(
             planned[0].companion.as_ref().unwrap().destination,
-            PathBuf::from("01_IMG_0001.jpg")
+            PathBuf::from("01_IMG_0001.JPG")
         );
     }
 
@@ -314,11 +322,11 @@ mod tests {
         );
         assert_eq!(
             planned[0].original.backup_destinations,
-            vec![PathBuf::from("backup/IMG_0001.cr3")]
+            vec![PathBuf::from("backup/IMG_0001.CR3")]
         );
         assert_eq!(
             planned[1].original.backup_destinations,
-            vec![PathBuf::from("backup/IMG_0002.cr3")]
+            vec![PathBuf::from("backup/IMG_0002.CR3")]
         );
     }
 
@@ -327,7 +335,7 @@ mod tests {
         let a = file("IMG_0001.CR3", "Camera A", datetime!(2026-01-01 9:00 UTC));
         let on_disk = |root: Root, p: &Path| {
             root == Root::Destination
-                && (p == Path::new("IMG_0001.cr3") || p == Path::new("IMG_0001_2.cr3"))
+                && (p == Path::new("IMG_0001.CR3") || p == Path::new("IMG_0001_2.CR3"))
         };
         let planned = plan(
             vec![group(a)],
@@ -339,7 +347,7 @@ mod tests {
         );
         assert_eq!(
             planned[0].original.destination,
-            PathBuf::from("IMG_0001_3.cr3")
+            PathBuf::from("IMG_0001_3.CR3")
         );
     }
 
@@ -356,12 +364,74 @@ mod tests {
         );
         assert_eq!(
             planned[0].original.destination,
-            PathBuf::from("IMG_0001.cr3")
+            PathBuf::from("IMG_0001.CR3")
         );
         assert_eq!(
             planned[0].original.backup_destinations,
-            vec![PathBuf::from("IMG_0001.cr3")],
+            vec![PathBuf::from("IMG_0001.CR3")],
             "a different root, its own namespace"
+        );
+    }
+
+    #[test]
+    fn two_names_that_differ_only_by_case_never_share_a_destination_and_each_keeps_its_own_case() {
+        let a = file("IMG_0001.CR3", "Camera A", datetime!(2026-01-01 9:00 UTC));
+        let b = file(
+            "copy/img_0001.cr3",
+            "Camera B",
+            datetime!(2026-01-01 9:05 UTC),
+        );
+        let planned = plan(
+            vec![group(a), group(b)],
+            "{name}",
+            &[],
+            None,
+            &mut UsedPaths::new(),
+            &|_, _| false,
+        );
+        assert_eq!(
+            planned[0].original.destination,
+            PathBuf::from("IMG_0001.CR3")
+        );
+        assert_eq!(
+            planned[1].original.destination,
+            PathBuf::from("img_0001_2.cr3"),
+            "the newcomer is numbered, in its own case"
+        );
+    }
+
+    #[test]
+    fn keeping_the_cards_folders_merges_into_a_folder_that_exists_and_numbers_only_a_clash() {
+        let a = file(
+            "DCIM/100CANON/IMG_0001.CR2",
+            "Camera A",
+            datetime!(2026-01-01 9:00 UTC),
+        );
+        let b = file(
+            "DCIM/100CANON/IMG_0002.CR2",
+            "Camera A",
+            datetime!(2026-01-01 9:01 UTC),
+        );
+        // `100CANON/IMG_0001.CR2` is already in the archive from an earlier card: the folder is
+        // merged into, and only the file that clashes gets a number.
+        let on_disk = |root: Root, p: &Path| {
+            root == Root::Destination && p == Path::new("100CANON/IMG_0001.CR2")
+        };
+        let planned = plan(
+            vec![group(a), group(b)],
+            "{path}",
+            &[],
+            None,
+            &mut UsedPaths::new(),
+            &on_disk,
+        );
+        assert_eq!(
+            planned[0].original.destination,
+            PathBuf::from("100CANON/IMG_0001_2.CR2")
+        );
+        assert_eq!(
+            planned[1].original.destination,
+            PathBuf::from("100CANON/IMG_0002.CR2")
         );
     }
 }

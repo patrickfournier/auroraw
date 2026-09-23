@@ -2,7 +2,10 @@
 //! Rendering a destination path template (M1 plan §6, item 6): `{year}`, `{month}`, `{day}`,
 //! `{date}` (`{year}-{month}-{day}`), `{hour}`, `{minute}`, `{second}`, `{time}` (`{hour}{minute}{second}`),
 //! `{seq}` (a sequence number, `{seq:04}` for zero-padded width 4), `{camera}`, `{original}` (the
-//! source file's name without its extension), `{ext}` (its extension, lowercase) and `{shoot}` (a
+//! source file's name without its extension), `{ext}` (its extension, **as found**: an imported file
+//! never changes case), `{name}` (the whole file name, as found), `{folder}` (the name of the folder it
+//! is in on the card, `100CANON` for `DCIM/100CANON/IMG_0001.CR2`), `{path}` (its path on the card below
+//! `DCIM` when there is one, folders and name as found: `{path}` alone keeps the card's own layout) and `{shoot}` (a
 //! session name, given at import time, not stored in the profile: D-029's profile schema does not
 //! name one, and it is naturally a per-import choice, like a wedding's name, not a per-profile one).
 //!
@@ -23,8 +26,10 @@ pub struct TemplateContext<'a> {
     pub camera: Option<&'a str>,
     /// The source file's name, without its extension.
     pub original_stem: &'a str,
-    /// The source file's extension, as found (rendered lowercase).
+    /// The source file's extension, as found (rendered as found).
     pub extension: &'a str,
+    /// The file's path in the source, with `/` separators.
+    pub source_path: &'a str,
     /// A session name given at import time.
     pub shoot: Option<&'a str>,
 }
@@ -45,6 +50,27 @@ fn sanitize(value: &str) -> String {
         .collect::<String>()
         .trim()
         .to_string()
+}
+
+/// The name of the folder a file is in (`100CANON` for `DCIM/100CANON/IMG_0001.CR2`), empty at the
+/// root of the source.
+fn folder_of(path: &str) -> &str {
+    let mut parts = path.rsplit('/');
+    parts.next();
+    parts.next().unwrap_or("")
+}
+
+/// The path below the camera's `DCIM` folder when it has one (`100CANON/IMG_0001.CR2`), else the
+/// whole path: the layout a card keeps, whatever else is above it. Components are kept as found.
+fn path_below_dcim(path: &str) -> String {
+    let parts: Vec<&str> = path.split('/').collect();
+    let below = parts
+        .iter()
+        .position(|part| part.eq_ignore_ascii_case("DCIM"))
+        .map(|at| &parts[at + 1..])
+        .filter(|rest| !rest.is_empty())
+        .unwrap_or(&parts[..]);
+    below.join("/")
 }
 
 fn field(name: &str, spec: Option<&str>, ctx: &TemplateContext) -> String {
@@ -74,7 +100,15 @@ fn field(name: &str, spec: Option<&str>, ctx: &TemplateContext) -> String {
         }
         "camera" => sanitize(ctx.camera.unwrap_or_default()),
         "original" => sanitize(ctx.original_stem),
-        "ext" => ctx.extension.to_ascii_lowercase(),
+        "ext" => sanitize(ctx.extension),
+        "name" => sanitize(
+            ctx.source_path
+                .rsplit('/')
+                .next()
+                .unwrap_or(ctx.source_path),
+        ),
+        "folder" => sanitize(folder_of(ctx.source_path)),
+        "path" => path_below_dcim(ctx.source_path),
         "shoot" => sanitize(ctx.shoot.unwrap_or_default()),
         // An unknown token renders as itself, wrapped, rather than silently vanishing: a typo in
         // a template should be visible in the resulting path, not swallowed.
@@ -146,6 +180,7 @@ mod tests {
             camera: Some("EOS R5 Mark II"),
             original_stem: "IMG_0042",
             extension: "CR3",
+            source_path: "DCIM/100CANON/IMG_0042.CR3",
             shoot: Some("Marie wedding"),
         }
     }
@@ -155,7 +190,7 @@ mod tests {
         let c = ctx(Some(datetime!(2026-09-23 14:05:09 UTC)));
         assert_eq!(
             render("{year}/{date}/{camera}_{seq:04}_{original}.{ext}", &c),
-            "2026/2026-09-23/EOS R5 Mark II_0007_IMG_0042.cr3"
+            "2026/2026-09-23/EOS R5 Mark II_0007_IMG_0042.CR3"
         );
     }
 
@@ -195,15 +230,15 @@ mod tests {
         let root = std::path::Path::new("/archive");
         for hostile in [
             "/etc/passwd",
-            "//IMG.cr3",
-            "../../outside/IMG.cr3",
-            "a/../../IMG.cr3",
-            "C:\\Windows\\IMG.cr3",
-            "C:/IMG.cr3",
-            "\\\\server\\share\\IMG.cr3",
-            "./IMG.cr3",
+            "//IMG.CR3",
+            "../../outside/IMG.CR3",
+            "a/../../IMG.CR3",
+            "C:\\Windows\\IMG.CR3",
+            "C:/IMG.CR3",
+            "\\\\server\\share\\IMG.CR3",
+            "./IMG.CR3",
         ] {
-            let relative = safe_relative(hostile, "fallback.cr3");
+            let relative = safe_relative(hostile, "fallback.CR3");
             assert!(relative.is_relative(), "{hostile}: {relative:?}");
             assert!(
                 relative
@@ -220,15 +255,44 @@ mod tests {
         let c = ctx(None);
         assert_eq!(
             safe_relative(&render("{year}/{date}/{original}.{ext}", &c), "x"),
-            std::path::PathBuf::from("IMG_0042.cr3")
+            std::path::PathBuf::from("IMG_0042.CR3")
         );
     }
 
     #[test]
     fn nothing_left_after_cleaning_falls_back() {
         assert_eq!(
-            safe_relative("../..//", "IMG.cr3"),
-            std::path::PathBuf::from("IMG.cr3")
+            safe_relative("../..//", "IMG.CR3"),
+            std::path::PathBuf::from("IMG.CR3")
         );
+    }
+
+    #[test]
+    fn a_file_keeps_its_case_and_the_card_layout_tokens_read_the_source_path() {
+        let c = ctx(None);
+        assert_eq!(render("{original}.{ext}", &c), "IMG_0042.CR3");
+        assert_eq!(render("{name}", &c), "IMG_0042.CR3");
+        assert_eq!(render("{folder}/{name}", &c), "100CANON/IMG_0042.CR3");
+        assert_eq!(render("{path}", &c), "100CANON/IMG_0042.CR3");
+    }
+
+    #[test]
+    fn the_path_token_starts_below_dcim_and_otherwise_keeps_everything() {
+        assert_eq!(
+            path_below_dcim("DCIM/100CANON/IMG_1.CR2"),
+            "100CANON/IMG_1.CR2"
+        );
+        assert_eq!(
+            path_below_dcim("card/dcim/101NIKON/D1.NEF"),
+            "101NIKON/D1.NEF"
+        );
+        assert_eq!(path_below_dcim("Trip/Day 1/a.ARW"), "Trip/Day 1/a.ARW");
+        assert_eq!(path_below_dcim("a.ARW"), "a.ARW");
+        assert_eq!(
+            path_below_dcim("DCIM"),
+            "DCIM",
+            "nothing below it: the path stays"
+        );
+        assert_eq!(folder_of("a.ARW"), "");
     }
 }

@@ -11,7 +11,7 @@
 //! file: a RAW+JPEG pair is one photo with two files (D-032), so a run interrupted between the
 //! two writes retries the whole pair rather than leaving a photo with only one of its files.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc;
@@ -39,7 +39,11 @@ pub(crate) struct ImportJob {
     pub workspace: Arc<Workspace>,
     pub source: FilesystemSource,
     pub dest_root: PathBuf,
-    pub dest_source_id: SourceId,
+    /// Where the imported photos are registered in the catalogue, or `None` for a plain copy: the
+    /// destination is not one of the catalogue's sources, so no sidecar is written and nothing is
+    /// registered. Photos already in the catalogue are then not skipped either: copying a card to
+    /// a second place is what was asked.
+    pub registration: Option<Registration>,
     pub profile: Profile,
     pub shoot: Option<String>,
     pub backup_roots: Vec<PathBuf>,
@@ -49,6 +53,17 @@ pub(crate) struct ImportJob {
     pub events: mpsc::Sender<Event>,
     pub inbound: mpsc::Sender<Inbound>,
     pub cancel: CancelToken,
+}
+
+/// Where imported photos live in the catalogue: the source that covers the destination folder, and
+/// the destination's path inside it (empty when the destination is the source's own folder), with
+/// `/` separators.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Registration {
+    /// The catalogue source that covers the destination folder.
+    pub source_id: SourceId,
+    /// The destination folder relative to that source's folder.
+    pub prefix: String,
 }
 
 pub(crate) fn spawn(job: ImportJob) {
@@ -193,7 +208,7 @@ fn build_metadata(job: &ImportJob, meta: Option<Metadata>) -> Metadata {
 }
 
 fn file_entry(
-    job: &ImportJob,
+    registration: &Registration,
     role: FileRole,
     planned: &PlannedFile,
     hash: ContentHash,
@@ -216,13 +231,31 @@ fn file_entry(
         fingerprint,
         hash: Some(hash),
         locations: vec![Location {
-            source: job.dest_source_id,
-            path: planned.destination.to_string_lossy().replace('\\', "/"),
+            source: registration.source_id,
+            path: {
+                let inside = planned.destination.to_string_lossy().replace('\\', "/");
+                if registration.prefix.is_empty() {
+                    inside
+                } else {
+                    format!("{}/{inside}", registration.prefix)
+                }
+            },
             seen: Some(Timestamp::now()),
             extra: Vec::new(),
         }],
         extra: Vec::new(),
     }
+}
+
+/// Whether two files hold the same bytes, by whole-file hash.
+fn same_content(a: &Path, b: &Path) -> bool {
+    let hash = |path: &Path| {
+        let mut file = std::fs::File::open(path).ok()?;
+        auroraw_format::fingerprint::content_hash(&mut file)
+            .ok()
+            .map(|(_, hash)| hash)
+    };
+    matches!((hash(a), hash(b)), (Some(x), Some(y)) if x == y)
 }
 
 fn full_backups(job: &ImportJob, backups: &[PathBuf]) -> Vec<PathBuf> {
@@ -235,7 +268,8 @@ fn full_backups(job: &ImportJob, backups: &[PathBuf]) -> Vec<PathBuf> {
 
 /// What happened to one planned photo.
 enum GroupOutcome {
-    Copied(PhotoId),
+    /// Copied and verified; the photo it was registered as, when it was registered.
+    Copied(Option<PhotoId>),
     Skipped,
     Failed(String),
 }
@@ -256,7 +290,9 @@ fn import_group(
     };
 
     let mut backfill = None;
-    if let Some(catalogue) = catalogue {
+    // Only a registering import consults the catalogue: a plain copy is what was asked for, even of
+    // photos the catalogue already knows.
+    if let (Some(catalogue), Some(_)) = (catalogue, &job.registration) {
         let (duplicate, found_backfill) = find_duplicate(
             catalogue,
             &job.workspace,
@@ -287,6 +323,21 @@ fn import_group(
         return GroupOutcome::Failed(e.to_string());
     }
 
+    let Some(registration) = &job.registration else {
+        // A plain copy: the companion is copied too, and that is all.
+        if let Some(companion) = &planned.companion
+            && let Ok(companion_read) = read_source(&job.source, &companion.source_path)
+        {
+            let _ = write_verified(
+                &companion_read.bytes,
+                &companion_read.hash,
+                &job.dest_root.join(&companion.destination),
+                &full_backups(job, &companion.backup_destinations),
+            );
+        }
+        return GroupOutcome::Copied(None);
+    };
+
     let photo_id = PhotoId::random();
     let mut photo = PhotoSidecar::new(photo_id);
     photo.meta = build_metadata(
@@ -295,7 +346,7 @@ fn import_group(
     );
     photo.imported = Some(Timestamp::now());
     photo.files.push(file_entry(
-        job,
+        registration,
         FileRole::Original,
         &planned.original,
         original_read.hash,
@@ -319,7 +370,7 @@ fn import_group(
         .is_ok()
         {
             photo.files.push(file_entry(
-                job,
+                registration,
                 FileRole::Companion,
                 companion,
                 companion_read.hash,
@@ -341,7 +392,7 @@ fn import_group(
         stat: Some(stat),
         backfill,
     });
-    GroupOutcome::Copied(photo_id)
+    GroupOutcome::Copied(Some(photo_id))
 }
 
 fn run(job: ImportJob) {
@@ -367,7 +418,12 @@ fn run(job: ImportJob) {
 
     let mut discovered = Vec::with_capacity(entries.len());
     let mut meta_by_path = HashMap::new();
-    for entry in &entries {
+    // Only still images are imported: a card also holds sidecar and system files, and videos are
+    // out of scope (spec §1).
+    for entry in entries
+        .iter()
+        .filter(|e| auroraw_imaging::is_photo_file(Path::new(&e.path)))
+    {
         let (file, meta) = discover_one(&source_root_path, &entry.path);
         if let Some(meta) = meta {
             meta_by_path.insert(file.path.clone(), meta);
@@ -376,6 +432,38 @@ fn run(job: ImportJob) {
     }
 
     let groups = pair_files(discovered, job.profile.pair_rule);
+
+    // A file already at its exact planned place with the same content is not copied again and is
+    // not given a numbered twin: a second import of the same card into the same folders adds
+    // nothing. (Found by asking the plan where every file would go if nothing were there.)
+    let identical: HashSet<String> = plan(
+        groups.clone(),
+        &job.profile.destination_template,
+        &job.profile.backup_templates,
+        job.shoot.as_deref(),
+        &mut UsedPaths::new(),
+        &|_, _| false,
+    )
+    .iter()
+    .filter(|photo| {
+        let destination = job.dest_root.join(&photo.original.destination);
+        std::fs::metadata(&destination).is_ok_and(|m| m.is_file() && m.len() == photo.original.size)
+            && same_content(
+                &source_root_path.join(
+                    photo
+                        .original
+                        .source_path
+                        .replace('/', std::path::MAIN_SEPARATOR_STR),
+                ),
+                &destination,
+            )
+    })
+    .map(|photo| photo.original.source_path.clone())
+    .collect();
+    let (identical_groups, groups): (Vec<_>, Vec<_>) = groups
+        .into_iter()
+        .partition(|group| identical.contains(&group.original.path));
+
     let mut used = UsedPaths::new();
     let on_disk = |root: Root, relative: &Path| match root {
         Root::Destination => job.dest_root.join(relative).exists(),
@@ -396,9 +484,31 @@ fn run(job: ImportJob) {
     let mut state = ImportState::load(&job.state_path).unwrap_or_default();
     let catalogue = Catalogue::open(&job.catalogue_path).ok();
 
-    let total = planned.len();
+    let total = planned.len() + identical_groups.len();
     let (mut copied, mut skipped, mut failed) = (0, 0, 0);
+    for (done, group) in identical_groups.iter().enumerate() {
+        skipped += 1;
+        let key = group.original.path.clone();
+        let outcome = ItemOutcome::Skipped {
+            reason: "already at the destination (identical)".into(),
+        };
+        state.record(key.clone(), outcome.clone());
+        let _ = state.save(&job.state_path);
+        let _ = job.events.send(Event::ImportItem {
+            job: job.job,
+            source_path: key,
+            photo_id: None,
+            outcome,
+        });
+        let _ = job.events.send(Event::JobProgress {
+            job: job.job,
+            done: done + 1,
+            total,
+        });
+    }
+    let offset = identical_groups.len();
     for (done, planned_photo) in planned.iter().enumerate() {
+        let done = done + offset;
         if job.cancel.is_cancelled() {
             let _ = job.events.send(Event::JobCancelled(job.job));
             return;
@@ -416,7 +526,7 @@ fn run(job: ImportJob) {
             let (item_outcome, photo_id) = match outcome {
                 GroupOutcome::Copied(id) => {
                     copied += 1;
-                    (ItemOutcome::Copied, Some(id))
+                    (ItemOutcome::Copied, id)
                 }
                 GroupOutcome::Skipped => {
                     skipped += 1;
