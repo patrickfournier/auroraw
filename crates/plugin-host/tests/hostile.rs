@@ -81,13 +81,13 @@ fn an_infinite_loop_is_interrupted_by_its_time_budget() {
         );
         // A shared CI runner can starve the host's own timer thread for a long stretch under
         // contention from every other test running in parallel (observed: several real seconds
-        // for a 100 ms budget on a busy runner) without that meaning anything is broken: the
+        // for a 100 ms budget on a busy runner, 13 s for 300 ms on a Windows one once the suite grew) without that meaning anything is broken: the
         // ticker is a plain thread, not a real-time one, and nothing here promises it never
         // shares a core with 187 other tests. What must still hold is "eventually", not "close to
         // on time": a genuinely stuck timer (the ticker thread panicked or was never started)
         // would still be caught by this, just with a lot of headroom instead of none.
         assert!(
-            took < deadline + Duration::from_secs(10),
+            took < deadline + Duration::from_secs(30),
             "interrupted far later than its deadline ({took:?} for a {deadline:?} budget)"
         );
         assert!(host_alive(&host, &wasm));
