@@ -7,6 +7,7 @@
 //! precedent): it opens whatever path its caller gives it.
 
 use std::path::Path;
+use std::time::Duration;
 
 use auroraw_types::PhotoId;
 use rusqlite::{Connection, OptionalExtension, params};
@@ -29,9 +30,16 @@ pub struct PreviewsDb {
 impl PreviewsDb {
     /// Opens (creating if needed) the previews database at `path`. `PRAGMA page_size` only takes
     /// effect on a brand new file; reopening an existing one keeps whatever size it already has.
+    /// WAL and a busy timeout (matching `catalogue::open`'s own reasoning, D-073): several
+    /// thumbnail worker threads (WP8) open their own connection to this same file and both read
+    /// and write it concurrently, which the rollback-journal default handles only by blocking
+    /// (and, past `busy_timeout`, failing) one writer behind another.
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)?;
         conn.pragma_update(None, "page_size", 32768)?;
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.pragma_update(None, "synchronous", "NORMAL")?;
+        conn.busy_timeout(Duration::from_secs(5))?;
         conn.execute_batch(SCHEMA)?;
         Ok(Self { conn })
     }

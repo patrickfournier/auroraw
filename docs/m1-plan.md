@@ -552,6 +552,60 @@ Done when: the grid holds 60 frames per second on a 100,000-photo catalogue on e
 with the engine under load, and the AT-SPI, translation and keyboard checks of the testing
 strategy §6 pass on the shell.
 
+**Status: a first slice, exactly as the heading's own "grows all along" says -- not the full
+"done when" (below), which needs a real display on each of three platforms this session does not
+have.** Built: `ui`, a Slint shell (`ui/shell.slint`) with the task bar spec §3 asks for (Import,
+Cull, Develop, Publish; only Cull has a working view, since only the grid exists so far -- the
+others are visibly present but inert, an honest shell rather than a hidden gap) and the library
+grid itself: `grid::RowModel`, a `slint::Model` built exactly on spike 3's own shape (a plain,
+already-fetched list of photos; a cell asks `auroraw_engine::ThumbnailService` for its image and
+renders empty, never missing, until one arrives), keyboard navigation and rating (arrow keys move
+the selection, `0`-`5` rate the selected photo through `Command::SetRating`, both listed in
+`commands::COMMANDS` and checked against `shell.slint`'s own key handling so the table cannot
+drift unnoticed), a rating filter bar, and bundled English and French translations
+(`slint-build`'s `with_default_translation_context(None)`, spike 2's own fix for the pitfall
+architecture §10.2 already recorded) with a test that no `@tr()` string is missing a translation
+or has one left over from a string no longer used (testing strategy §6's own wording). `engine`
+gained `ThumbnailService` (a background worker pool generating and caching thumbnails through
+`imaging::process` on first request, D-075) and `imaging::PreviewsDb::open` gained the WAL mode
+and busy timeout WP6/WP7's own memory notes had already flagged as missing -- needed for real now
+that several worker threads touch the same previews database at once.
+
+**Not built, each deliberately, not by oversight.** **Collections, keywords and metadata panels**
+(spec §3's "filters, collections, keywords, metadata" is four things; this pass built one):
+collections has no engine command yet to build a panel against (WP3 never added one, and adding
+one is its own piece of work, not a side effect of a UI pass); keywords needs the same vocabulary
+tree spike 2 already prototyped (§10.2), left for the next WP8 pass now that the grid it sits
+beside exists; the metadata shown is a one-line status strip, not the panel spec §5.7 describes.
+**Undo** is not started: "undo across the application" is a design of its own (a command-history
+stack every mutating action would need to push to, most of which -- `SetRating` today -- do not
+exist yet either), not a small addition to bolt on afterward without redesigning how commands are
+issued once more of them exist. **Settings** and the **4K-to-laptop layout check**: not started.
+**The pseudo-locale check** (testing strategy §6: accented, 40% longer text, run through every
+screen to find clipping) is not built; what exists instead is narrower and automated -- a test
+that no translatable string is missing or unused (above) -- catching a real but different mistake,
+not the layout one a pseudo-locale is for.
+
+**The "done when" itself needs what this session does not have: a real display on Linux, Windows
+and macOS**, and this session's own attempt to get even the Linux half surfaced a real, if
+mundane, environment gap worth recording. The shell renders and its logic is tested without a
+window (testing strategy §6: "unit tests without a window" for the model, done above), and the
+whole application launches and runs correctly against a real workspace built from the actual RAW
+samples (`auroraw-cli source add`/`scan`/`add-new --all` against `testdata/samples`, by hand, this
+session) -- but this machine's live GNOME/Wayland session would not let an unattended shell
+capture a screenshot of it (every portal and root-window capture path refused), and a disposable
+`Xvfb` display, tried instead specifically so nothing needed touching the person's own real
+desktop, left the window created but stuck at 1x1 and unmapped for reasons that look like a
+`winit`/bare-`Xvfb` interaction (no window manager) rather than anything in this crate: plausible
+enough that a person watching it happen live would very likely see it work, implausible enough
+that this paragraph does not claim it as verified. **AT-SPI, NVDA, VoiceOver and the 60 fps
+100,000-photo measurement on each platform are exactly what testing strategy §7 already says CI
+does not gate on** ("the gate is Patrick's machines"): a pre-release checklist item here, the same
+place WP4's real-card check and WP8's own AT-SPI script already live, not a CI test this pass
+could have added regardless of the display problem above. `accessible-role`/`accessible-label` are
+set on the grid's interactive elements and the task tabs in `shell.slint` on the strength of
+Slint's own AccessKit integration, unverified by a script for the reasons above.
+
 ### WP9 Culling (XL). Needs WP5, WP8
 
 Single-image view (zoom and pan on the preview, the 100 % view of the preview), **cull mode**

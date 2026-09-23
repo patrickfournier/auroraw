@@ -1,0 +1,171 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//! A background thumbnail service (architecture §5.7, D-075; WP8): the grid asks for a photo's
+//! preview by identifier and gets it immediately if it is already in the previews database, or a
+//! signal once a worker thread has decoded, cached and delivered it. Mirrors spike 3's own
+//! four-worker-thread shape, but generates a thumbnail on first request (spike 3's corpus was
+//! pre-built) rather than only reading one that already exists.
+//!
+//! Worker threads own their own read connection to the catalogue and their own connection to the
+//! previews database (SQLite's WAL, many readers and writers at once, D-073, matching
+//! `catalogue::open`'s own reasoning); nothing here touches the coordinator's connections, so a
+//! slow decode never competes with a command being applied.
+
+use std::collections::HashSet;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
+
+use auroraw_catalogue::Catalogue;
+use auroraw_imaging::{PreviewsDb, Thumbnail};
+use auroraw_types::{PhotoId, SourceId};
+use auroraw_workspace::Workspace;
+
+use crate::error::Result;
+
+struct Shared {
+    queue: Mutex<Vec<PhotoId>>,
+    cv: Condvar,
+    stop: AtomicBool,
+}
+
+/// A background service that turns a photo id into a thumbnail, generating and caching one on
+/// first request if none exists yet.
+pub struct ThumbnailService {
+    shared: Arc<Shared>,
+    inbox: Arc<Mutex<Vec<(PhotoId, Thumbnail)>>>,
+    requested: Mutex<HashSet<PhotoId>>,
+    workers: Vec<std::thread::JoinHandle<()>>,
+}
+
+impl ThumbnailService {
+    /// Starts `workers` worker threads (spike 3 measured four as enough to keep a scrolling grid
+    /// fed) against the previews database at `previews_path` (created if it does not exist yet;
+    /// this crate resolves no cache directory itself, matching `catalogue::Registry`'s own
+    /// precedent -- the caller decides where it lives).
+    pub fn start(
+        workspace: Arc<Workspace>,
+        catalogue_path: PathBuf,
+        previews_path: PathBuf,
+        workers: usize,
+    ) -> Result<Self> {
+        // Opened once, up front: fails fast on a bad path, and guarantees the schema exists
+        // before any worker races to create it.
+        PreviewsDb::open(&previews_path)?;
+        let shared = Arc::new(Shared {
+            queue: Mutex::new(Vec::new()),
+            cv: Condvar::new(),
+            stop: AtomicBool::new(false),
+        });
+        let inbox = Arc::new(Mutex::new(Vec::new()));
+        let handles = (0..workers.max(1))
+            .map(|_| {
+                let shared = shared.clone();
+                let inbox = inbox.clone();
+                let workspace = workspace.clone();
+                let catalogue_path = catalogue_path.clone();
+                let previews_path = previews_path.clone();
+                std::thread::spawn(move || {
+                    worker(shared, inbox, workspace, catalogue_path, previews_path)
+                })
+            })
+            .collect();
+        Ok(Self {
+            shared,
+            inbox,
+            requested: Mutex::new(HashSet::new()),
+            workers: handles,
+        })
+    }
+
+    /// Asks for `id`'s thumbnail, if nothing has already asked for it and not yet received it.
+    pub fn request(&self, id: PhotoId) {
+        let mut requested = self.requested.lock().expect("not poisoned");
+        if !requested.insert(id) {
+            return;
+        }
+        self.shared.queue.lock().expect("not poisoned").push(id);
+        self.shared.cv.notify_one();
+    }
+
+    /// Every thumbnail a worker has finished since the last call, without blocking.
+    pub fn poll(&self) -> Vec<(PhotoId, Thumbnail)> {
+        let items = std::mem::take(&mut *self.inbox.lock().expect("not poisoned"));
+        let mut requested = self.requested.lock().expect("not poisoned");
+        for (id, _) in &items {
+            requested.remove(id);
+        }
+        items
+    }
+}
+
+impl Drop for ThumbnailService {
+    fn drop(&mut self) {
+        self.shared.stop.store(true, Ordering::Relaxed);
+        self.shared.cv.notify_all();
+        for handle in self.workers.drain(..) {
+            let _ = handle.join();
+        }
+    }
+}
+
+/// A source's root path on this machine, from the workspace's `sources.json` hint (design note
+/// 002 §6.6): the same lookup `engine::import_job` does, read directly since a worker thread
+/// needs no coordination for a read.
+fn source_root(workspace: &Workspace, source_id: SourceId) -> Option<PathBuf> {
+    let sources = workspace.read_sources().ok()??.current()?;
+    let entry = sources.sources.into_iter().find(|s| s.id == source_id)?;
+    entry
+        .hint
+        .get("path")
+        .and_then(|v| v.as_str())
+        .map(PathBuf::from)
+}
+
+fn worker(
+    shared: Arc<Shared>,
+    inbox: Arc<Mutex<Vec<(PhotoId, Thumbnail)>>>,
+    workspace: Arc<Workspace>,
+    catalogue_path: PathBuf,
+    previews_path: PathBuf,
+) {
+    let (Ok(catalogue), Ok(previews)) = (
+        Catalogue::open(&catalogue_path),
+        PreviewsDb::open(&previews_path),
+    ) else {
+        return;
+    };
+    loop {
+        let id = {
+            let mut queue = shared.queue.lock().expect("not poisoned");
+            loop {
+                if shared.stop.load(Ordering::Relaxed) {
+                    return;
+                }
+                if let Some(id) = queue.pop() {
+                    break id;
+                }
+                queue = shared.cv.wait(queue).expect("not poisoned");
+            }
+        };
+        if let Some(thumbnail) = generate(&catalogue, &previews, &workspace, id) {
+            inbox.lock().expect("not poisoned").push((id, thumbnail));
+        }
+    }
+}
+
+fn generate(
+    catalogue: &Catalogue,
+    previews: &PreviewsDb,
+    workspace: &Workspace,
+    id: PhotoId,
+) -> Option<Thumbnail> {
+    if let Ok(Some(thumbnail)) = previews.get(&id) {
+        return Some(thumbnail);
+    }
+    let row = catalogue.photo(&id).ok().flatten()?;
+    let root = source_root(workspace, row.source_id?)?;
+    let full = root.join(row.path?.replace('/', std::path::MAIN_SEPARATOR_STR));
+    let (_, thumbnail, _) = auroraw_imaging::process(&full).ok()?;
+    let _ = previews.put(&id, &thumbnail);
+    Some(thumbnail)
+}

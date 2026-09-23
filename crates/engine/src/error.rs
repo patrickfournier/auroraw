@@ -34,6 +34,9 @@ pub enum EngineError {
     /// A source refused an operation (WP4): unreachable, or no file at the path asked for.
     #[error(transparent)]
     Source(#[from] auroraw_plugin_api::source::SourceError),
+    /// The previews database, or decoding a photo for its thumbnail, refused an operation (WP8).
+    #[error(transparent)]
+    Imaging(#[from] auroraw_imaging::ImagingError),
 }
 
 /// The result type this crate uses throughout.

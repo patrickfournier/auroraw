@@ -12,4 +12,16 @@ description = "The Slint user interface"
 workspace = true
 
 [dependencies]
+auroraw-catalogue = { path = "../catalogue" }
 auroraw-engine = { path = "../engine" }
+auroraw-imaging = { path = "../imaging" }
+auroraw-types = { path = "../types" }
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+slint = "1.18"
+
+[build-dependencies]
+slint-build = "1.18"
+
+[dev-dependencies]
+auroraw-testkit = { path = "../testkit" }
+auroraw-workspace = { path = "../workspace" }

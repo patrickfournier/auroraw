@@ -1,0 +1,157 @@
+import { ListView, Button } from "std-widgets.slint";
+
+export struct Cell {
+    photo-id: string,
+    thumb: image,
+    rating: int,
+    ready: bool,
+    selected: bool,
+}
+export struct GridRow { cells: [Cell] }
+
+component Task inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    in property <bool> enabled: true;
+    callback activate();
+    width: 120px;
+    height: 36px;
+    background: active ? #3a5f8a : #2b2b2b;
+    TouchArea {
+        clicked => { if (enabled) { root.activate(); } }
+    }
+    Text {
+        text: root.label;
+        color: root.enabled ? (root.active ? white : #cccccc) : #666666;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        width: 100%;
+        height: 100%;
+        accessible-role: tab;
+        accessible-label: root.label;
+    }
+}
+
+export component MainWindow inherits Window {
+    title: @tr("Auroraw");
+    background: #1e1e1e;
+    width: 1400px;
+    height: 900px;
+
+    in property <[GridRow]> rows;
+    in property <string> status;
+    in property <int> min-rating-filter: 0;
+    in property <string> selected-summary;
+    in-out property <length> grid-scroll: 0px;
+
+    callback cell-clicked(int);
+    callback rate-selected(string);
+    callback move-selection(int, int);
+    callback set-filter(int);
+
+    property <string> current-task: "cull";
+
+    VerticalLayout {
+        // The task bar (spec §3: "workflows, not panels"): every task is present, only Cull has
+        // a working view in M1 (WP9 builds cull mode itself; this crate only has the grid so
+        // far, WP8's own scope).
+        Rectangle {
+            height: 36px;
+            background: #262626;
+            HorizontalLayout {
+                alignment: start;
+                Task { label: @tr("Import"); enabled: false; }
+                Task { label: @tr("Cull"); active: root.current-task == "cull"; activate => { root.current-task = "cull"; } }
+                Task { label: @tr("Develop"); enabled: false; }
+                Task { label: @tr("Publish"); enabled: false; }
+            }
+        }
+
+        // The filter bar and status line.
+        Rectangle {
+            height: 36px;
+            background: #2b2b2b;
+            HorizontalLayout {
+                padding: 6px;
+                spacing: 6px;
+                alignment: start;
+                Button { text: @tr("All"); clicked => { root.set-filter(0); } }
+                Button { text: @tr("1+"); clicked => { root.set-filter(1); } }
+                Button { text: @tr("2+"); clicked => { root.set-filter(2); } }
+                Button { text: @tr("3+"); clicked => { root.set-filter(3); } }
+                Button { text: @tr("4+"); clicked => { root.set-filter(4); } }
+                Button { text: @tr("5"); clicked => { root.set-filter(5); } }
+                Text {
+                    text: root.status;
+                    color: #99cc99;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // The library grid.
+        grid-focus := FocusScope {
+            key-pressed(event) => {
+                if (event.text == "0" || event.text == "1" || event.text == "2" || event.text == "3" || event.text == "4" || event.text == "5") {
+                    root.rate-selected(event.text);
+                    return accept;
+                }
+                if (event.text == Key.UpArrow) { root.move-selection(0, -1); return accept; }
+                if (event.text == Key.DownArrow) { root.move-selection(0, 1); return accept; }
+                if (event.text == Key.LeftArrow) { root.move-selection(-1, 0); return accept; }
+                if (event.text == Key.RightArrow) { root.move-selection(1, 0); return accept; }
+                reject
+            }
+            ListView {
+                content-y <=> root.grid-scroll;
+                for row[ri] in root.rows : HorizontalLayout {
+                    height: 124px;
+                    spacing: 4px;
+                    padding-left: 4px;
+                    alignment: start;
+                    for c[ci] in row.cells : Rectangle {
+                        width: 160px;
+                        height: 120px;
+                        background: #333333;
+                        border-width: c.selected ? 2px : 0px;
+                        border-color: #ffd24a;
+                        TouchArea {
+                            clicked => {
+                                grid-focus.focus();
+                                root.cell-clicked(ri * 8 + ci);
+                            }
+                        }
+                        if c.ready : Image {
+                            source: c.thumb;
+                            width: 100%;
+                            height: 100%;
+                            image-fit: contain;
+                            accessible-role: image;
+                            accessible-label: c.rating > 0 ? @tr("Photo, {} stars", c.rating) : @tr("Photo");
+                        }
+                        if c.rating > 0 : Text {
+                            x: 6px;
+                            y: 4px;
+                            text: "\{c.rating}★";
+                            color: #ffd24a;
+                        }
+                    }
+                }
+            }
+        }
+
+        // A status strip for the selected photo (a minimal metadata panel, WP8's own scope note:
+        // filters, collections, keywords are grown in a later pass).
+        Rectangle {
+            height: 28px;
+            background: #262626;
+            Text {
+                text: root.selected-summary;
+                color: #cccccc;
+                x: 6px;
+                vertical-alignment: center;
+                height: 100%;
+            }
+        }
+    }
+}

@@ -1,0 +1,43 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: fr\n"
+
+msgid "Auroraw"
+msgstr "Auroraw"
+
+msgid "Import"
+msgstr "Import"
+
+msgid "Cull"
+msgstr "Trier"
+
+msgid "Develop"
+msgstr "Développer"
+
+msgid "Publish"
+msgstr "Publier"
+
+msgid "All"
+msgstr "Tout"
+
+msgid "1+"
+msgstr "1+"
+
+msgid "2+"
+msgstr "2+"
+
+msgid "3+"
+msgstr "3+"
+
+msgid "4+"
+msgstr "4+"
+
+msgid "5"
+msgstr "5"
+
+msgid "Photo, {} stars"
+msgstr "Photo, {} étoiles"
+
+msgid "Photo"
+msgstr "Photo"

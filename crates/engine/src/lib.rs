@@ -21,12 +21,14 @@ mod event;
 mod import_job;
 mod job;
 mod refresh;
+mod thumbnails;
 
 pub use command::Command;
 pub use coordinator::Outcome;
 pub use error::{EngineError, Result};
 pub use event::Event;
 pub use job::JobId;
+pub use thumbnails::ThumbnailService;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -176,6 +178,22 @@ impl Engine {
     /// catalogue's only writer, by convention this crate does not enforce at the type level.
     pub fn read_catalogue(&self) -> Result<Catalogue> {
         Ok(Catalogue::open(&self.catalogue_path)?)
+    }
+
+    /// Starts a [`ThumbnailService`] for this engine's workspace and catalogue, generating and
+    /// caching thumbnails at `previews_path` (D-075) on `workers` background threads. This crate
+    /// resolves no cache directory itself; the caller decides where `previews_path` lives.
+    pub fn start_thumbnails(
+        &self,
+        previews_path: &Path,
+        workers: usize,
+    ) -> Result<ThumbnailService> {
+        ThumbnailService::start(
+            self.workspace.clone(),
+            self.catalogue_path.clone(),
+            previews_path.to_path_buf(),
+            workers,
+        )
     }
 }
 

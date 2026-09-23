@@ -27,3 +27,4 @@ time = { workspace = true, features = ["parsing"] }
 
 [dev-dependencies]
 auroraw-testkit = { path = "../testkit" }
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
