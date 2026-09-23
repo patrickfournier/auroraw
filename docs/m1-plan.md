@@ -587,18 +587,25 @@ that no translatable string is missing or unused (above) -- catching a real but 
 not the layout one a pseudo-locale is for.
 
 **The "done when" itself needs what this session does not have: a real display on Linux, Windows
-and macOS**, and this session's own attempt to get even the Linux half surfaced a real, if
-mundane, environment gap worth recording. The shell renders and its logic is tested without a
-window (testing strategy §6: "unit tests without a window" for the model, done above), and the
-whole application launches and runs correctly against a real workspace built from the actual RAW
-samples (`auroraw-cli source add`/`scan`/`add-new --all` against `testdata/samples`, by hand, this
-session) -- but this machine's live GNOME/Wayland session would not let an unattended shell
-capture a screenshot of it (every portal and root-window capture path refused), and a disposable
-`Xvfb` display, tried instead specifically so nothing needed touching the person's own real
-desktop, left the window created but stuck at 1x1 and unmapped for reasons that look like a
-`winit`/bare-`Xvfb` interaction (no window manager) rather than anything in this crate: plausible
-enough that a person watching it happen live would very likely see it work, implausible enough
-that this paragraph does not claim it as verified. **AT-SPI, NVDA, VoiceOver and the 60 fps
+and macOS.** The shell renders and its logic is tested without a window (testing strategy §6:
+"unit tests without a window" for the model, done above), and the whole application launches and
+runs correctly against a real workspace built from the actual RAW samples (`auroraw-cli source
+add`/`scan`/`add-new --all` against `testdata/samples`, by hand, this session) -- but this
+session's own attempt to also get a screenshot of it running found that this session has **no
+route to a real display at all**, not merely an awkward one: `loginctl` shows the account this
+runs as is on its own remote session (`Type=wayland`, `Remote=yes`), entirely separate from the
+person's own local one (a different seat, a different login); `DISPLAY=:0` was this session's own
+virtual display, not the person's screen, which is why the screenshot portal refused (correctly:
+it is not this session's screen to capture) and a disposable `Xvfb` tried instead (deliberately,
+so nothing depended on reaching the person's own desktop at all) hit its own, likely unrelated,
+`winit` windowing issue (a window created but stuck at 1x1 and unmapped, cause unconfirmed).
+Reaching the person's real local display directly (`DISPLAY=:1`) was tried once this was
+understood and correctly refused for want of its `Xauthority` credentials, which this session has
+no business obtaining. **This is a boundary this session cannot cross, not a bug to keep
+chasing**: real visual, AT-SPI and frame-rate verification needs either the person running the
+build themselves, or a session set up with genuine access to a display, and is not something a
+future attempt at screenshots from a session shaped like this one should expect to solve.
+**AT-SPI, NVDA, VoiceOver and the 60 fps
 100,000-photo measurement on each platform are exactly what testing strategy §7 already says CI
 does not gate on** ("the gate is Patrick's machines"): a pre-release checklist item here, the same
 place WP4's real-card check and WP8's own AT-SPI script already live, not a CI test this pass
