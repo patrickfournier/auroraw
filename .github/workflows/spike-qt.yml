@@ -70,6 +70,19 @@ jobs:
           start=$(date +%s)
           ./run-tests.sh
           echo "- tests: $(( $(date +%s) - start )) s" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Backtrace of the crash (macOS)
+        if: failure() && runner.os == 'macOS'
+        continue-on-error: true
+        shell: bash
+        working-directory: spikes/qt-ui
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          SPIKE_HOME: ${{ runner.temp }}/qt-ui-spike-work/empty
+          SPIKE_TESTS: ${{ github.workspace }}/spikes/qt-ui/tests
+        run: |
+          sudo DevToolsSecurity -enable || true
+          lldb --batch -o "run" -o "bt all" -o "quit" -- target/debug/qt-ui-spike --quicktest -input tests/tst_modality.qml 2>&1 | tail -80
       - name: Windows bundle size (windeployqt, release Qt libraries)
         if: runner.os == 'Windows'
         continue-on-error: true

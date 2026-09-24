@@ -19,5 +19,23 @@ rm -rf "$WORK" && mkdir -p "$WORK/empty" "$WORK/extra"
 SPIKE_HOME="$WORK/fixture" SPIKE_PHOTOS=80 "$BIN" --make-fixture
 for n in 0 1 2 3 4; do cp "$WORK/fixture/Card/IMG_000$n.jpg" "$WORK/extra/IMG_000${n}_x.jpg"; done
 
-SPIKE_TESTS="$HERE/tests" SPIKE_HOME="$WORK/empty" "$BIN" --quicktest -input "$HERE/tests/tst_modality.qml"
-SPIKE_TESTS="$HERE/tests" SPIKE_HOME="$WORK/fixture" SPIKE_EXTRA="$WORK/extra" "$BIN" --quicktest -input "$HERE/tests/tst_grid.qml"
+# Each suite writes its results to a file (some consoles lose the runner's own output), which is
+# printed afterwards and must end in a clean totals line.
+suite() {
+    name="$1"
+    shift
+    out="$WORK/$name.txt"
+    status=0
+    env SPIKE_TESTS="$HERE/tests" "$@" "$BIN" --quicktest -input "$HERE/tests/tst_$name.qml" -o "$out,txt" || status=$?
+    [ -f "$out" ] && cat "$out"
+    if [ "$status" -ne 0 ]; then
+        echo "suite $name: exit status $status"
+        return 1
+    fi
+    grep -q "^Totals: .* 0 failed" "$out" || {
+        echo "suite $name: no clean totals line"
+        return 1
+    }
+}
+suite modality SPIKE_HOME="$WORK/empty"
+suite grid SPIKE_HOME="$WORK/fixture" SPIKE_EXTRA="$WORK/extra"
