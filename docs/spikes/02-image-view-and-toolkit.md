@@ -213,8 +213,8 @@ deprecates; its Skia/Metal renderer may be needed there.
 
 - [x] **Qt accessibility**: works in a stock Qt application on the real session (Orca reads Qt
   Linguist). Left: checking the prototype itself with Orca.
-- [ ] **Qt through Rust.** These measures used C++ and QML. The Rust-side cost of driving Qt
-  (cxx-qt) is unmeasured.
+- [x] **Qt through Rust.** Measured in [spike 5](05-qt-quick-through-rust.md): cxx-qt on Qt 6.4.2,
+  the Slint shell's first screens ported with 61 lines of C++ (Linux only, no decision).
 - [x] **Windows** (Slint and iced): done, Slint holds 60 frames per second in every mode.
 - [ ] **macOS**, and **Qt on Windows and macOS** (not built there).
 - [ ] **Colour on a wide-gamut display**, and the display profile from the operating system.

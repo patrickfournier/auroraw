@@ -1,11 +1,12 @@
 # The technical spikes
 
-Four throwaway prototypes measured the technology choices (see [../technical-spikes.md](../technical-spikes.md)):
+Throwaway prototypes measured the technology choices (see [../technical-spikes.md](../technical-spikes.md)):
 
 1. [The GPU pipeline](01-gpu-pipeline.md): wgpu, WGSL, the same result on three graphics APIs.
 2. [The image view and the interface toolkit](02-image-view-and-toolkit.md): Slint, decision D-072.
 3. [The catalogue, the thumbnails and the workspace](03-catalogue-and-grid.md): SQLite, D-073 to D-075.
 4. [The plugin sandbox](04-plugin-sandbox.md): WebAssembly on wasmtime, D-076 to D-078.
+5. [The interface slice on Qt Quick, through cxx-qt](05-qt-quick-through-rust.md): what a switch from Slint would cost (measured, no decision).
 
 **The code** is no longer on `dev`. It is kept at the tag `spikes-final`, in `spikes/`:
 
