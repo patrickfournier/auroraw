@@ -292,6 +292,45 @@ fn filling_the_form_and_clicking_import_copies_verifies_and_shows_the_photos() {
     });
 }
 
+/// Whether the button with this label is enabled.
+fn button_enabled(app: &App, label: &str) -> bool {
+    ElementQuery::from_root(&app.ui())
+        .match_descendants()
+        .match_accessible_role(AccessibleRole::Button)
+        .match_predicate({
+            let label = label.to_string();
+            move |element| element.accessible_label().is_some_and(|l| l == label)
+        })
+        .find_first()
+        .and_then(|element| element.accessible_enabled())
+        .unwrap_or_else(|| panic!("no button labelled {label:?}"))
+}
+
+#[test]
+fn the_import_dialog_cannot_be_closed_while_an_import_runs() {
+    init();
+    let f = fixture(40);
+    let shell = to_import(open(&f));
+    assert!(button_enabled(&shell, "Close"));
+    fill_import_form(&shell, &f);
+    focus_field(&shell, "Destination folder");
+    click(&shell, "Import");
+    assert!(shell.ui().get_importing());
+
+    // Neither the button nor Escape closes it; the import can still be cancelled. (Nothing here
+    // lets time pass, so the import is still running: a pointer click would.)
+    assert!(!button_enabled(&shell, "Close"));
+    press(&shell, escape().as_str());
+    assert_eq!(shell.ui().get_dialog(), "import");
+    assert!(shell.ui().get_importing());
+    assert!(button_enabled(&shell, "Cancel import"));
+
+    settle("the import", || shell.ui().get_import_finished());
+    assert!(button_enabled(&shell, "Close"));
+    click(&shell, "Close");
+    assert_eq!(shell.ui().get_dialog(), "");
+}
+
 #[test]
 fn a_second_import_of_the_same_card_says_so_and_copies_nothing() {
     init();

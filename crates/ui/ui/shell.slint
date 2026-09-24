@@ -328,7 +328,10 @@ export component MainWindow inherits Window {
         rights <=> root.import-rights;
         layout <=> root.import-layout;
         add-destination <=> root.import-add-destination;
-        close => { root.close-dialog(); }
+        // Escape too: the window stays while an import runs.
+        close => {
+            if (!root.importing) { root.close-dialog(); }
+        }
         start-import => { root.start-import(); }
         cancel-import => { root.cancel-import(); }
         refresh-volumes => { root.refresh-volumes(); }

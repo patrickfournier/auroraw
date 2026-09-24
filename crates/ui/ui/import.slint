@@ -180,7 +180,8 @@ export component ImportDialog inherits Modal {
             enabled: !root.importing;
             clicked => { root.start-import(); }
         }
-        Button { text: @tr("Close"); clicked => { root.close(); } }
+        // An import that runs is stopped with "Cancel import", not by closing the window over it.
+        Button { text: @tr("Close"); enabled: !root.importing; clicked => { root.close(); } }
     }
 
     // Takes no room: these only tell how wide each label wants to be.
