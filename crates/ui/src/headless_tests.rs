@@ -752,7 +752,8 @@ fn the_proposed_folder_follows_the_name_until_the_folder_is_edited() {
     assert_eq!(
         app.ui().get_new_location(),
         f.pictures
-            .join("Auroraw/Family _ trips_ 2026")
+            .join("Auroraw")
+            .join("Family _ trips_ 2026")
             .to_string_lossy(),
         "what a file system refuses is replaced"
     );
