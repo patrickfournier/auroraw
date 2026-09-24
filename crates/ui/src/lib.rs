@@ -41,11 +41,14 @@ pub struct Launch {
     pub open: Option<PathBuf>,
 }
 
-/// Asks a person for a folder: called with a dialog title, the folder to open the dialog at, and
-/// what to do with the answer (`None` when the dialog was cancelled). Returns whether a dialog was
-/// started. The answer is delivered on the interface thread. Tests without a display pass a
-/// picker of their own: a native dialog cannot be opened without one.
-pub type FolderPicker = Rc<dyn Fn(&str, Option<PathBuf>, Box<dyn FnOnce(Option<PathBuf>)>) -> bool>;
+/// Asks a person for a folder: called with the window the dialog belongs to (it opens over that
+/// window and, where the system allows, keeps it from being used meanwhile), a dialog title, the
+/// folder to open the dialog at, and what to do with the answer (`None` when the dialog was
+/// cancelled). Returns whether a dialog was started. The answer is delivered on the interface
+/// thread. Tests without a display pass a picker of their own: a native dialog cannot be opened
+/// without one.
+pub type FolderPicker =
+    Rc<dyn Fn(&slint::Window, &str, Option<PathBuf>, Box<dyn FnOnce(Option<PathBuf>)>) -> bool>;
 
 /// The removable volumes mounted right now.
 pub type VolumeLister = Rc<dyn Fn() -> Vec<VolumeInfo>>;
@@ -80,10 +83,15 @@ pub fn run(launch: Launch) -> Result<(), slint::PlatformError> {
 /// The system's own folder dialog (Windows and macOS: the native ones; Linux: the desktop portal),
 /// run as a task of the event loop so the window stays alive and the dialog cannot freeze it.
 fn native_folder_picker() -> FolderPicker {
-    Rc::new(|title, start, done| {
+    Rc::new(|window, title, start, done| {
         let title = title.to_string();
+        // The dialog is made a child of the application's window, so that it stays over it and the
+        // window cannot be used (or closed) while it is open.
+        let parent = window.window_handle();
         slint::spawn_local(async move {
-            let mut dialog = rfd::AsyncFileDialog::new().set_title(title);
+            let mut dialog = rfd::AsyncFileDialog::new()
+                .set_title(title)
+                .set_parent(&parent);
             if let Some(start) = start {
                 dialog = dialog.set_directory(start);
             }

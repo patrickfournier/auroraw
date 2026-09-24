@@ -82,7 +82,7 @@ impl App {
 
 /// A folder picker that must never be reached: a test that does not browse.
 fn no_dialog() -> FolderPicker {
-    Rc::new(|_, _, _| panic!("no folder dialog was expected"))
+    Rc::new(|_, _, _, _| panic!("no folder dialog was expected"))
 }
 
 fn platform(pick_folder: FolderPicker) -> Platform {
@@ -662,13 +662,16 @@ struct Dialogs {
     /// Holds the answer back until the test delivers it, like a dialog that is still open.
     held: Option<Box<dyn FnOnce(Option<PathBuf>)>>,
     hold: bool,
+    /// For each dialog, whether the window it was given to belong to was showing.
+    parent_was_showing: Vec<bool>,
 }
 
 fn stand_in(dialogs: &Rc<RefCell<Dialogs>>) -> FolderPicker {
     let dialogs = dialogs.clone();
-    Rc::new(move |title, start, done| {
+    Rc::new(move |window, title, start, done| {
         let mut state = dialogs.borrow_mut();
         state.asked.push((title.to_string(), start));
+        state.parent_was_showing.push(window.is_visible());
         if state.hold {
             state.held = Some(done);
         } else {
@@ -724,6 +727,38 @@ fn browsing_fills_the_field_and_opens_the_dialog_where_the_field_points() {
         f.workspace.to_string_lossy()
     );
     assert_eq!(dialogs.borrow().asked[2].0, "Choose the backup folder");
+}
+
+#[test]
+fn while_the_folder_dialog_is_open_the_window_belongs_to_it_and_waits() {
+    init();
+    let f = fixture(0);
+    let dialogs = Rc::new(RefCell::new(Dialogs {
+        hold: true,
+        ..Dialogs::default()
+    }));
+    let shell = to_import(open_with(&f, "en", platform(stand_in(&dialogs))));
+
+    click(&shell, "Browse for: Destination folder");
+    assert_eq!(
+        dialogs.borrow().parent_was_showing,
+        [true],
+        "the dialog is given the application's window to open over"
+    );
+    assert!(shell.ui().get_picking());
+
+    // Nothing of the window answers meanwhile: the import dialog stays, the menu stays shut.
+    click(&shell, "Close");
+    assert_eq!(shell.ui().get_dialog(), "import");
+    click(&shell, "Menu");
+    assert!(!shell.ui().get_menu_open());
+
+    // Once the folder is chosen (or the dialog cancelled) the window is usable again.
+    let done = dialogs.borrow_mut().held.take().unwrap();
+    done(None);
+    assert!(!shell.ui().get_picking());
+    click(&shell, "Close");
+    assert_eq!(shell.ui().get_dialog(), "");
 }
 
 #[test]
@@ -1076,7 +1111,7 @@ fn a_workspace_opens_from_a_folder_chosen_in_the_dialog_and_a_plain_folder_is_re
 
     // The stand-in dialog answers with the plain folder first, then with the moved workspace.
     let answers = Rc::new(RefCell::new(vec![hidden.clone(), plain]));
-    let picker: FolderPicker = Rc::new(move |_, _, done| {
+    let picker: FolderPicker = Rc::new(move |_, _, _, done| {
         done(answers.borrow_mut().pop());
         true
     });
@@ -1276,7 +1311,7 @@ fn importing_is_available_in_the_menu_once_a_workspace_is_open() {
 fn every_command_of_the_menu_is_carried_out_by_the_interface() {
     init();
     let f = fixture(0);
-    let picker: FolderPicker = Rc::new(|_, _, _| false);
+    let picker: FolderPicker = Rc::new(|_, _, _, _| false);
     let app = launch_in(&f, "en", platform(picker));
     for command in COMMANDS.iter().filter(|c| c.menu) {
         assert!(
@@ -1776,6 +1811,34 @@ fn a_card_with_camera_folders_offers_to_keep_them() {
         "folders and case kept"
     );
     assert!(f.archive.join("101CANON/IMG_0002.JPG").is_file());
+}
+
+/// Where the text field labelled `label` starts, from the left of the window.
+fn field_left(app: &App, label: &str) -> f32 {
+    ElementHandle::find_by_accessible_label(&app.ui(), label)
+        .find(|element| element.accessible_value().is_some())
+        .unwrap_or_else(|| panic!("no text field labelled {label:?}"))
+        .absolute_position()
+        .x
+}
+
+#[test]
+fn the_import_forms_labels_get_the_room_their_translation_needs() {
+    init();
+    let english = to_import(open(&fixture(0)));
+    let en = field_left(&english, "Backup folder (optional)");
+    let french = to_import(open_in(&fixture(0), "fr"));
+    let fr = field_left(&french, "Dossier de sauvegarde (facultatif)");
+    assert!(
+        fr > en,
+        "the label column follows the widest label: {fr} in French, {en} in English"
+    );
+    // Every field of a form starts in the same column.
+    assert_eq!(
+        field_left(&french, "Importer depuis (carte ou dossier)"),
+        fr
+    );
+    assert_eq!(field_left(&french, "Nom de la séance (facultatif)"), fr);
 }
 
 /// Whether a button with this label is on screen.

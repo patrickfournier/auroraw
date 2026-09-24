@@ -713,13 +713,18 @@ folder, and its card scrolls in a small window; the menus have separators where 
 and Delete, then Select all, which moves Delete before Select all); a scan registers photos by path
 (case aside) and the interface makes each photo's thumbnail as it enters the catalogue
 (`ThumbnailService::warm`, a lower-priority first-in-first-out queue behind what a grid asks for), so
-the grid finds them ready.
+the grid finds them ready. **Second pass on the import dialog:** the label column is as wide as the
+widest label in the language and font in use (measured, not fixed at 210 px, so French labels are
+not cut short); the system's folder dialog is opened as a child of the application's window
+(`rfd`'s `set_parent` with Slint's `raw-window-handle-06`, and `rfd`'s `wayland` feature so the
+desktop portal can name a Wayland window), and the window is covered by a dimming layer that swallows
+clicks while it is open, so the import dialog cannot be closed and the folder dialog left behind.
 
 **Still open in WP8:** the keywords, collections and metadata panels, undo of photo actions (the Edit
 items work on text fields only), the 4K/laptop layout check, the pseudo-locale, GPX in the import dialog, a CLI `import`, importing individual files rather than a folder, source
 plugins for network and cloud kinds (`Engine::source_kinds` is ready for them), and the copy-on-demand
 of a non-local original when it is developed (M2). **Not verified on a real machine:** the native
-folder dialogs, a real card insertion, the hamburger's look, typing with an input method.
+folder dialogs (including that they stay over the window on X11 and Wayland), a real card insertion, the hamburger's look, typing with an input method.
 
 ### WP9 Culling (XL). Needs WP5, WP8
 

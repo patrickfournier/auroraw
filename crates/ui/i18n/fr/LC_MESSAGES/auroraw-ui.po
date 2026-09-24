@@ -402,3 +402,6 @@ msgstr "Ce dossier n'est pas dans le catalogue : les photos sont seulement copi�
 
 msgid "This folder contains the sources {}: the photos are only copied."
 msgstr "Ce dossier contient les sources {} : les photos sont seulement copiées."
+
+msgid "Choose a folder in the folder dialog…"
+msgstr "Choisissez un dossier dans la fenêtre de sélection…"

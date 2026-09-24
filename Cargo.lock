@@ -5251,6 +5251,9 @@ dependencies = [
  "raw-window-handle",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols",
  "web-sys",
  "windows-sys 0.61.2",
 ]
@@ -5653,6 +5656,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "pin-weak",
+ "raw-window-handle",
  "slint-macros",
  "unicode-segmentation",
  "vtable",

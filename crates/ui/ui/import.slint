@@ -38,8 +38,16 @@ export component ImportDialog inherits Modal {
     callback browse-folder(string);
     callback fields-changed();
 
+    // The widest label of the form in the language and font in use (measured below): no label is
+    // cut short or runs into its field, whatever the translation or the system's font.
+    property <length> label-width: max(
+        measure-source.preferred-width, measure-destination.preferred-width,
+        measure-layout.preferred-width, measure-template.preferred-width,
+        measure-backup.preferred-width, measure-shoot.preferred-width,
+        measure-creator.preferred-width, measure-rights.preferred-width) + 12px;
+
     title: @tr("Import");
-    card-width: 780px;
+    card-width: root.label-width + 580px;
 
     Text {
         text: @tr("Cards and drives");
@@ -67,7 +75,7 @@ export component ImportDialog inherits Modal {
         }
     }
     Field {
-        label-width: 210px;
+        label-width: root.label-width;
         label: @tr("Import from (card or folder)");
         text <=> root.source;
         browsable: true;
@@ -81,7 +89,7 @@ export component ImportDialog inherits Modal {
         wrap: word-wrap;
     }
     Field {
-        label-width: 210px;
+        label-width: root.label-width;
         label: @tr("Destination folder");
         placeholder: @tr("Where the photos are copied to");
         text <=> root.destination;
@@ -104,7 +112,7 @@ export component ImportDialog inherits Modal {
     HorizontalLayout {
         spacing: 8px;
         alignment: start;
-        Text { text: @tr("Folder layout"); width: 210px; color: #cccccc; vertical-alignment: center; }
+        Text { text: @tr("Folder layout"); width: root.label-width; color: #cccccc; vertical-alignment: center; }
         Button {
             text: @tr("Use the template");
             primary: root.layout == "template";
@@ -117,13 +125,13 @@ export component ImportDialog inherits Modal {
         }
     }
     if root.layout == "template" : Field {
-        label-width: 210px;
+        label-width: root.label-width;
         label: @tr("Folders and file names");
         placeholder: "{year}/{date}/{original}.{ext}";
         text <=> root.template;
     }
     Field {
-        label-width: 210px;
+        label-width: root.label-width;
         label: @tr("Backup folder (optional)");
         text <=> root.backup;
         browsable: true;
@@ -131,17 +139,17 @@ export component ImportDialog inherits Modal {
         browse => { root.browse-folder("backup"); }
     }
     Field {
-        label-width: 210px;
+        label-width: root.label-width;
         label: @tr("Shoot name (optional)");
         text <=> root.shoot;
     }
     if root.registering : Field {
-        label-width: 210px;
+        label-width: root.label-width;
         label: @tr("Creator");
         text <=> root.creator;
     }
     if root.registering : Field {
-        label-width: 210px;
+        label-width: root.label-width;
         label: @tr("Copyright");
         text <=> root.rights;
     }
@@ -173,5 +181,18 @@ export component ImportDialog inherits Modal {
             clicked => { root.start-import(); }
         }
         Button { text: @tr("Close"); clicked => { root.close(); } }
+    }
+
+    // Takes no room: these only tell how wide each label wants to be.
+    Rectangle {
+        height: 0px;
+        measure-source := Text { text: @tr("Import from (card or folder)"); visible: false; }
+        measure-destination := Text { text: @tr("Destination folder"); visible: false; }
+        measure-layout := Text { text: @tr("Folder layout"); visible: false; }
+        measure-template := Text { text: @tr("Folders and file names"); visible: false; }
+        measure-backup := Text { text: @tr("Backup folder (optional)"); visible: false; }
+        measure-shoot := Text { text: @tr("Shoot name (optional)"); visible: false; }
+        measure-creator := Text { text: @tr("Creator"); visible: false; }
+        measure-rights := Text { text: @tr("Copyright"); visible: false; }
     }
 }

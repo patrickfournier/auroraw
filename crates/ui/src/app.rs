@@ -523,7 +523,12 @@ impl Launcher {
                 }
             })
         };
-        if !(self.platform.pick_folder)(&title, start_directory(current.as_str()), answer) {
+        if !(self.platform.pick_folder)(
+            ui.window(),
+            &title,
+            start_directory(current.as_str()),
+            answer,
+        ) {
             ui.set_picking(false);
         }
     }
