@@ -1,6 +1,8 @@
 import { Button, LineEdit } from "std-widgets.slint";
 
 export struct Cell {
+    // The cell's place in the whole list, whatever the row width is now.
+    index: int,
     photo-id: string,
     thumb: image,
     rating: int,
@@ -51,6 +53,12 @@ export global Texts {
     }
     public pure function cannot-create(reason: string) -> string {
         return @tr("Cannot create the workspace: {}", reason);
+    }
+    public pure function workspace-will-be-at(path: string) -> string {
+        return @tr("Workspace folder: {}", path);
+    }
+    public pure function folder-taken(path: string) -> string {
+        return @tr("The folder {} already exists and is not empty. Choose another name or folder.", path);
     }
     public pure function default-workspace-name() -> string {
         return @tr("Main");
@@ -124,8 +132,9 @@ export global Editing {
     in-out property <bool> text-focused: false;
 }
 
-// One item of the hamburger menu (its id is a command of `commands.rs`).
-export struct MenuEntry { id: string, label: string, shortcut: string, enabled: bool }
+// One item of the hamburger menu (its id is a command of `commands.rs`). `separator` draws a line
+// above it, between two groups of items.
+export struct MenuEntry { id: string, label: string, shortcut: string, enabled: bool, separator: bool }
 
 // One source of the catalogue, as the catalogue panel lists it.
 export struct SourceEntry { name: string, path: string, online: bool, photos: int, worked-on: int }

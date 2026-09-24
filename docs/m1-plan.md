@@ -677,7 +677,8 @@ its timers, without `run`) exists for this.
 changed the workflow, and the Import view and the "open a folder given on the command line" launch
 were replaced. What is built: **the launcher** (`ui::app`): the last workspace, or a welcome list of the
 workspaces this machine knows (`catalogue::Registry`, with last-opened and a recent-first order), New
-workspace (name, folder proposed as `<Pictures>/Auroraw/<name>` following the name until edited) and
+workspace (name, and the folder that will hold the workspace's own folder, proposed as
+`<Pictures>/Auroraw`: the workspace is created in `<folder>/<name>`, as a preview line says) and
 Open workspace (folder dialog); the catalogue database and previews moved out of the workspace into the
 machine's data and cache folders (`engine::LocalDirs`, `Engine::create_workspace`/`open_workspace`, a
 missing database is rebuilt from the workspace's files); **the hamburger menu** (File, Edit, Help; the
@@ -702,9 +703,20 @@ folders (WP7); an import registered the card as a source and the destination as 
 a completion event could reach a listener before the catalogue writes it followed (all jobs now report
 through the coordinator's queue). A typed `~/Images/Photos` had created a folder named `~`.
 
+**First feedback round (2026-09-23), all with tests.** The window is resizable (minimum 640 x 420) and
+the grid re-flows to the columns that fit, keeping the selected photo; PageUp, PageDown (a screenful,
+same column), Home and End move the selection and scroll it into view (`grid::step` and `grid::jump`
+are pure and unit-tested); the import dialog always offers the folder layout (template, or keep the
+source's folders), notices camera folders when the chosen folder is the card's root *or* its `DCIM`
+folder, and its card scrolls in a small window; the menus have separators where they are usually found
+(File: New and Open, then Import, then Settings, then Quit; Edit: Undo and Redo, then Cut, Copy, Paste
+and Delete, then Select all, which moves Delete before Select all); a scan registers photos by path
+(case aside) and the interface makes each photo's thumbnail as it enters the catalogue
+(`ThumbnailService::warm`, a lower-priority first-in-first-out queue behind what a grid asks for), so
+the grid finds them ready.
+
 **Still open in WP8:** the keywords, collections and metadata panels, undo of photo actions (the Edit
-items work on text fields only), the 4K/laptop layout check, the pseudo-locale, thumbnails during the
-scan, GPX in the import dialog, a CLI `import`, importing individual files rather than a folder, source
+items work on text fields only), the 4K/laptop layout check, the pseudo-locale, GPX in the import dialog, a CLI `import`, importing individual files rather than a folder, source
 plugins for network and cloud kinds (`Engine::source_kinds` is ready for them), and the copy-on-demand
 of a non-local original when it is developed (M2). **Not verified on a real machine:** the native
 folder dialogs, a real card insertion, the hamburger's look, typing with an input method.

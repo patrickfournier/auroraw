@@ -76,7 +76,7 @@ export component ImportDialog inherits Modal {
         edited(text) => { root.fields-changed(); }
     }
     if root.source-has-folders : Text {
-        text: @tr("This card keeps its photos in camera folders ({}).", root.source-folders);
+        text: @tr("The photos are in camera folders ({}).", root.source-folders);
         color: #aaaaaa;
         wrap: word-wrap;
     }
@@ -101,6 +101,27 @@ export component ImportDialog inherits Modal {
         checked <=> root.add-destination;
         toggled => { root.fields-changed(); }
     }
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        Text { text: @tr("Folder layout"); width: 210px; color: #cccccc; vertical-alignment: center; }
+        Button {
+            text: @tr("Use the template");
+            primary: root.layout == "template";
+            clicked => { root.layout = "template"; }
+        }
+        Button {
+            text: @tr("Keep the source's folders");
+            primary: root.layout == "folders";
+            clicked => { root.layout = "folders"; }
+        }
+    }
+    if root.layout == "template" : Field {
+        label-width: 210px;
+        label: @tr("Folders and file names");
+        placeholder: "{year}/{date}/{original}.{ext}";
+        text <=> root.template;
+    }
     Field {
         label-width: 210px;
         label: @tr("Backup folder (optional)");
@@ -108,27 +129,6 @@ export component ImportDialog inherits Modal {
         browsable: true;
         browse-enabled: !root.picking;
         browse => { root.browse-folder("backup"); }
-    }
-    if root.source-has-folders : HorizontalLayout {
-        spacing: 8px;
-        alignment: start;
-        Text { text: @tr("Layout"); width: 210px; color: #cccccc; vertical-alignment: center; }
-        Button {
-            text: @tr("Use the template");
-            primary: root.layout == "template";
-            clicked => { root.layout = "template"; }
-        }
-        Button {
-            text: @tr("Keep the card's folders");
-            primary: root.layout == "folders";
-            clicked => { root.layout = "folders"; }
-        }
-    }
-    if !root.source-has-folders || root.layout == "template" : Field {
-        label-width: 210px;
-        label: @tr("Folders and file names");
-        placeholder: "{year}/{date}/{original}.{ext}";
-        text <=> root.template;
     }
     Field {
         label-width: 210px;

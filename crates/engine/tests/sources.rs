@@ -123,6 +123,48 @@ fn adding_a_folder_registers_its_photos_and_only_its_photos_without_copying() {
 }
 
 #[test]
+fn a_scan_registers_photos_by_path_case_aside_whatever_order_the_folder_lists_them_in() {
+    let s = setup();
+    let folder = folder_with(
+        &s,
+        "Trip",
+        &[
+            "IMG_0003.jpg",
+            "b/IMG_0001.jpg",
+            "IMG_0010.jpg",
+            "a/IMG_0009.jpg",
+            "img_0002.jpg",
+        ],
+    );
+    let (_, job) = add(&s, &folder);
+
+    let mut arrived = Vec::new();
+    loop {
+        match s.events.recv_timeout(Duration::from_secs(20)) {
+            Some(Event::PhotoChanged(id)) => arrived.push(id),
+            Some(Event::IndexFinished { job: j, .. }) if j == job => break,
+            Some(_) => {}
+            None => panic!("the scan never finished"),
+        }
+    }
+    let catalogue = s.engine.read_catalogue().unwrap();
+    let paths: Vec<String> = arrived
+        .iter()
+        .map(|id| catalogue.photo(id).unwrap().unwrap().path.unwrap())
+        .collect();
+    assert_eq!(
+        paths,
+        [
+            "a/IMG_0009.jpg",
+            "b/IMG_0001.jpg",
+            "img_0002.jpg",
+            "IMG_0003.jpg",
+            "IMG_0010.jpg",
+        ]
+    );
+}
+
+#[test]
 fn scanning_again_adds_nothing_and_finds_new_files_only() {
     let s = setup();
     let folder = folder_with(&s, "Trip", &["a.jpg", "b.jpg"]);

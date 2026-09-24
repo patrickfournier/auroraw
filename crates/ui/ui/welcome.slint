@@ -13,7 +13,10 @@ export component WelcomeView inherits Rectangle {
     HorizontalLayout {
         alignment: center;
         VerticalLayout {
-            width: min(720px, root.width);
+            // As wide as the window allows, up to 720px, centred (a width tied to the window's own
+            // would loop through the window's layout constraints now that it can be resized).
+            horizontal-stretch: 1;
+            max-width: 720px;
             padding: 32px;
             spacing: 14px;
             alignment: start;

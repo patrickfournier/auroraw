@@ -180,6 +180,12 @@ msgstr "The last workspace could not be found: {}"
 msgid "Cannot open the workspace: {}"
 msgstr "Cannot open the workspace: {}"
 
+msgid "Workspace folder: {}"
+msgstr "Workspace folder: {}"
+
+msgid "The folder {} already exists and is not empty. Choose another name or folder."
+msgstr "The folder {} already exists and is not empty. Choose another name or folder."
+
 msgid "Cannot create the workspace: {}"
 msgstr "Cannot create the workspace: {}"
 
@@ -370,17 +376,17 @@ msgstr "Card detected: {}"
 msgid "Destination folder"
 msgstr "Destination folder"
 
-msgid "This card keeps its photos in camera folders ({})."
-msgstr "This card keeps its photos in camera folders ({})."
+msgid "The photos are in camera folders ({})."
+msgstr "The photos are in camera folders ({})."
 
-msgid "Layout"
-msgstr "Layout"
+msgid "Folder layout"
+msgstr "Folder layout"
 
 msgid "Use the template"
 msgstr "Use the template"
 
-msgid "Keep the card's folders"
-msgstr "Keep the card's folders"
+msgid "Keep the source's folders"
+msgstr "Keep the source's folders"
 
 msgid "Add this folder to the catalogue's sources"
 msgstr "Add this folder to the catalogue's sources"

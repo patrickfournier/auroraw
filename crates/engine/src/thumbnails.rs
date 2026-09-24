@@ -10,7 +10,7 @@
 //! `catalogue::open`'s own reasoning); nothing here touches the coordinator's connections, so a
 //! slow decode never competes with a command being applied.
 
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -29,8 +29,20 @@ struct Inbox {
     failed: Vec<PhotoId>,
 }
 
+/// What is waiting for a worker: thumbnails somebody is looking at, then thumbnails made ahead of
+/// time.
+#[derive(Default)]
+struct Queues {
+    /// Asked for by [`ThumbnailService::request`]: the newest first, since what a person scrolled
+    /// to last is what is on screen.
+    urgent: Vec<PhotoId>,
+    /// Asked for by [`ThumbnailService::warm`]: in the order they were asked for, only when
+    /// nothing urgent waits.
+    warm: VecDeque<PhotoId>,
+}
+
 struct Shared {
-    queue: Mutex<Vec<PhotoId>>,
+    queue: Mutex<Queues>,
     cv: Condvar,
     stop: AtomicBool,
 }
@@ -41,6 +53,7 @@ pub struct ThumbnailService {
     shared: Arc<Shared>,
     inbox: Arc<Mutex<Inbox>>,
     requested: Mutex<HashSet<PhotoId>>,
+    warmed: Mutex<HashSet<PhotoId>>,
     workers: Vec<std::thread::JoinHandle<()>>,
 }
 
@@ -59,7 +72,7 @@ impl ThumbnailService {
         // before any worker races to create it.
         PreviewsDb::open(&previews_path)?;
         let shared = Arc::new(Shared {
-            queue: Mutex::new(Vec::new()),
+            queue: Mutex::new(Queues::default()),
             cv: Condvar::new(),
             stop: AtomicBool::new(false),
         });
@@ -80,6 +93,7 @@ impl ThumbnailService {
             shared,
             inbox,
             requested: Mutex::new(HashSet::new()),
+            warmed: Mutex::new(HashSet::new()),
             workers: handles,
         })
     }
@@ -90,7 +104,29 @@ impl ThumbnailService {
         if !requested.insert(id) {
             return;
         }
-        self.shared.queue.lock().expect("not poisoned").push(id);
+        self.shared
+            .queue
+            .lock()
+            .expect("not poisoned")
+            .urgent
+            .push(id);
+        self.shared.cv.notify_one();
+    }
+
+    /// Makes `id`'s thumbnail ahead of anybody asking for it, so that it is in the previews
+    /// database when a grid shows the photo: only when no worker has a requested thumbnail to
+    /// make, and in the order photos are given here (a scan gives them by name). Nothing is
+    /// delivered by [`Self::poll`] for it; a photo given more than once is made once.
+    pub fn warm(&self, id: PhotoId) {
+        if !self.warmed.lock().expect("not poisoned").insert(id) {
+            return;
+        }
+        self.shared
+            .queue
+            .lock()
+            .expect("not poisoned")
+            .warm
+            .push_back(id);
         self.shared.cv.notify_one();
     }
 
@@ -155,19 +191,26 @@ fn worker(
         return;
     };
     loop {
-        let id = {
+        let (id, wanted) = {
             let mut queue = shared.queue.lock().expect("not poisoned");
             loop {
                 if shared.stop.load(Ordering::Relaxed) {
                     return;
                 }
-                if let Some(id) = queue.pop() {
-                    break id;
+                if let Some(id) = queue.urgent.pop() {
+                    break (id, true);
+                }
+                if let Some(id) = queue.warm.pop_front() {
+                    break (id, false);
                 }
                 queue = shared.cv.wait(queue).expect("not poisoned");
             }
         };
         let generated = generate(&catalogue, &previews, &workspace, id);
+        if !wanted {
+            // Made ahead of time: it is in the database now, or it will be reported when asked for.
+            continue;
+        }
         let mut inbox = inbox.lock().expect("not poisoned");
         match generated {
             Some(thumbnail) => inbox.ready.push((id, thumbnail)),

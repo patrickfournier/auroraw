@@ -190,8 +190,9 @@ translation can fail unnoticed. What is checked:
   every menu command and shortcut, the Edit items on a focused field, the catalogue panel (add, scan,
   refuse, merge, remove, restore), the import dialog (destination kinds, plain copy, card folders) and
   the card banner (the folder dialog and the mounted cards are injected, so nothing touches the
-  machine), the refusal messages, rating from the keyboard and the run-time translations with their
-  plural forms, on every CI platform. With the software rasteriser it also draws each
+  machine), the refusal messages, rating and paging from the keyboard, a resized window's columns,
+  the menus' separators (by the rows' positions), thumbnails made while a source is scanned and the
+  run-time translations with their plural forms, on every CI platform. With the software rasteriser it also draws each
   view to a PNG (`AUR_SNAPSHOT_DIR=<folder> cargo test -p auroraw-ui headless`), which is how
   layout, clipping and French text are looked at without touching anyone's desktop.
 - **What only a real machine shows**, checked by a person before a release: GPU rendering, the

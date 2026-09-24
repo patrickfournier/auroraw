@@ -122,21 +122,28 @@ impl Engine {
     }
 
     /// Looks at a card or folder without reading any photo: does it have a camera's `DCIM` layout,
-    /// and which camera folders.
+    /// and which camera folders. The folder may be the card's root or `DCIM` itself.
     pub fn inspect_import_source(root: &Path) -> ImportSourceInfo {
-        let Ok(entries) = std::fs::read_dir(root) else {
-            return ImportSourceInfo::default();
+        let is_dcim = |path: &Path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case("DCIM"))
         };
-        let Some(dcim) = entries.flatten().find(|entry| {
-            entry
-                .file_name()
-                .to_string_lossy()
-                .eq_ignore_ascii_case("DCIM")
-                && entry.path().is_dir()
-        }) else {
-            return ImportSourceInfo::default();
+        let dcim = if is_dcim(root) && root.is_dir() {
+            root.to_path_buf()
+        } else {
+            let Ok(entries) = std::fs::read_dir(root) else {
+                return ImportSourceInfo::default();
+            };
+            let Some(found) = entries
+                .flatten()
+                .map(|entry| entry.path())
+                .find(|path| is_dcim(path) && path.is_dir())
+            else {
+                return ImportSourceInfo::default();
+            };
+            found
         };
-        let mut camera_folders: Vec<String> = std::fs::read_dir(dcim.path())
+        let mut camera_folders: Vec<String> = std::fs::read_dir(&dcim)
             .map(|entries| {
                 entries
                     .flatten()

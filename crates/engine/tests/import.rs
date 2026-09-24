@@ -321,7 +321,13 @@ fn a_card_with_a_dcim_folder_says_which_camera_folders_it_has() {
     assert!(info.has_dcim);
     assert_eq!(info.camera_folders, ["100NIKON", "101NIKON"]);
 
+    // The DCIM folder itself, whatever its case, is a camera card's layout too.
+    let inside = Engine::inspect_import_source(&card.join("dcim"));
+    assert!(inside.has_dcim);
+    assert_eq!(inside.camera_folders, ["100NIKON", "101NIKON"]);
+
     let plain = s.dir.path().join("Plain");
     write(&plain.join("a.jpg"), b"x");
     assert!(!Engine::inspect_import_source(&plain).has_dcim);
+    assert!(!Engine::inspect_import_source(&s.dir.path().join("Nowhere/DCIM")).has_dcim);
 }

@@ -247,19 +247,6 @@ pub fn folder_name(name: &str, fallback: &str) -> String {
     }
 }
 
-/// `parent/name`, or `parent/name 2`, `parent/name 3`... when that already exists: the folder to
-/// offer for something new.
-pub fn unique_folder(parent: &Path, name: &str) -> PathBuf {
-    let first = parent.join(name);
-    if !first.exists() {
-        return first;
-    }
-    (2u32..)
-        .map(|n| parent.join(format!("{name} {n}")))
-        .find(|candidate| !candidate.exists())
-        .expect("some number is free")
-}
-
 /// Whether `inner` is `outer` or lies inside it, compared component by component on canonical
 /// paths (`/photos/2026-old` is not inside `/photos/2026`).
 pub fn is_inside(inner: &Path, outer: &Path) -> bool {
@@ -411,16 +398,6 @@ mod tests {
         assert_eq!(folder_name("  trailing. . ", "x"), "trailing");
         assert_eq!(folder_name("...", "Workspace"), "Workspace");
         assert_eq!(folder_name("", "Workspace"), "Workspace");
-    }
-
-    #[test]
-    fn a_new_folder_is_offered_a_number_when_the_name_is_taken() {
-        let dir = auroraw_testkit::temp_dir();
-        assert_eq!(unique_folder(dir.path(), "Main"), dir.path().join("Main"));
-        std::fs::create_dir_all(dir.path().join("Main")).unwrap();
-        assert_eq!(unique_folder(dir.path(), "Main"), dir.path().join("Main 2"));
-        std::fs::create_dir_all(dir.path().join("Main 2")).unwrap();
-        assert_eq!(unique_folder(dir.path(), "Main"), dir.path().join("Main 3"));
     }
 
     #[test]

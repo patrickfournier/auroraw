@@ -5,7 +5,7 @@
 //! cell only until one arrives (testing strategy §6: "the model never returns an empty cell for a
 //! row that is on screen", checked without a window in this module's own tests).
 
-use std::cell::RefCell;
+use std::cell::{Cell as Counter, RefCell};
 use std::collections::{HashMap, HashSet};
 
 use auroraw_engine::ThumbnailService;
@@ -17,8 +17,48 @@ use slint::{
 
 use crate::generated::{Cell, GridRow};
 
-/// The columns a row holds (spike 3's own number, measured against a typical window width).
-pub const COLS: usize = 8;
+/// The columns a row holds until the window says how many fit (spike 3's own number, measured
+/// against a typical window width).
+pub const DEFAULT_COLS: usize = 8;
+
+/// Where a keyboard move goes, beyond a step to a neighbour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Jump {
+    /// One screenful up, in the same column.
+    PageUp,
+    /// One screenful down, in the same column.
+    PageDown,
+    /// The first photo.
+    Home,
+    /// The last photo.
+    End,
+}
+
+/// The index a step of `(dx, dy)` cells from `current` lands on, in a grid `cols` wide with `len`
+/// photos: always a photo, never outside the list.
+pub fn step(current: usize, dx: i32, dy: i32, cols: usize, len: usize) -> usize {
+    if len == 0 {
+        return 0;
+    }
+    let target = current as i64 + i64::from(dx) + i64::from(dy) * cols as i64;
+    target.clamp(0, len as i64 - 1) as usize
+}
+
+/// The index a [`Jump`] lands on: a page moves by the rows that fit on screen (at least one), keeps
+/// its column, and stops at the first or last photo (the last row may be shorter than the column,
+/// so a page down onto it lands on its last photo).
+pub fn jump(kind: Jump, current: usize, cols: usize, visible_rows: usize, len: usize) -> usize {
+    if len == 0 {
+        return 0;
+    }
+    let page = visible_rows.max(1) * cols;
+    match kind {
+        Jump::Home => 0,
+        Jump::End => len - 1,
+        Jump::PageUp => current.saturating_sub(page),
+        Jump::PageDown => (current + page).min(len - 1),
+    }
+}
 
 /// One photo, as much as the grid needs to draw a cell and act on a click.
 #[derive(Clone, Copy)]
@@ -52,6 +92,8 @@ pub struct GridState {
     cache: RefCell<HashMap<PhotoId, Image>>,
     unavailable: RefCell<HashSet<PhotoId>>,
     selected: RefCell<Option<usize>>,
+    /// How many cells a row holds: what fits the window's width (see [`GridState::set_columns`]).
+    cols: Counter<usize>,
     notify: ModelNotify,
 }
 
@@ -63,12 +105,32 @@ impl Default for GridState {
             cache: RefCell::new(HashMap::new()),
             unavailable: RefCell::new(HashSet::new()),
             selected: RefCell::new(None),
+            cols: Counter::new(DEFAULT_COLS),
             notify: ModelNotify::default(),
         }
     }
 }
 
 impl GridState {
+    /// The cells a row holds right now.
+    pub fn columns(&self) -> usize {
+        self.cols.get()
+    }
+
+    /// Re-flows the rows to `cols` cells each (the window was resized): every row changes, the
+    /// selection stays on the same photo. Does nothing when the count is the same.
+    pub fn set_columns(&self, cols: usize) {
+        let cols = cols.max(1);
+        if self.cols.replace(cols) != cols {
+            self.notify.reset();
+        }
+    }
+
+    /// The row a photo's cell is in.
+    pub fn row_of(&self, flat_index: usize) -> usize {
+        flat_index / self.columns()
+    }
+
     /// Replaces the whole list (a fresh filter or the first load) and clears whatever thumbnails
     /// were cached for photos no longer shown, so the cache cannot grow without bound across
     /// many filter changes.
@@ -91,7 +153,7 @@ impl GridState {
                 return;
             };
             items[i].rating = rating;
-            i / COLS
+            i / self.columns()
         };
         self.notify.row_changed(row);
     }
@@ -103,7 +165,7 @@ impl GridState {
         self.cache
             .borrow_mut()
             .insert(id, to_slint_image(thumbnail));
-        let row = self.index.borrow().get(&id).copied()? / COLS;
+        let row = self.index.borrow().get(&id).copied()? / self.columns();
         self.notify.row_changed(row);
         Some(row)
     }
@@ -114,7 +176,7 @@ impl GridState {
     pub fn mark_unavailable(&self, id: PhotoId) {
         self.unavailable.borrow_mut().insert(id);
         if let Some(i) = self.index.borrow().get(&id).copied() {
-            self.notify.row_changed(i / COLS);
+            self.notify.row_changed(i / self.columns());
         }
     }
 
@@ -133,6 +195,11 @@ impl GridState {
         self.id_at(index)
     }
 
+    /// The selected flat index, if any.
+    pub fn selected_index(&self) -> Option<usize> {
+        *self.selected.borrow()
+    }
+
     /// The selected flat index, or 0 (the first cell) if nothing is selected yet: what arrow
     /// navigation starts from.
     pub fn current_selected_or_zero(&self) -> usize {
@@ -147,11 +214,11 @@ impl GridState {
         let index = index.filter(|_| len > 0).map(|i| i.min(len - 1));
         let old = self.selected.borrow_mut().take();
         if let Some(old) = old {
-            self.notify.row_changed(old / COLS);
+            self.notify.row_changed(old / self.columns());
         }
         *self.selected.borrow_mut() = index;
         if let Some(index) = index {
-            self.notify.row_changed(index / COLS);
+            self.notify.row_changed(index / self.columns());
         }
         index.and_then(|i| self.id_at(i))
     }
@@ -176,7 +243,7 @@ impl Model for RowModel {
     type Data = GridRow;
 
     fn row_count(&self) -> usize {
-        self.state.len().div_ceil(COLS)
+        self.state.len().div_ceil(self.state.columns())
     }
 
     fn row_data(&self, row: usize) -> Option<Self::Data> {
@@ -184,10 +251,12 @@ impl Model for RowModel {
         let selected = *self.state.selected.borrow();
         let cache = self.state.cache.borrow();
         let unavailable = self.state.unavailable.borrow();
-        let cells: Vec<Cell> = (0..COLS)
-            .filter_map(|c| items.get(row * COLS + c).map(|it| (row * COLS + c, it)))
+        let cols = self.state.columns();
+        let cells: Vec<Cell> = (0..cols)
+            .filter_map(|c| items.get(row * cols + c).map(|it| (row * cols + c, it)))
             .map(|(flat, it)| match cache.get(&it.id) {
                 Some(image) => Cell {
+                    index: flat as i32,
                     photo_id: it.id.to_string().into(),
                     thumb: image.clone(),
                     rating: it.rating as i32,
@@ -201,6 +270,7 @@ impl Model for RowModel {
                         self.thumbnails.request(it.id);
                     }
                     Cell {
+                        index: flat as i32,
                         photo_id: it.id.to_string().into(),
                         thumb: Image::default(),
                         rating: it.rating as i32,
@@ -261,10 +331,10 @@ mod tests {
         let row = model.row_data(0).unwrap();
         assert_eq!(
             row.cells.row_count(),
-            COLS,
+            DEFAULT_COLS,
             "every column of a full row is present"
         );
-        for i in 0..COLS {
+        for i in 0..DEFAULT_COLS {
             let cell = row.cells.row_data(i).unwrap();
             assert!(
                 !cell.photo_id.is_empty(),
@@ -275,7 +345,7 @@ mod tests {
 
     #[test]
     fn a_short_last_row_has_only_as_many_cells_as_photos_remain() {
-        let state = state_with(COLS + 3);
+        let state = state_with(DEFAULT_COLS + 3);
         let model = RowModel::new(state, service());
         assert_eq!(model.row_count(), 2);
         assert_eq!(model.row_data(1).unwrap().cells.row_count(), 3);
@@ -304,11 +374,11 @@ mod tests {
 
     #[test]
     fn selecting_a_cell_marks_only_that_cell_selected() {
-        let state = state_with(COLS * 2);
-        *state.selected.borrow_mut() = Some(COLS + 2);
+        let state = state_with(DEFAULT_COLS * 2);
+        *state.selected.borrow_mut() = Some(DEFAULT_COLS + 2);
         let model = RowModel::new(state, service());
         let row = model.row_data(1).unwrap();
-        for i in 0..COLS {
+        for i in 0..DEFAULT_COLS {
             let selected = row.cells.row_data(i).unwrap().selected;
             assert_eq!(selected, i == 2, "cell {i}");
         }
@@ -327,5 +397,60 @@ mod tests {
         assert!(state.selected.borrow().is_none());
         assert!(state.id_at(0).is_some());
         assert_ne!(state.id_at(0), Some(a));
+    }
+
+    #[test]
+    fn a_resized_window_re_flows_the_rows_and_keeps_the_selection_on_its_photo() {
+        let state = state_with(20);
+        *state.selected.borrow_mut() = Some(11);
+        let selected = state.selected_id();
+        let model = RowModel::new(state.clone(), service());
+        assert_eq!(model.row_count(), 3, "8 per row");
+
+        state.set_columns(5);
+        assert_eq!(model.row_count(), 4);
+        assert_eq!(model.row_data(0).unwrap().cells.row_count(), 5);
+        assert_eq!(state.selected_id(), selected);
+        assert_eq!(state.row_of(11), 2);
+        let cell = model.row_data(2).unwrap().cells.row_data(1).unwrap();
+        assert!(cell.selected, "photo 11 is the second cell of row 2 now");
+
+        state.set_columns(0);
+        assert_eq!(state.columns(), 1, "never fewer than one column");
+    }
+
+    #[test]
+    fn steps_stay_inside_the_list_and_move_by_rows_of_the_current_width() {
+        assert_eq!(step(10, 1, 0, 8, 20), 11);
+        assert_eq!(step(10, 0, 1, 8, 20), 18);
+        assert_eq!(step(10, 0, 1, 5, 20), 15);
+        assert_eq!(step(2, 0, -1, 8, 20), 0, "clamped at the start");
+        assert_eq!(step(19, 1, 0, 8, 20), 19, "clamped at the end");
+        assert_eq!(step(0, 0, 1, 8, 0), 0, "an empty list has nothing to go to");
+    }
+
+    #[test]
+    fn home_end_and_pages_land_on_photos_and_keep_their_column() {
+        // 100 photos, 8 per row, 5 rows on screen: a page is 40 photos.
+        assert_eq!(jump(Jump::Home, 57, 8, 5, 100), 0);
+        assert_eq!(jump(Jump::End, 3, 8, 5, 100), 99);
+        assert_eq!(jump(Jump::PageDown, 3, 8, 5, 100), 43);
+        assert_eq!(
+            jump(Jump::PageDown, 70, 8, 5, 100),
+            99,
+            "stops at the last photo"
+        );
+        assert_eq!(jump(Jump::PageUp, 43, 8, 5, 100), 3);
+        assert_eq!(
+            jump(Jump::PageUp, 10, 8, 5, 100),
+            0,
+            "stops at the first photo"
+        );
+        assert_eq!(
+            jump(Jump::PageDown, 0, 8, 0, 100),
+            8,
+            "a page is a row at least"
+        );
+        assert_eq!(jump(Jump::End, 0, 8, 5, 0), 0, "an empty list");
     }
 }

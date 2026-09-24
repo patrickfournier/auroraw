@@ -175,6 +175,7 @@ pub(crate) fn attach(
     ui.set_workspace_name(name.into());
 
     let state = Rc::new(GridState::default());
+    state.set_columns(ui.get_grid_columns() as usize);
     let items = load_items(&engine, 0).unwrap_or_default();
     ui.set_status(ui.global::<Texts>().invoke_photos(items.len() as i32));
     state.set_items(items);
@@ -227,7 +228,7 @@ pub(crate) fn attach(
     {
         let (state, engine, weak) = (state.clone(), engine.clone(), ui.as_weak());
         let (run, new_photos) = (run.clone(), new_photos.clone());
-        let catalogue = catalogue.clone();
+        let (catalogue, thumbnails) = (catalogue.clone(), thumbnails.clone());
         let mut last_reload = Instant::now();
         event_timer.start(TimerMode::Repeated, Duration::from_millis(50), move || {
             let Some(ui) = weak.upgrade() else { return };
@@ -294,6 +295,9 @@ pub(crate) fn attach(
                         new_photos.set(true);
                     }
                     Event::PhotoChanged(id) => {
+                        // A photo that just entered the catalogue gets its thumbnail made at once,
+                        // in the order photos arrive, without waiting for a grid to show it.
+                        thumbnails.warm(id);
                         if let Some(row) = photo_row(&engine, id) {
                             state.set_rating(id, row.effective_rating);
                             if state.selected_id() == Some(id) {
@@ -410,9 +414,50 @@ pub(crate) fn attach(
             if state.len() == 0 {
                 return;
             }
-            let next = next_index(&state, dx, dy, grid::COLS as i32);
-            if let Some(id) = state.select(Some(next)) {
-                ui.set_selected_summary(summary_of(&engine, id).into());
+            let next = grid::step(
+                state.current_selected_or_zero(),
+                dx,
+                dy,
+                state.columns(),
+                state.len(),
+            );
+            select_and_reveal(&ui, &engine, &state, next);
+        });
+    }
+
+    {
+        let (state, engine, weak) = (state.clone(), engine.clone(), ui.as_weak());
+        ui.on_jump_selection(move |kind| {
+            let Some(ui) = weak.upgrade() else { return };
+            let kind = match kind.as_str() {
+                "page-up" => grid::Jump::PageUp,
+                "page-down" => grid::Jump::PageDown,
+                "home" => grid::Jump::Home,
+                "end" => grid::Jump::End,
+                _ => return,
+            };
+            if state.len() == 0 {
+                return;
+            }
+            let next = grid::jump(
+                kind,
+                state.current_selected_or_zero(),
+                state.columns(),
+                ui.get_grid_visible_rows() as usize,
+                state.len(),
+            );
+            select_and_reveal(&ui, &engine, &state, next);
+        });
+    }
+
+    {
+        // The window was resized: the rows are re-flowed to what fits, and the selection is
+        // brought back into view since its row moved.
+        let (state, weak) = (state.clone(), ui.as_weak());
+        ui.on_columns_changed(move |cols| {
+            state.set_columns(cols.max(1) as usize);
+            if let (Some(ui), Some(selected)) = (weak.upgrade(), state.selected_index()) {
+                reveal(&ui, &state, selected);
             }
         });
     }
@@ -756,8 +801,29 @@ pub(crate) fn attach(
 }
 
 /// The flat index arrow navigation lands on, clamped to the list's bounds.
-fn next_index(state: &GridState, dx: i32, dy: i32, cols: i32) -> usize {
-    let len = state.len() as i32;
-    let current = state.current_selected_or_zero() as i32;
-    (current + dx + dy * cols).clamp(0, (len - 1).max(0)) as usize
+/// A row of the grid is this many logical pixels high (`ui/shell.slint`'s cell height and spacing).
+const ROW_HEIGHT: f32 = 124.0;
+
+/// Scrolls the grid the least that puts the row of `index` in view.
+fn reveal(ui: &MainWindow, state: &GridState, index: usize) {
+    let top = state.row_of(index) as f32 * ROW_HEIGHT;
+    let bottom = top + ROW_HEIGHT;
+    let view = ui.get_grid_view_height();
+    let scrolled = -ui.get_grid_scroll();
+    let target = if top < scrolled {
+        top
+    } else if bottom > scrolled + view {
+        bottom - view
+    } else {
+        return;
+    };
+    ui.set_grid_scroll(-target.max(0.0));
+}
+
+/// Selects `index`, shows its summary and keeps it in view (a keyboard move).
+fn select_and_reveal(ui: &MainWindow, engine: &Engine, state: &GridState, index: usize) {
+    if let Some(id) = state.select(Some(index)) {
+        ui.set_selected_summary(summary_of(engine, id).into());
+    }
+    reveal(ui, state, index);
 }

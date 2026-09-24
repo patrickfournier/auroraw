@@ -5,7 +5,7 @@
 //! workspace; a workspace's engine lives exactly as long as its window.
 
 use std::cell::RefCell;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 
@@ -55,9 +55,6 @@ pub(crate) struct Launcher {
     /// The workspace on screen, so that opening it again is not a second attempt to lock it.
     current: RefCell<Option<PathBuf>>,
     settings: RefCell<AppSettings>,
-    /// The folder the New workspace dialog proposed for the name it shows, so that a folder chosen
-    /// by hand is told apart from one still following the name.
-    automatic_location: RefCell<String>,
     me: Weak<Launcher>,
 }
 
@@ -74,7 +71,6 @@ impl Launcher {
             screen: RefCell::new(None),
             current: RefCell::new(None),
             settings: RefCell::new(AppSettings::default()),
-            automatic_location: RefCell::new(String::new()),
             me: me.clone(),
         });
         *launcher.settings.borrow_mut() = AppSettings::load(&launcher.settings_path());
@@ -289,17 +285,20 @@ impl Launcher {
         }
         {
             let (launcher, weak) = (self.me.clone(), ui.as_weak());
-            ui.on_new_name_edited(move |name| {
+            ui.on_new_name_edited(move |_| {
                 let (Some(launcher), Some(ui)) = (launcher.upgrade(), weak.upgrade()) else {
                     return;
                 };
-                let follows_the_name =
-                    ui.get_new_location() == launcher.automatic_location.borrow().as_str();
-                if follows_the_name && !name.trim().is_empty() {
-                    let location = launcher.default_location(&name);
-                    *launcher.automatic_location.borrow_mut() = location.clone();
-                    ui.set_new_location(location.into());
-                }
+                launcher.update_new_preview(&ui);
+            });
+        }
+        {
+            let (launcher, weak) = (self.me.clone(), ui.as_weak());
+            ui.on_new_location_edited(move |_| {
+                let (Some(launcher), Some(ui)) = (launcher.upgrade(), weak.upgrade()) else {
+                    return;
+                };
+                launcher.update_new_preview(&ui);
             });
         }
         {
@@ -368,14 +367,36 @@ impl Launcher {
         ui.set_language(code.into());
     }
 
+    /// Opens the New workspace dialog: the folder that will hold the workspace's own folder
+    /// (`<Pictures>/Auroraw`), and a name whose folder does not exist there yet.
     fn new_workspace_dialog(&self, ui: &MainWindow) {
-        let name = ui.global::<Texts>().invoke_default_workspace_name();
-        let location = self.default_location(&name);
-        *self.automatic_location.borrow_mut() = location.clone();
-        ui.set_new_name(name);
-        ui.set_new_location(location.into());
+        let parent = self.launch.pictures.join("Auroraw");
+        let name = free_workspace_name(
+            &parent,
+            &ui.global::<Texts>().invoke_default_workspace_name(),
+        );
+        ui.set_new_name(name.into());
+        ui.set_new_location(parent.to_string_lossy().as_ref().into());
         ui.set_dialog_error(SharedString::new());
+        self.update_new_preview(ui);
         ui.set_dialog("new-workspace".into());
+    }
+
+    /// Shows where the workspace would be created: the folder field's folder and, in it, the
+    /// name's own folder (`/home/patrick/Pictures/Auroraw` and `Main` make `.../Auroraw/Main`).
+    fn update_new_preview(&self, ui: &MainWindow) {
+        let name = ui.get_new_name();
+        let preview = match (name.trim(), paths::resolve(ui.get_new_location().as_str())) {
+            ("", _) | (_, Err(_)) => SharedString::new(),
+            (name, Ok(parent)) => ui.global::<Texts>().invoke_workspace_will_be_at(
+                parent
+                    .join(paths::folder_name(name, "Workspace"))
+                    .to_string_lossy()
+                    .as_ref()
+                    .into(),
+            ),
+        };
+        ui.set_new_preview(preview);
     }
 
     /// Carries out a command of the menus or their shortcuts (`commands.rs`); false for an id it
@@ -416,15 +437,6 @@ impl Launcher {
         true
     }
 
-    /// `<Pictures>/Auroraw/<name>`, numbered when it already exists (design note 001 §5.7).
-    fn default_location(&self, name: &str) -> String {
-        let parent = self.launch.pictures.join("Auroraw");
-        let folder = paths::folder_name(name, "Workspace");
-        paths::unique_folder(&parent, &folder)
-            .to_string_lossy()
-            .into_owned()
-    }
-
     /// Creates the workspace the new-workspace dialog describes and opens it.
     fn create(self: &Rc<Self>, ui: &MainWindow) {
         let texts = ui.global::<Texts>();
@@ -433,15 +445,21 @@ impl Launcher {
             ui.set_dialog_error(texts.invoke_name_required());
             return;
         }
-        let root = match paths::resolve(ui.get_new_location().as_str()) {
-            Ok(root) => root,
+        let parent = match paths::resolve(ui.get_new_location().as_str()) {
+            Ok(parent) => parent,
             Err(e) => {
                 ui.set_dialog_error(texts.invoke_cannot_create(e.to_string().into()));
                 return;
             }
         };
         // The dialog shows back what was understood, so an error names the folder that was meant.
-        ui.set_new_location(root.to_string_lossy().as_ref().into());
+        ui.set_new_location(parent.to_string_lossy().as_ref().into());
+        let root = parent.join(paths::folder_name(&name, "Workspace"));
+        self.update_new_preview(ui);
+        if !is_free(&root) {
+            ui.set_dialog_error(texts.invoke_folder_taken(root.to_string_lossy().as_ref().into()));
+            return;
+        }
         let opened = match Engine::create_workspace(&root, &name, &self.launch.dirs) {
             Ok(opened) => opened,
             Err(e) => {
@@ -493,7 +511,10 @@ impl Launcher {
                     }
                     "backup" => ui.set_import_backup(text),
                     "add-source" => ui.set_source_folder(text),
-                    _ if new_workspace_dialog => ui.set_new_location(text),
+                    _ if new_workspace_dialog => {
+                        ui.set_new_location(text);
+                        launcher.update_new_preview(&ui);
+                    }
                     _ => {
                         if let Err(message) = launcher.open_typed(&text) {
                             launcher.notify(&ui, &message);
@@ -505,6 +526,27 @@ impl Launcher {
         if !(self.platform.pick_folder)(&title, start_directory(current.as_str()), answer) {
             ui.set_picking(false);
         }
+    }
+}
+
+/// `base`, or `base 2`, `base 3`... when a folder of that name is already in `parent`: the name to
+/// offer for a new workspace.
+fn free_workspace_name(parent: &Path, base: &str) -> String {
+    let taken = |name: &str| parent.join(paths::folder_name(name, "Workspace")).exists();
+    if !taken(base) {
+        return base.to_string();
+    }
+    (2u32..)
+        .map(|n| format!("{base} {n}"))
+        .find(|name| !taken(name))
+        .expect("some number is free")
+}
+
+/// Whether a workspace can be made in `folder`: it does not exist, or is an empty folder.
+fn is_free(folder: &Path) -> bool {
+    match std::fs::read_dir(folder) {
+        Ok(mut entries) => entries.next().is_none(),
+        Err(_) => !folder.exists(),
     }
 }
 

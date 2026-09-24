@@ -153,9 +153,17 @@ fn run(job: IndexJob) {
         })
         .collect();
     let groups = pair_files(listed, PairRule::Both);
-    let (known_groups, new_groups): (Vec<_>, Vec<_>) = groups
+    let (known_groups, mut new_groups): (Vec<_>, Vec<_>) = groups
         .into_iter()
         .partition(|group| known.contains(&group.original.path));
+    // By path, case aside: photos enter the catalogue (and get their thumbnails) in the order a
+    // person reads a folder, whatever order the source listed them in.
+    new_groups.sort_by_cached_key(|group| {
+        (
+            group.original.path.to_lowercase(),
+            group.original.path.clone(),
+        )
+    });
 
     // Fingerprints, and which new photos are ones that were removed earlier.
     let removed = job.workspace.removed_photos();

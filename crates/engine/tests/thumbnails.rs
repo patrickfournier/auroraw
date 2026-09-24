@@ -168,3 +168,57 @@ fn a_photo_no_thumbnail_can_be_made_from_is_reported_not_silently_missing() {
         std::thread::sleep(Duration::from_millis(5));
     }
 }
+
+#[test]
+fn a_warmed_thumbnail_is_cached_for_later_and_never_delivered() {
+    let (engine, _events, dir) = new_engine();
+    let source_root = dir.path().join("Card");
+    std::fs::create_dir_all(&source_root).unwrap();
+    write_test_jpeg(&source_root.join("a.jpg"));
+    let photo_id = import_one_photo(&engine, &source_root);
+
+    let previews_path = dir.path().join("previews.db");
+    let service = engine.start_thumbnails(&previews_path, 2).unwrap();
+    let previews = auroraw_imaging::PreviewsDb::open(&previews_path).unwrap();
+    assert!(previews.get(&photo_id).unwrap().is_none());
+
+    service.warm(photo_id);
+    service.warm(photo_id);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while previews.get(&photo_id).unwrap().is_none() {
+        assert!(Instant::now() < deadline, "the thumbnail was never made");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(previews.count().unwrap(), 1);
+    assert!(
+        service.poll().is_empty(),
+        "nobody asked for it, so nothing arrives"
+    );
+    assert!(service.poll_failed().is_empty());
+
+    // Asking for it afterwards is served from what was made ahead.
+    service.request(photo_id);
+    let thumbnail = poll_until(&service, photo_id, Duration::from_secs(5));
+    assert_eq!((thumbnail.width, thumbnail.height), (64, 48));
+}
+
+#[test]
+fn a_warmed_photo_that_cannot_be_made_does_not_stop_the_others() {
+    let (engine, _events, dir) = new_engine();
+    let source_root = dir.path().join("Card");
+    std::fs::create_dir_all(&source_root).unwrap();
+    write_test_jpeg(&source_root.join("a.jpg"));
+    let photo_id = import_one_photo(&engine, &source_root);
+
+    let service = engine
+        .start_thumbnails(&dir.path().join("previews.db"), 1)
+        .unwrap();
+    service.warm(PhotoId::random());
+    service.warm(photo_id);
+    let previews = auroraw_imaging::PreviewsDb::open(&dir.path().join("previews.db")).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while previews.get(&photo_id).unwrap().is_none() {
+        assert!(Instant::now() < deadline, "the thumbnail was never made");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}

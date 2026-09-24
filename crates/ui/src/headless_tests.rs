@@ -62,7 +62,7 @@ fn fixture(photos: u8) -> Fixture {
             cache: dir.path().join("cache"),
         },
         pictures: dir.path().join("Pictures"),
-        workspace: dir.path().join("Workspaces/Test"),
+        workspace: dir.path().join("Workspaces/Main"),
         archive: dir.path().join("Archive"),
         card,
         _dir: dir,
@@ -134,12 +134,18 @@ fn open_with(fixture: &Fixture, language: &str, platform: Platform) -> App {
         "New workspace…"
     };
     click(&app, new_workspace);
-    let folder = if language == "fr" {
-        "Dossier"
+    // The dialog's folder holds the workspace's own folder, which is named after the workspace.
+    let (name, folder) = if language == "fr" {
+        ("Nom", "Dossier")
     } else {
-        "Folder"
+        ("Name", "Folder")
     };
-    type_into(&app, folder, &fixture.workspace.to_string_lossy());
+    type_into(&app, name, "Main");
+    type_into(
+        &app,
+        folder,
+        &fixture.workspace.parent().unwrap().to_string_lossy(),
+    );
     click(&app, if language == "fr" { "Créer" } else { "Create" });
     assert_eq!(app.ui().get_screen(), "workspace");
     app.ui().show().unwrap();
@@ -399,6 +405,12 @@ fn press(shell: &App, text: &str) {
         .dispatch_event(WindowEvent::KeyReleased { text: text.into() });
 }
 
+/// A special key (an arrow, a page key...) pressed and released.
+fn press_key(shell: &App, key: Key) {
+    let text: slint::SharedString = key.into();
+    press(shell, text.as_str());
+}
+
 /// Clicks the n-th cell of the grid's first row.
 fn click_cell(shell: &App, n: usize) {
     // A cell is 160 x 120 logical pixels with 4 between them, below the two 36 px bars.
@@ -423,6 +435,117 @@ fn click_cell(shell: &App, n: usize) {
             position,
             button: PointerEventButton::Left,
         });
+}
+
+/// The window's size in logical pixels, and the time the shell needs to notice it.
+fn resize(shell: &App, width: u32, height: u32) {
+    shell
+        .ui()
+        .window()
+        .set_size(slint::PhysicalSize::new(width, height));
+    mock_elapsed_time(Duration::from_millis(50));
+}
+
+/// The flat index of the selected cell of the grid, if one is.
+fn selected_cell(shell: &App) -> Option<i32> {
+    let rows = shell.ui().get_rows();
+    (0..rows.row_count())
+        .flat_map(|r| {
+            let cells = rows.row_data(r).unwrap().cells;
+            (0..cells.row_count())
+                .map(|c| cells.row_data(c).unwrap())
+                .collect::<Vec<_>>()
+        })
+        .find(|cell| cell.selected)
+        .map(|cell| cell.index)
+}
+
+/// A workspace with `photos` imported and shown in the grid.
+fn grid_of(f: &Fixture) -> App {
+    let shell = to_import(open(f));
+    fill_import_form(&shell, f);
+    click(&shell, "Import");
+    settle("the import", || shell.ui().get_import_finished());
+    click(&shell, "Show photos");
+    shell
+}
+
+#[test]
+fn page_up_page_down_home_and_end_move_the_selection_and_keep_it_in_view() {
+    init();
+    let f = fixture(40);
+    let shell = grid_of(&f);
+    resize(&shell, 1400, 500);
+    let ui = shell.ui();
+    assert_eq!(ui.get_grid_columns(), 8);
+    assert_eq!(
+        ui.get_grid_visible_rows(),
+        3,
+        "500 less the bars and the strip"
+    );
+
+    click_cell(&shell, 1);
+    assert_eq!(selected_cell(&shell), Some(1));
+    press_key(&shell, Key::PageDown);
+    assert_eq!(
+        selected_cell(&shell),
+        Some(25),
+        "three rows down, same column"
+    );
+    press_key(&shell, Key::PageDown);
+    assert_eq!(
+        selected_cell(&shell),
+        Some(39),
+        "the last photo, not beyond"
+    );
+    assert_eq!(
+        ui.get_grid_scroll(),
+        -220.0,
+        "the last row (5 x 124) is at the bottom of a 400 high view"
+    );
+    press_key(&shell, Key::PageUp);
+    assert_eq!(selected_cell(&shell), Some(15));
+    press_key(&shell, Key::Home);
+    assert_eq!(selected_cell(&shell), Some(0));
+    assert_eq!(ui.get_grid_scroll(), 0.0, "back at the top");
+    press_key(&shell, Key::End);
+    assert_eq!(selected_cell(&shell), Some(39));
+    assert!(!ui.get_selected_summary().is_empty(), "the summary follows");
+}
+
+#[test]
+fn a_resized_window_shows_as_many_columns_as_fit_and_keeps_the_selected_photo() {
+    init();
+    let f = fixture(20);
+    let shell = grid_of(&f);
+    resize(&shell, 1400, 700);
+    click_cell(&shell, 3);
+    assert_eq!(selected_cell(&shell), Some(3));
+    assert_eq!(
+        shell.ui().get_rows().row_data(0).unwrap().cells.row_count(),
+        8
+    );
+
+    // 1100 wide holds six cells of 160 with 4 between them.
+    resize(&shell, 1100, 700);
+    assert_eq!(shell.ui().get_grid_columns(), 6);
+    assert_eq!(
+        shell.ui().get_rows().row_data(0).unwrap().cells.row_count(),
+        6
+    );
+    assert_eq!(
+        shell.ui().get_rows().row_count(),
+        4,
+        "20 photos in rows of six"
+    );
+    assert_eq!(selected_cell(&shell), Some(3));
+
+    // Narrower than one cell still shows one column; wider shows more.
+    resize(&shell, 640, 700);
+    assert_eq!(shell.ui().get_grid_columns(), 3);
+    resize(&shell, 1900, 700);
+    assert_eq!(shell.ui().get_grid_columns(), 11);
+    assert_eq!(selected_cell(&shell), Some(3));
 }
 
 #[test]
@@ -707,12 +830,15 @@ fn creating_a_workspace_from_the_dialog_opens_it_and_remembers_it() {
     let f = fixture(0);
     let app = launch(&f);
     click(&app, "New workspace…");
-    // The dialog proposes <Pictures>/Auroraw/<name>, and the name is translated ("Main").
+    // The folder is the one that will hold the workspace's own folder, which is named after it
+    // ("Main" in English): <Pictures>/Auroraw, then Main below it.
+    let parent = f.pictures.join("Auroraw");
     assert_eq!(app.ui().get_dialog(), "new-workspace");
     assert_eq!(app.ui().get_new_name(), "Main");
+    assert_eq!(app.ui().get_new_location(), parent.to_string_lossy());
     assert_eq!(
-        app.ui().get_new_location(),
-        f.pictures.join("Auroraw").join("Main").to_string_lossy()
+        app.ui().get_new_preview(),
+        format!("Workspace folder: {}", parent.join("Main").display())
     );
 
     click(&app, "Create");
@@ -724,12 +850,10 @@ fn creating_a_workspace_from_the_dialog_opens_it_and_remembers_it() {
         "catalogue",
         "a new workspace opens on what fills it"
     );
+    assert!(parent.join("Main").join("workspace.json").is_file());
     assert!(
-        f.pictures
-            .join("Auroraw")
-            .join("Main")
-            .join("workspace.json")
-            .is_file()
+        !parent.join("workspace.json").exists(),
+        "the folder itself is not the workspace"
     );
     let known = Engine::known_workspaces(&f.dirs);
     assert_eq!(known.len(), 1);
@@ -737,44 +861,61 @@ fn creating_a_workspace_from_the_dialog_opens_it_and_remembers_it() {
 }
 
 #[test]
-fn the_proposed_folder_follows_the_name_until_the_folder_is_edited() {
+fn the_preview_follows_the_name_and_the_folder_and_the_folder_is_left_alone() {
     init();
     let f = fixture(0);
     let app = launch(&f);
     click(&app, "New workspace…");
+    let parent = f.pictures.join("Auroraw");
+    let preview = |path: &Path| format!("Workspace folder: {}", path.display());
 
     type_into(&app, "Name", "Family");
-    assert_eq!(
-        app.ui().get_new_location(),
-        f.pictures.join("Auroraw").join("Family").to_string_lossy()
-    );
+    assert_eq!(app.ui().get_new_location(), parent.to_string_lossy());
+    assert_eq!(app.ui().get_new_preview(), preview(&parent.join("Family")));
     type_into(&app, "Name", "Family / trips: 2026");
     assert_eq!(
-        app.ui().get_new_location(),
-        f.pictures
-            .join("Auroraw")
-            .join("Family _ trips_ 2026")
-            .to_string_lossy(),
+        app.ui().get_new_preview(),
+        preview(&parent.join("Family _ trips_ 2026")),
         "what a file system refuses is replaced"
     );
 
-    // A folder chosen by hand is not overwritten by a later change of name.
-    type_into(&app, "Folder", &f.workspace.to_string_lossy());
+    // A folder typed by hand stays as it is when the name changes.
+    type_into(
+        &app,
+        "Folder",
+        &f.workspace.parent().unwrap().to_string_lossy(),
+    );
     type_into(&app, "Name", "Renamed");
-    assert_eq!(app.ui().get_new_location(), f.workspace.to_string_lossy());
+    assert_eq!(
+        app.ui().get_new_location(),
+        f.workspace.parent().unwrap().to_string_lossy()
+    );
+    assert_eq!(
+        app.ui().get_new_preview(),
+        preview(&f.workspace.parent().unwrap().join("Renamed"))
+    );
+
+    // Nothing to show while the name is empty or the folder is not a full path.
+    type_into(&app, "Name", "  ");
+    assert_eq!(app.ui().get_new_preview(), "");
+    type_into(&app, "Name", "Main");
+    type_into(&app, "Folder", "relative/path");
+    assert_eq!(app.ui().get_new_preview(), "");
 }
 
 #[test]
 fn a_taken_name_is_offered_with_a_number() {
     init();
     let f = fixture(0);
-    std::fs::create_dir_all(f.pictures.join("Auroraw").join("Main")).unwrap();
+    let parent = f.pictures.join("Auroraw");
+    std::fs::create_dir_all(parent.join("Main")).unwrap();
     let app = launch(&f);
     click(&app, "New workspace…");
-    assert_eq!(
-        app.ui().get_new_location(),
-        f.pictures.join("Auroraw").join("Main 2").to_string_lossy()
-    );
+    assert_eq!(app.ui().get_new_name(), "Main 2");
+    assert_eq!(app.ui().get_new_location(), parent.to_string_lossy());
+    click(&app, "Create");
+    assert_eq!(app.ui().get_screen(), "workspace");
+    assert!(parent.join("Main 2").join("workspace.json").is_file());
 }
 
 #[test]
@@ -801,6 +942,26 @@ fn a_workspace_that_cannot_be_created_says_why_and_the_dialog_stays() {
     assert!(app.ui().get_dialog_error().contains("absolute"));
     assert_eq!(app.ui().get_screen(), "welcome");
     assert_eq!(app.ui().get_dialog(), "new-workspace");
+
+    // A folder of that name that already holds something is never built into.
+    let parent = f.pictures.join("Auroraw");
+    std::fs::create_dir_all(parent.join("Main")).unwrap();
+    std::fs::write(parent.join("Main").join("notes.txt"), b"mine").unwrap();
+    type_into(&app, "Folder", &parent.to_string_lossy());
+    click(&app, "Create");
+    assert!(
+        app.ui().get_dialog_error().contains("already exists"),
+        "{}",
+        app.ui().get_dialog_error()
+    );
+    assert_eq!(app.ui().get_screen(), "welcome");
+    assert!(!parent.join("Main").join("workspace.json").exists());
+
+    // An empty one is fine.
+    std::fs::remove_file(parent.join("Main").join("notes.txt")).unwrap();
+    click(&app, "Create");
+    assert_eq!(app.ui().get_screen(), "workspace");
+    assert!(parent.join("Main").join("workspace.json").is_file());
 }
 
 #[test]
@@ -811,14 +972,27 @@ fn a_typed_folder_is_shown_back_canonical() {
     click(&app, "New workspace…");
     // A path with `..` and a repeated separator is what a person may type; the dialog shows what
     // was understood (and the workspace is created there, not in a folder named "..").
+    let workspaces = f.workspace.parent().unwrap();
     let typed = format!(
-        "{}//Workspaces/x/../Test/",
-        f.workspace.parent().unwrap().parent().unwrap().display()
+        "{}//Workspaces/x/../",
+        workspaces.parent().unwrap().display()
     );
     type_into(&app, "Folder", &typed);
+    type_into(&app, "Name", "Main");
+    assert_eq!(
+        app.ui().get_new_preview(),
+        format!("Workspace folder: {}", f.workspace.display())
+    );
+
+    // Once shown back (an error keeps the dialog open), the field holds the clean path.
+    std::fs::create_dir_all(&f.workspace).unwrap();
+    std::fs::write(f.workspace.join("notes.txt"), b"mine").unwrap();
     click(&app, "Create");
-    assert_eq!(app.ui().get_screen(), "workspace");
-    assert!(f.workspace.join("workspace.json").is_file());
+    assert_eq!(
+        app.ui().get_new_location(),
+        canonical(workspaces).to_string_lossy()
+    );
+    assert!(app.ui().get_dialog_error().contains("already exists"));
 }
 
 #[test]
@@ -1042,6 +1216,50 @@ fn the_hamburger_menu_opens_lists_its_sections_and_runs_a_command() {
     assert!(menu_row_enabled(&app, "About Auroraw"));
 }
 
+/// Where the menu row with this label starts, from the top of the window.
+fn menu_row_top(app: &App, label: &str) -> f32 {
+    let ui = app.ui();
+    ElementQuery::from_root(&ui)
+        .match_descendants()
+        .match_accessible_role(AccessibleRole::Button)
+        .match_predicate({
+            let label = label.to_string();
+            move |element| element.accessible_label().is_some_and(|l| l == label)
+        })
+        .find_all()
+        .into_iter()
+        .next_back()
+        .map(|element| element.absolute_position().y)
+        .unwrap_or_else(|| panic!("no menu row labelled {label:?}"))
+}
+
+#[test]
+fn the_menus_group_their_items_with_separators_where_they_are_usually_found() {
+    init();
+    let f = fixture(0);
+    let app = launch(&f);
+    menu_open(&app);
+
+    // A row is 30 high; a separator adds 9 above the row that starts a group.
+    let gap = |from: &str, to: &str| menu_row_top(&app, to) - menu_row_top(&app, from);
+    assert_eq!(gap("New workspace…", "Open workspace…"), 30.0);
+    assert_eq!(
+        gap("Open workspace…", "Import…"),
+        39.0,
+        "the new and open group ends"
+    );
+    assert_eq!(gap("Import…", "Settings…"), 39.0);
+    assert_eq!(gap("Settings…", "Quit"), 39.0, "Quit is last, on its own");
+
+    click_on_top(&app, "Edit");
+    assert_eq!(gap("Undo", "Redo"), 30.0);
+    assert_eq!(gap("Redo", "Cut"), 39.0, "history, then the clipboard");
+    assert_eq!(gap("Cut", "Copy"), 30.0);
+    assert_eq!(gap("Copy", "Paste"), 30.0);
+    assert_eq!(gap("Paste", "Delete"), 30.0);
+    assert_eq!(gap("Delete", "Select all"), 39.0);
+}
+
 #[test]
 fn importing_is_available_in_the_menu_once_a_workspace_is_open() {
     init();
@@ -1195,6 +1413,35 @@ fn add_source_through_the_panel(app: &App, folder: &Path) {
 
 fn wait_for_the_scan(app: &App) {
     settle("the scan to end", || !app.ui().get_catalogue_busy());
+}
+
+/// The previews database of the only workspace this machine has.
+fn previews_of_the_only_workspace(f: &Fixture) -> PathBuf {
+    let catalogues = f.dirs.cache.join("catalogues");
+    let workspace = std::fs::read_dir(catalogues)
+        .unwrap()
+        .flatten()
+        .next()
+        .expect("a workspace has its previews folder");
+    workspace.path().join("previews.db")
+}
+
+#[test]
+fn a_new_sources_thumbnails_are_made_as_it_is_scanned_before_any_grid_shows_them() {
+    init();
+    let f = fixture(6);
+    let app = open(&f);
+    assert_eq!(app.ui().get_current_task(), "catalogue");
+    let previews = previews_of_the_only_workspace(&f);
+
+    add_source_through_the_panel(&app, &f.card);
+    // The catalogue panel stays on screen throughout: nothing but the scan asked for them.
+    settle("every thumbnail to be made", || {
+        auroraw_imaging::PreviewsDb::open(&previews)
+            .and_then(|db| db.count())
+            .is_ok_and(|count| count == 6)
+    });
+    assert_eq!(app.ui().get_current_task(), "catalogue");
 }
 
 #[test]
@@ -1520,7 +1767,7 @@ fn a_card_with_camera_folders_offers_to_keep_them() {
 
     // The template is proposed; the card's folders are one click away.
     assert_eq!(app.ui().get_import_layout(), "template");
-    click(&app, "Keep the card's folders");
+    click(&app, "Keep the source's folders");
     assert_eq!(app.ui().get_import_layout(), "folders");
     click(&app, "Import");
     wait_for_the_import(&app);
@@ -1529,6 +1776,76 @@ fn a_card_with_camera_folders_offers_to_keep_them() {
         "folders and case kept"
     );
     assert!(f.archive.join("101CANON/IMG_0002.JPG").is_file());
+}
+
+/// Whether a button with this label is on screen.
+fn has_button(app: &App, label: &str) -> bool {
+    ElementQuery::from_root(&app.ui())
+        .match_descendants()
+        .match_accessible_role(AccessibleRole::Button)
+        .match_predicate({
+            let label = label.to_string();
+            move |element| element.accessible_label().is_some_and(|l| l == label)
+        })
+        .find_first()
+        .is_some()
+}
+
+#[test]
+fn the_folder_layout_choice_is_always_offered_and_dcim_itself_counts_as_a_camera_card() {
+    init();
+    let f = fixture(0);
+    write_jpeg(&f.card.join("DCIM/100CANON/IMG_0001.JPG"), 1);
+    write_jpeg(&f.card.join("DCIM/101CANON/IMG_0002.JPG"), 2);
+    let app = to_import(open(&f));
+
+    // Nothing chosen yet: the choice is there all the same.
+    assert!(has_button(&app, "Use the template"));
+    assert!(has_button(&app, "Keep the source's folders"));
+
+    // The card's root, its DCIM folder (any case): the camera folders are noticed.
+    for source in [f.card.clone(), f.card.join("DCIM")] {
+        type_into(
+            &app,
+            "Import from (card or folder)",
+            &source.to_string_lossy(),
+        );
+        app.ui().invoke_import_fields_changed();
+        assert!(app.ui().get_import_source_has_folders(), "{source:?}");
+        assert_eq!(app.ui().get_import_source_folders(), "100CANON, 101CANON");
+        assert!(has_button(&app, "Keep the source's folders"));
+    }
+
+    // A folder with no camera layout still offers the choice, and no note.
+    type_into(
+        &app,
+        "Import from (card or folder)",
+        &f.archive.to_string_lossy(),
+    );
+    app.ui().invoke_import_fields_changed();
+    assert!(!app.ui().get_import_source_has_folders());
+    assert!(has_button(&app, "Keep the source's folders"));
+}
+
+/// Keeping the folders of a chosen `DCIM` folder (not the card's root) lands `100CANON/...`.
+#[test]
+fn keeping_the_folders_of_a_chosen_dcim_folder_copies_the_camera_folders() {
+    init();
+    let f = fixture(0);
+    write_jpeg(&f.card.join("DCIM/100CANON/IMG_0001.JPG"), 1);
+    let app = to_import(open(&f));
+    type_into(
+        &app,
+        "Import from (card or folder)",
+        &f.card.join("DCIM").to_string_lossy(),
+    );
+    type_into(&app, "Destination folder", &f.archive.to_string_lossy());
+    app.ui().set_import_add_destination(false);
+    app.ui().invoke_import_fields_changed();
+    click(&app, "Keep the source's folders");
+    click(&app, "Import");
+    wait_for_the_import(&app);
+    assert!(f.archive.join("100CANON/IMG_0001.JPG").is_file());
 }
 
 /// Cards the stand-in machine has mounted, changed by a test as a person would insert one.

@@ -180,6 +180,12 @@ msgstr "Le dernier workspace est introuvable : {}"
 msgid "Cannot open the workspace: {}"
 msgstr "Impossible d'ouvrir le workspace : {}"
 
+msgid "Workspace folder: {}"
+msgstr "Dossier du workspace : {}"
+
+msgid "The folder {} already exists and is not empty. Choose another name or folder."
+msgstr "Le dossier {} existe déjà et n'est pas vide. Choisissez un autre nom ou un autre dossier."
+
 msgid "Cannot create the workspace: {}"
 msgstr "Impossible de créer le workspace : {}"
 
@@ -370,17 +376,17 @@ msgstr "Carte détectée : {}"
 msgid "Destination folder"
 msgstr "Dossier de destination"
 
-msgid "This card keeps its photos in camera folders ({})."
-msgstr "Cette carte garde ses photos dans des dossiers d'appareil ({})."
+msgid "The photos are in camera folders ({})."
+msgstr "Les photos sont dans des dossiers d'appareil ({})."
 
-msgid "Layout"
-msgstr "Disposition"
+msgid "Folder layout"
+msgstr "Disposition des dossiers"
 
 msgid "Use the template"
 msgstr "Utiliser le modèle"
 
-msgid "Keep the card's folders"
-msgstr "Garder les dossiers de la carte"
+msgid "Keep the source's folders"
+msgstr "Garder les dossiers de la source"
 
 msgid "Add this folder to the catalogue's sources"
 msgstr "Ajouter ce dossier aux sources du catalogue"

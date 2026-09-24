@@ -77,18 +77,18 @@ export component MenuOverlay inherits Rectangle {
     property <[MenuEntry]> file-items: [
         { id: "file.new-workspace", label: @tr("New workspace…"), shortcut: root.modifier + "+N", enabled: true },
         { id: "file.open-workspace", label: @tr("Open workspace…"), shortcut: root.modifier + "+O", enabled: true },
-        { id: "file.settings", label: @tr("Settings…"), shortcut: root.modifier + "+,", enabled: true },
-        { id: "file.import", label: @tr("Import…"), shortcut: root.modifier + "+I", enabled: root.has-workspace },
-        { id: "file.quit", label: @tr("Quit"), shortcut: root.modifier + "+Q", enabled: true },
+        { id: "file.import", label: @tr("Import…"), shortcut: root.modifier + "+I", enabled: root.has-workspace, separator: true },
+        { id: "file.settings", label: @tr("Settings…"), shortcut: root.modifier + "+,", enabled: true, separator: true },
+        { id: "file.quit", label: @tr("Quit"), shortcut: root.modifier + "+Q", enabled: true, separator: true },
     ];
     property <[MenuEntry]> edit-items: [
         { id: "edit.undo", label: @tr("Undo"), shortcut: root.modifier + "+Z", enabled: Editing.text-focused },
         { id: "edit.redo", label: @tr("Redo"), shortcut: root.redo-shortcut, enabled: Editing.text-focused },
-        { id: "edit.cut", label: @tr("Cut"), shortcut: root.modifier + "+X", enabled: Editing.text-focused },
+        { id: "edit.cut", label: @tr("Cut"), shortcut: root.modifier + "+X", enabled: Editing.text-focused, separator: true },
         { id: "edit.copy", label: @tr("Copy"), shortcut: root.modifier + "+C", enabled: Editing.text-focused },
         { id: "edit.paste", label: @tr("Paste"), shortcut: root.modifier + "+V", enabled: Editing.text-focused },
-        { id: "edit.select-all", label: @tr("Select all"), shortcut: root.modifier + "+A", enabled: Editing.text-focused },
         { id: "edit.delete", label: @tr("Delete"), shortcut: "Del", enabled: Editing.text-focused },
+        { id: "edit.select-all", label: @tr("Select all"), shortcut: root.modifier + "+A", enabled: Editing.text-focused, separator: true },
     ];
     property <[MenuEntry]> help-items: [
         { id: "help.about", label: @tr("About Auroraw"), shortcut: "F1", enabled: true },
@@ -118,11 +118,23 @@ export component MenuOverlay inherits Rectangle {
             }
             list := VerticalLayout {
                 alignment: start;
-                for entry in root.items : MenuRow {
-                    entry: entry;
-                    activated(id) => {
-                        root.close();
-                        root.command(id);
+                for entry in root.items : VerticalLayout {
+                    if entry.separator : Rectangle {
+                        height: 9px;
+                        Rectangle {
+                            x: 8px;
+                            y: 4px;
+                            width: parent.width - 16px;
+                            height: 1px;
+                            background: #4a4a4a;
+                        }
+                    }
+                    MenuRow {
+                        entry: entry;
+                        activated(id) => {
+                            root.close();
+                            root.command(id);
+                        }
                     }
                 }
             }
