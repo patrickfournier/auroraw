@@ -4,6 +4,9 @@
 set -e
 export QMAKE="${QMAKE:-$(command -v qmake6 || command -v qmake)}"
 export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
+# A platform-independent style: the native ones (macOS, Windows) draw through the system and expect a
+# real window server (on macOS the first Button crashed in objc_msgSend under the offscreen platform).
+export QT_QUICK_CONTROLS_STYLE="${QT_QUICK_CONTROLS_STYLE:-Fusion}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="${WORK:-${TMPDIR:-/tmp}/qt-ui-spike-work}"
 # Under Git Bash on Windows, native programs need Windows paths (D:/a/...), not /d/a/...
