@@ -1,8 +1,9 @@
 # Spike 5: the interface slice on Qt Quick, through cxx-qt
 
 > **Status: measured, no decision.** D-072 (Slint) stands until Patrick decides. The code is on the
-> branch `spike/qt-quick`, in `spikes/qt-ui/`, not merged. Measured on Linux only, with the Qt 6.4.2 of
-> Ubuntu 24.04, offscreen and software-rendered.
+> branch `spike/qt-quick`, in `spikes/qt-ui/`, not merged. Developed on Linux with the Qt 6.4.2 of
+> Ubuntu 24.04, then built and tested on **Linux, Windows and macOS in CI with Qt 6.8.3** (see
+> "Three platforms"); offscreen and software-rendered throughout.
 
 ## Question
 
@@ -83,13 +84,40 @@ the interface. 14 tests pass (8 on modality and menus, 6 on the grid), with real
 - An open workspace holds its folder: the previous session has to be dropped before another opens
   (true of the Slint shell too, where it took a bug fix).
 
+### Three platforms (CI, Qt 6.8.3)
+
+A workflow that runs only on the branch (`.github/workflows/spike-qt.yml`) installs Qt with **one step**
+(`jurplel/install-qt-action`, pinned by hash, 6.8.3, cached), builds the spike and runs both suites
+offscreen. Third run, all green:
+
+| | Linux x64 (GCC) | Windows x64 (MSVC 2022) | macOS arm64 (Apple clang) |
+| --- | --- | --- | --- |
+| Tests (14) | 14 passed | 14 passed | 14 passed |
+| Debug build, cold Rust cache (first run) | 324 s | 599 s | 378 s |
+| Debug build, later runs (partly cached) | 173 s | 219 s | 323 s |
+| Qt payload | 39.5 MB of libraries linked | **121 MB** `windeployqt` bundle (release DLLs, QML modules, no executable) | not measured |
+
+So the same code builds against Qt 6.4.2 (Ubuntu) and Qt 6.8.3 (all three), with no source change. The
+run also gave:
+
+- **macOS crashed under the offscreen platform with the default (native macOS) style**: `objc_msgSend`
+  on a bad object when the first control was drawn (`EXC_BAD_ACCESS`, address 0x2). The native styles
+  draw through the system and expect a real window server. The tests now force `Fusion`; with it all
+  three pass. Consequence: **the native styles are not exercised by these tests**, and how they look and
+  behave stays to be checked on real machines.
+- On Windows the first run gave no test output in the log (the runner's own output was lost); the script
+  now has each suite write its results to a file and requires a clean totals line.
+- Windows and macOS builds print warnings (ranlib, duplicate rpath) that are harmless.
+- The 173 to 310 s "tests" step includes a needless rebuild caused by `QMAKE` being exported by the
+  script; the tests themselves take 6 s and 3 s.
+
 ### Not measured
 
-Windows and macOS (nothing was built there: **the CI cost on three platforms is unknown**), a Qt newer
-than 6.4, the bundle a release would ship (the figures above are libraries on this machine), frame rate,
-colour and wide-gamut display, HiDPI, Wayland, the native folder dialog, input methods, accessibility of
-this prototype (Qt's is said to work; spike 2 could not confirm it with the test script), macOS native
-menu, and the look of Qt's Controls styles on Windows and macOS.
+A release build and its real bundle (macOS not measured at all; the Windows figure is a debug
+executable's `windeployqt` output), frame rate, colour and wide-gamut display, HiDPI, Wayland, the
+native folder dialog, input methods, accessibility of this prototype (Qt's is said to work; spike 2 could
+not confirm it with the test script), the macOS native menu, and how Qt's native Controls styles look
+and behave on Windows and macOS (the tests use Fusion).
 
 ## Qt Bridge for Rust
 
@@ -108,38 +136,47 @@ rewriting `launcher.rs` and `grid.rs` (519 lines), not the interface.
 1. **C++**: 61 lines, none for ordinary features (models, properties, signals, threads, invokables are
    Rust). The provider is a fixed cost that the developed image view needs anyway. Met, with the 19
    `unsafe` occurrences and the workspace's `unsafe_code = "deny"` as a policy point.
-2. **Rebuild and CI**: 9.3 s incremental, met. One Qt install step per platform: **not verified**.
+2. **Rebuild and CI**: 9.3 s incremental, met. One Qt install step per platform: **met** (one action
+   step on Linux, Windows and macOS; the build takes 3 to 10 minutes in CI).
 3. **Size**: about 10 % larger than the Slint slice, about the same. Met.
 4. **Headless tests, modality included**: met, with a C++ entry.
 5. **Removes the custom parts**: modal dialogs (mouse), the folder dialog, menu shortcuts and separators,
    the Edit menu, resizing: yes. Left: the shortcut guard, the image provider, dark theming.
 
-By the rule, reopening D-072 is justified on the measured points. The rule did not include what the
-spike could not measure, and those are the risks that would decide it.
+By the rule, reopening D-072 is justified: every point is met, including the one that was open.
+What the rule did not include, and the spike could not measure, remains: real displays (colour, HiDPI,
+Wayland, the native styles and dialogs), which neither toolkit has passed yet.
 
 ## Recommendation
 
-This is Patrick's decision; the spike removes the doubt that Qt through Rust is costly or fragile to
-work with, and it does not remove these:
+This is Patrick's decision. The spike removes the doubts that Qt through Rust is costly, fragile to
+work with, or hard to build on the three platforms. What it leaves, and what would weigh on the choice:
 
-- **CI and packaging on Windows and macOS**, the one unmeasured item that could reverse everything.
-  A cheap check: build and test this spike on the three CI platforms (Qt installed by an action, the
-  system's `qmake`), and measure a release bundle on Linux.
-- **Weight**: the Qt libraries (30 MB), the QML modules (20 MB) and ICU (35 MB) come to about 85 MB on this machine, next to a Slint executable of about 40 MB that links everything statically.
-- **cxx-qt is pre-1.0**, and Qt Bridge, the vendor's own, is in beta: the bridge layer is the least
-  mature part of the Qt option, more than Qt itself.
-- **Two languages in the interface** (QML and Rust), against one in Slint.
+- **Weight**: the Qt libraries (30 to 40 MB), the QML modules (20 MB) and ICU (35 MB on Linux) come to
+  about 85 MB on Linux and **121 MB on Windows** (`windeployqt`), next to a Slint executable of about
+  40 MB that links everything statically.
+- **cxx-qt is pre-1.0**, and Qt Bridge, the vendor's own, is in beta: the bridge is the least mature part
+  of the Qt option, more than Qt itself. It kept working from Qt 6.4 to 6.8 unchanged.
+- **Two languages in the interface** (QML and Rust), against one in Slint, and 61 lines of C++ that a
+  developed-image view needs anyway.
+- **The native styles are unverified** (they crash offscreen on macOS), as is everything on a real
+  display, for both toolkits.
+- **`unsafe`**: the product's workspace denies it; a Qt crate needs an exception.
 
-My reading: on what was measured Qt Quick removes real, recurring costs (modality, dialogs, menus,
-richer controls for the develop module, a large ecosystem) at a modest and bounded price, and the cost of
-switching is smallest now, before WP9. If the three-platform build passes and the bundle weight is
-acceptable, I would switch. If either fails, I would stay with Slint and add the gaps above to spike 2's
-"what to watch".
+My reading: Qt Quick removes real, recurring costs (modality, dialogs, menus, richer controls for the
+develop module, a large ecosystem) at a modest and bounded price, and every criterion set in advance is
+met, including the three-platform build. The cost of switching is smallest now, before WP9: the
+interface so far is about 1,460 lines of `.slint`, 2,560 of Rust and 2,140 of tests, the engine's 14,000
+lines do not change. **I would switch**, in a branch that keeps the Slint shell on `dev` until the Qt one
+reaches parity, and I would first put the two real-display checks (a native folder dialog and the
+native style on macOS and Windows, on your machines) at the head of the port. If the bundle weight is a
+dealbreaker, the answer is to stay with Slint and add the gaps above to spike 2's "what to watch".
 
 ## What remains
 
-- [ ] The same spike built and tested on Windows and macOS (CI); a release bundle on Linux.
-- [ ] A newer Qt (6.8 or later), to see which findings change.
+- [x] The same spike built and tested on Windows and macOS (CI), on a newer Qt (6.8.3).
+- [ ] A release build and a real bundle on each platform (Linux, macOS not measured).
+- [ ] The native Controls styles on real Windows and macOS machines.
 - [ ] Colour, HiDPI and Wayland on a real display, for both toolkits (as spike 2).
 - [ ] Qt Bridge, when out of beta.
 - [ ] Theming Controls with a dark palette; runtime language switch.

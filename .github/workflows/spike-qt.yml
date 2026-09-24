@@ -8,6 +8,7 @@ name: Spike Qt Quick
 on:
   push:
     branches: [spike/qt-quick]
+    paths: ['spikes/qt-ui/**', '.github/workflows/spike-qt.yml']
   workflow_dispatch:
 
 permissions:
