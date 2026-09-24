@@ -2,10 +2,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Builds, then runs both QtQuickTest suites offscreen on throwaway machines under $WORK.
 set -e
-export QMAKE="${QMAKE:-/usr/bin/qmake6}"
+export QMAKE="${QMAKE:-$(command -v qmake6 || command -v qmake)}"
 export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
 HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="${WORK:-${TMPDIR:-/tmp}/qt-ui-spike-work}"
+# Under Git Bash on Windows, native programs need Windows paths (D:/a/...), not /d/a/...
+if command -v cygpath >/dev/null 2>&1; then
+    HERE="$(cygpath -m "$HERE")"
+    WORK="$(cygpath -m "$WORK")"
+fi
 cargo build --manifest-path "$HERE/Cargo.toml"
 BIN="${CARGO_TARGET_DIR:-$HERE/target}/debug/qt-ui-spike"
 rm -rf "$WORK" && mkdir -p "$WORK/empty" "$WORK/extra"

@@ -1,0 +1,90 @@
+name: Spike Qt Quick
+
+# A throwaway check (docs/spikes/05-qt-quick-through-rust.md): does the Qt Quick spike build and pass
+# its offscreen tests on the three CI platforms, with Qt installed by an action? It runs only on the
+# branch spike/qt-quick and is not part of the product's CI. Third-party actions are pinned to a full
+# commit hash, with the version in a comment.
+
+on:
+  push:
+    branches: [spike/qt-quick]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  spike:
+    name: spike (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x64, os: ubuntu-24.04 }
+          - { name: windows-x64, os: windows-2025, arch: win64_msvc2022_64 }
+          - { name: macos-arm64, os: macos-15 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: spikes/qt-ui
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: 6.8.3
+          arch: ${{ matrix.arch }}
+          cache: true
+      - name: Versions
+        shell: bash
+        run: |
+          {
+            echo "### ${{ matrix.name }}"
+            echo "- Qt: $(qmake -query QT_VERSION)"
+            echo "- $(cmake --version | head -1)"
+            echo "- $(rustc --version)"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Build
+        shell: bash
+        working-directory: spikes/qt-ui
+        run: |
+          start=$(date +%s)
+          cargo build
+          echo "- build (debug, cold Rust cache on the first run): $(( $(date +%s) - start )) s" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Tests (offscreen, both suites)
+        shell: bash
+        working-directory: spikes/qt-ui
+        env:
+          WORK: ${{ runner.temp }}/qt-ui-spike-work
+        run: |
+          start=$(date +%s)
+          ./run-tests.sh
+          echo "- tests: $(( $(date +%s) - start )) s" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Windows bundle size (windeployqt, release Qt libraries)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: bash
+        working-directory: spikes/qt-ui
+        run: |
+          mkdir -p "$RUNNER_TEMP/bundle"
+          cp target/debug/qt-ui-spike.exe "$RUNNER_TEMP/bundle/"
+          windeployqt --release --qmldir qml --no-translations "$RUNNER_TEMP/bundle/qt-ui-spike.exe"
+          echo "- Windows Qt bundle without the executable: $(du -sm "$RUNNER_TEMP/bundle" | cut -f1) MB" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Linked Qt libraries (Linux)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        working-directory: spikes/qt-ui
+        run: |
+          ldd target/debug/qt-ui-spike | grep -i libQt6 | awk '{print $3}' | xargs stat -L -c %s \
+            | awk '{s+=$1} END {printf "- Qt libraries linked: %.1f MB\n", s/1048576}' | tee -a "$GITHUB_STEP_SUMMARY"
