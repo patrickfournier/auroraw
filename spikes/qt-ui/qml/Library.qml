@@ -16,7 +16,7 @@ FocusScope {
         width: parent.width
         height: 28
         z: 1
-        color: "#262626"
+        color: root.palette.dark
         visible: root.launcher.scanStatus !== ""
         Row {
             anchors.verticalCenter: parent.verticalCenter
@@ -27,7 +27,7 @@ FocusScope {
                 value: root.launcher.scanProgress
                 anchors.verticalCenter: parent.verticalCenter
             }
-            Label { text: root.launcher.scanStatus; color: "#cccccc" }
+            Label { text: root.launcher.scanStatus }
         }
     }
 
@@ -86,9 +86,9 @@ FocusScope {
                 x: 4
                 width: 160
                 height: 120
-                color: "#333333"
+                color: root.palette.dark
                 border.width: cell.GridView.isCurrentItem ? 2 : 0
-                border.color: "#ffd24a"
+                border.color: root.palette.highlight
 
                 Image {
                     anchors.fill: parent

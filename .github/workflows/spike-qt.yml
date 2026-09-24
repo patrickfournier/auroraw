@@ -2,12 +2,12 @@ name: Spike Qt Quick
 
 # A throwaway check (docs/spikes/05-qt-quick-through-rust.md): does the Qt Quick spike build and pass
 # its offscreen tests on the three CI platforms, with Qt installed by an action? It runs only on the
-# branch spike/qt-quick and is not part of the product's CI. Third-party actions are pinned to a full
+# branches spike/qt-quick and feature/qt-ui and is not part of the product's CI. Third-party actions are pinned to a full
 # commit hash, with the version in a comment.
 
 on:
   push:
-    branches: [spike/qt-quick]
+    branches: [spike/qt-quick, feature/qt-ui]
     paths: ['spikes/qt-ui/**', '.github/workflows/spike-qt.yml']
   workflow_dispatch:
 
@@ -84,16 +84,26 @@ jobs:
         run: |
           sudo DevToolsSecurity -enable || true
           lldb --batch -o "run" -o "bt all" -o "quit" -- target/debug/qt-ui-spike --quicktest -input tests/tst_modality.qml 2>&1 | tail -80
-      - name: Windows bundle size (windeployqt, release Qt libraries)
+      - name: Windows release bundle (windeployqt) for the manual checks
         if: runner.os == 'Windows'
         continue-on-error: true
         shell: bash
         working-directory: spikes/qt-ui
         run: |
+          cargo build --release
           mkdir -p "$RUNNER_TEMP/bundle"
-          cp target/debug/qt-ui-spike.exe "$RUNNER_TEMP/bundle/"
+          cp target/release/qt-ui-spike.exe "$RUNNER_TEMP/bundle/"
           windeployqt --release --qmldir qml --no-translations "$RUNNER_TEMP/bundle/qt-ui-spike.exe"
-          echo "- Windows Qt bundle without the executable: $(du -sm "$RUNNER_TEMP/bundle" | cut -f1) MB" | tee -a "$GITHUB_STEP_SUMMARY"
+          cp CHECKS.md "$RUNNER_TEMP/bundle/"
+          echo "- Windows release bundle: $(du -sm "$RUNNER_TEMP/bundle" | cut -f1) MB" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload the Windows bundle
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qt-ui-spike-windows
+          path: ${{ runner.temp }}/bundle
+          retention-days: 14
       - name: Linked Qt libraries (Linux)
         if: runner.os == 'Linux'
         continue-on-error: true

@@ -24,6 +24,8 @@ SPIKE_HOME=/tmp/empty target/debug/qt-ui-spike --quicktest -input tests/tst_moda
 SPIKE_QM=spike_fr.qm ...    # a translation: lrelease i18n/spike_fr.ts -qm spike_fr.qm
 ```
 
+Checking it on a real machine (Linux, Windows): `CHECKS.md`.
+
 Layout: `src/launcher.rs`, `src/grid.rs` (cxx-qt objects), `src/session.rs` (what they share),
 `src/thumbs.rs` and `src/thumbs.cpp` (the image provider, the test runner entry and the translation
 loader: the only C++), `qml/*.qml` (the interface), `tests/tst_*.qml` (QtQuickTest), `i18n/*.ts`.

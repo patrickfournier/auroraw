@@ -731,6 +731,16 @@ plugins for network and cloud kinds (`Engine::source_kinds` is ready for them), 
 of a non-local original when it is developed (M2). **Not verified on a real machine:** the native
 folder dialogs (including that they stay over the window on X11 and Wayland), a real card insertion, the hamburger's look, typing with an input method.
 
+**Toolkit change (D-094, 2026-09-24).** The interface moves from Slint to **Qt Quick through cxx-qt**
+(spike 5), in a long-lived branch `feature/qt-ui` that keeps the Slint shell on `dev` until parity, with
+Fusion as the only style (a neutral grey theme with colour accents) and Qt Linguist `.ts` translations.
+Milestones: Q0 a kit for Patrick to check the spike on his Linux and Windows machines (native folder
+dialog, the grey theme, HiDPI, accents), Q1 foundations (crate, event bus, theme, translations, CI), Q2
+launcher, menus and dialogs, Q3 the grid, Q4 the catalogue panel, Q5 import and cards, Q6 parity (the 54
+Slint headless scenarios ported, three platforms green, a manual pass), Q7 cutover (Slint deleted, merged
+into `dev`). The Slint shell gets bug fixes only meanwhile, and the interface work of the later work
+packages (WP9 onward) is built on the Qt shell.
+
 ### WP9 Culling (XL). Needs WP5, WP8
 
 Single-image view (zoom and pan on the preview, the 100 % view of the preview), **cull mode**

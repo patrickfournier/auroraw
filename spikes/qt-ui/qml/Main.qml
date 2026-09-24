@@ -12,9 +12,36 @@ ApplicationWindow {
     height: 900
     minimumWidth: 640
     minimumHeight: 420
-    color: "#1e1e1e"
-    palette.windowText: "#dddddd"
-    palette.text: "#dddddd"
+    // A neutral grey theme on Fusion (D-094): no colour cast around a photograph, colour only for
+    // what is selected, focused or warned about. `SPIKE_THEME` picks one of three greys to compare.
+    readonly property var greys: ({
+        graphite: { window: "#2f2f2f", base: "#262626", button: "#3d3d3d", light: "#4e4e4e", dark: "#1c1c1c", text: "#dcdcdc", placeholder: "#858585" },
+        neutral: { window: "#3c3c3c", base: "#2f2f2f", button: "#4b4b4b", light: "#5c5c5c", dark: "#262626", text: "#e0e0e0", placeholder: "#8c8c8c" },
+        mid: { window: "#585858", base: "#484848", button: "#666666", light: "#787878", dark: "#3a3a3a", text: "#ececec", placeholder: "#a0a0a0" }
+    })
+    readonly property var grey: greys[launcher.env("SPIKE_THEME")] || greys.neutral
+    readonly property color accent: "#4a8fd0"
+    color: grey.window
+    background: Rectangle { color: window.palette.window }
+    palette {
+        window: grey.window
+        windowText: grey.text
+        base: grey.base
+        alternateBase: grey.window
+        text: grey.text
+        button: grey.button
+        buttonText: grey.text
+        light: grey.light
+        midlight: grey.button
+        mid: grey.dark
+        dark: grey.dark
+        shadow: "#000000"
+        highlight: window.accent
+        highlightedText: "#ffffff"
+        placeholderText: grey.placeholder
+        toolTipBase: grey.base
+        toolTipText: grey.text
+    }
     title: launcher.screen === "workspace" ? launcher.workspaceName + " — Auroraw" : "Auroraw"
 
     // What the tests reach into (tests/tst_*.qml).

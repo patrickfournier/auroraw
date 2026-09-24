@@ -9,7 +9,7 @@ mod thumbs;
 
 use std::ffi::c_void;
 
-use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
+use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QQuickStyle, QString, QUrl};
 
 fn main() {
     match std::env::args().nth(1).as_deref() {
@@ -22,6 +22,8 @@ fn main() {
     if let Some(qm) = std::env::var_os("SPIKE_QM") {
         thumbs::install_translation(&qm.to_string_lossy());
     }
+    // One style on every platform (D-094): Fusion, drawn by Qt itself, with our own grey palette.
+    QQuickStyle::set_style(&QString::from("Fusion"));
     let mut engine = QQmlApplicationEngine::new();
     if let Some(mut engine) = engine.as_mut() {
         // SAFETY: the pointer is only handed to the provider registration, during this call.

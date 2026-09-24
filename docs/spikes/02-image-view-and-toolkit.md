@@ -1,6 +1,6 @@
 # Spike 2: the image view and the interface toolkit
 
-> **Status: decided (D-072): Slint.** Slint, iced and Qt Quick measured on Linux, on a real
+> **Status: decided (D-072): Slint; superseded by D-094 (Qt Quick, after [spike 5](05-qt-quick-through-rust.md)).** Slint, iced and Qt Quick measured on Linux, on a real
 > display, with real RAW frames; Slint and iced also on Windows. Not blocking, to be checked during
 > M1: Slint on macOS, and Qt on Windows and macOS if the fallback is ever needed.
 

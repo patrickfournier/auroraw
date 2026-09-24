@@ -1,6 +1,6 @@
 # Spike 5: the interface slice on Qt Quick, through cxx-qt
 
-> **Status: measured, no decision.** D-072 (Slint) stands until Patrick decides. The code is on the
+> **Status: measured; adopted by D-094 (2026-09-24), which supersedes D-072.** The code is on the
 > branch `spike/qt-quick`, in `spikes/qt-ui/`, not merged. Developed on Linux with the Qt 6.4.2 of
 > Ubuntu 24.04, then built and tested on **Linux, Windows and macOS in CI with Qt 6.8.3** (see
 > "Three platforms"); offscreen and software-rendered throughout.
