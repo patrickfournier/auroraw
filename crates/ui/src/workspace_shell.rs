@@ -79,6 +79,9 @@ struct CatalogueState {
     /// The source a removal is confirmed for, and its name for the closing message.
     removing: Option<(auroraw_types::SourceId, String)>,
     removing_name: String,
+    /// The scan asked whether to restore removed photos while another dialog was open: the question
+    /// is put once that dialog is closed.
+    restore_waiting: bool,
 }
 
 fn refresh_sources(engine: &Engine, ui: &MainWindow, state: &Rc<RefCell<CatalogueState>>) {
@@ -246,7 +249,12 @@ pub(crate) fn attach(
                         if restorable > 0 {
                             ui.set_restore_count(restorable as i32);
                             ui.set_restore_total(new_files as i32);
-                            ui.set_dialog("restore".into());
+                            // Dialogs are modal: one that is open is not replaced.
+                            if ui.get_dialog().is_empty() {
+                                ui.set_dialog("restore".into());
+                            } else {
+                                catalogue.borrow_mut().restore_waiting = true;
+                            }
                         }
                     }
                     Event::JobProgress { job, done, total } if scanning(&job) && total > 0 => {
@@ -364,6 +372,18 @@ pub(crate) fn attach(
                     _ => {}
                 }
             }
+            // The restore question that had to wait for another dialog is put as soon as none is
+            // open, if the scan is still waiting for it.
+            {
+                let mut state = catalogue.borrow_mut();
+                if state.job.is_none() {
+                    state.restore_waiting = false;
+                } else if state.restore_waiting && ui.get_dialog().is_empty() {
+                    state.restore_waiting = false;
+                    ui.set_dialog("restore".into());
+                }
+            }
+
             // Photos an import has registered since the grid was last loaded: refresh it, at
             // most once a second, and only while it is the view on screen.
             if new_photos.get()

@@ -683,8 +683,8 @@ Open workspace (folder dialog); the catalogue database and previews moved out of
 machine's data and cache folders (`engine::LocalDirs`, `Engine::create_workspace`/`open_workspace`, a
 missing database is rebuilt from the workspace's files); **the hamburger menu** (File, Edit, Help; the
 `commands.rs` table cross-checked against `menu.slint` and the shell's key handling; Edit reaches the
-focused text field by delivering the platform's own shortcut; the top bar stays reachable over
-dialogs), Settings (language) and About; **the catalogue panel**: sources listed with counts, added
+focused text field by delivering the platform's own shortcut; the menu stays reachable over a dialog
+for those Edit items), Settings (language) and About; **the catalogue panel**: sources listed with counts, added
 (background `IndexSource` job reading each file's metadata into its sidecar, RAW+JPEG paired within a
 folder), rescanned and removed (`RemoveSource`, recoverable, with a confirmation that gives the
 numbers), adding a removed folder again offers to restore its photos, a folder inside a source is
@@ -719,6 +719,11 @@ not cut short); the system's folder dialog is opened as a child of the applicati
 (`rfd`'s `set_parent` with Slint's `raw-window-handle-06`, and `rfd`'s `wayland` feature so the
 desktop portal can name a Wayland window), and the window is covered by a dimming layer that swallows
 clicks while it is open, so the import dialog cannot be closed and the folder dialog left behind.
+**Dialogs are modal:** Close and Escape are inert while an import runs; while any dialog is open the
+commands and shortcuts that open a window (New and Open workspace, Settings, Import, About), the
+card banner's Import button and the Catalogue and Cull tabs do nothing (the menu greys them; Edit and
+Quit still work), and the scan's question about restoring removed photos waits until the open dialog
+is closed instead of replacing it.
 
 **Still open in WP8:** the keywords, collections and metadata panels, undo of photo actions (the Edit
 items work on text fields only), the 4K/laptop layout check, the pseudo-locale, GPX in the import dialog, a CLI `import`, importing individual files rather than a folder, source

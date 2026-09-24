@@ -402,6 +402,11 @@ impl Launcher {
     /// Carries out a command of the menus or their shortcuts (`commands.rs`); false for an id it
     /// does not know.
     pub(crate) fn run_command(self: &Rc<Self>, ui: &MainWindow, id: &str) -> bool {
+        // Dialogs are modal: while one is open no other window is opened over it (the Edit
+        // commands, which act on its fields, and Quit still work).
+        if OPENS_A_WINDOW.contains(&id) && !ui.get_dialog().is_empty() {
+            return true;
+        }
         match id {
             "file.new-workspace" => self.new_workspace_dialog(ui),
             "file.open-workspace" => self.pick("workspace", ui),
@@ -533,6 +538,15 @@ impl Launcher {
         }
     }
 }
+
+/// The commands that open a dialog or the system's folder dialog.
+const OPENS_A_WINDOW: [&str; 5] = [
+    "file.new-workspace",
+    "file.open-workspace",
+    "file.settings",
+    "file.import",
+    "help.about",
+];
 
 /// `base`, or `base 2`, `base 3`... when a folder of that name is already in `parent`: the name to
 /// offer for a new workspace.

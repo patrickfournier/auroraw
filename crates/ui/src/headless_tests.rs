@@ -1679,6 +1679,112 @@ fn removing_a_source_confirms_with_the_numbers_and_can_be_undone_by_adding_it_ag
 }
 
 #[test]
+fn dialogs_are_modal_no_other_window_opens_over_one_and_the_rest_waits() {
+    init();
+    let f = fixture(0);
+    let app = open(&f);
+    combo(&app, ",");
+    assert_eq!(app.ui().get_dialog(), "settings");
+
+    // The shortcuts of every command that opens a window do nothing meanwhile (a folder dialog
+    // would panic the stand-in that stands for the system's).
+    for key in ["n", "o", "i"] {
+        combo(&app, key);
+    }
+    press_key(&app, Key::F1);
+    assert_eq!(app.ui().get_dialog(), "settings");
+
+    // The menu still opens, for the Edit items on the dialog's fields, with those commands greyed.
+    menu_open(&app);
+    for label in ["New workspace…", "Open workspace…", "Settings…", "Import…"] {
+        assert!(!menu_row_enabled(&app, label), "{label} is greyed");
+    }
+    assert!(menu_row_enabled(&app, "Quit"));
+    click_on_top(&app, "Help");
+    assert!(!menu_row_enabled(&app, "About Auroraw"));
+    click_on_top(&app, "About Auroraw");
+    assert_eq!(app.ui().get_dialog(), "settings");
+    app.ui().set_menu_open(false);
+
+    // The task bar waits too.
+    click_tab(&app, "Cull");
+    assert_eq!(app.ui().get_current_task(), "catalogue");
+
+    // Once the dialog is closed everything is back.
+    app.ui().invoke_close_dialog();
+    menu_open(&app);
+    assert!(menu_row_enabled(&app, "Import…"));
+    click_on_top(&app, "Help");
+    assert!(menu_row_enabled(&app, "About Auroraw"));
+    app.ui().set_menu_open(false);
+    combo(&app, "i");
+    assert_eq!(app.ui().get_dialog(), "import");
+    app.ui().invoke_close_dialog();
+    click_tab(&app, "Cull");
+    assert_eq!(app.ui().get_current_task(), "cull");
+}
+
+#[test]
+fn a_cards_banner_cannot_open_the_import_dialog_over_another_dialog() {
+    init();
+    let f = fixture(1);
+    let cards = Rc::new(RefCell::new(Vec::new()));
+    let app = open_with(&f, "en", cards_platform(&cards));
+    combo(&app, ",");
+    assert_eq!(app.ui().get_dialog(), "settings");
+
+    cards.borrow_mut().push(camera_card("EOS_DIGITAL", &f.card));
+    settle("the card to be noticed", || {
+        app.ui().get_card_banner() != ""
+    });
+    click_on_top(&app, "Import…");
+    assert_eq!(app.ui().get_dialog(), "settings");
+    assert_eq!(app.ui().get_card_banner(), "Card detected: EOS_DIGITAL");
+
+    app.ui().invoke_close_dialog();
+    click_on_top(&app, "Import…");
+    assert_eq!(app.ui().get_dialog(), "import");
+    assert_eq!(app.ui().get_import_source(), f.card.to_string_lossy());
+}
+
+#[test]
+fn the_question_about_removed_photos_waits_for_the_dialog_that_is_open() {
+    init();
+    let f = fixture(2);
+    let app = open(&f);
+    add_source_through_the_panel(&app, &f.card);
+    wait_for_the_scan(&app);
+    click(&app, "Remove: Card");
+    click(&app, "Remove");
+    wait_for_the_scan(&app);
+
+    // Add the folder again and, before any time passes, open Settings: the scan then asks whether
+    // to restore, and that question does not replace the dialog that is open.
+    click(&app, "Add a source…");
+    type_into(&app, "Folder", &f.card.to_string_lossy());
+    app.ui().invoke_add_source_confirm();
+    combo(&app, ",");
+    assert_eq!(app.ui().get_dialog(), "settings");
+    settle("the scan to reach its question", || {
+        app.ui().get_restore_count() == 2
+    });
+    for _ in 0..5 {
+        mock_elapsed_time(Duration::from_millis(60));
+    }
+    assert_eq!(app.ui().get_dialog(), "settings");
+
+    // It is put once the dialog is closed.
+    app.ui().invoke_close_dialog();
+    settle("the question", || app.ui().get_dialog() == "restore");
+    click(&app, "Restore them");
+    wait_for_the_scan(&app);
+    assert_eq!(
+        app.ui().get_catalogue_status(),
+        "Done: 0 added, 2 restored, 0 already known, 0 not readable."
+    );
+}
+
+#[test]
 fn a_source_can_be_rescanned_to_pick_up_new_photos() {
     init();
     let f = fixture(1);

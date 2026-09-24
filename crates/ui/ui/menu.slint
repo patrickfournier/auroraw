@@ -65,6 +65,8 @@ component MenuHeader inherits Rectangle {
 // Paste and the others still know which field they are for.
 export component MenuOverlay inherits Rectangle {
     in property <bool> has-workspace;
+    // A dialog is open: dialogs are modal, so the commands that open a window are greyed.
+    in property <bool> dialog-open;
     // How this platform writes its shortcut key, and its redo shortcut ("Ctrl" and "Ctrl+Y" on
     // Windows, "Ctrl+Shift+Z" elsewhere, "⌘" on macOS): set from Rust.
     in property <string> modifier: "Ctrl";
@@ -75,10 +77,10 @@ export component MenuOverlay inherits Rectangle {
     background: transparent;
 
     property <[MenuEntry]> file-items: [
-        { id: "file.new-workspace", label: @tr("New workspace…"), shortcut: root.modifier + "+N", enabled: true },
-        { id: "file.open-workspace", label: @tr("Open workspace…"), shortcut: root.modifier + "+O", enabled: true },
-        { id: "file.import", label: @tr("Import…"), shortcut: root.modifier + "+I", enabled: root.has-workspace, separator: true },
-        { id: "file.settings", label: @tr("Settings…"), shortcut: root.modifier + "+,", enabled: true, separator: true },
+        { id: "file.new-workspace", label: @tr("New workspace…"), shortcut: root.modifier + "+N", enabled: !root.dialog-open },
+        { id: "file.open-workspace", label: @tr("Open workspace…"), shortcut: root.modifier + "+O", enabled: !root.dialog-open },
+        { id: "file.import", label: @tr("Import…"), shortcut: root.modifier + "+I", enabled: root.has-workspace && !root.dialog-open, separator: true },
+        { id: "file.settings", label: @tr("Settings…"), shortcut: root.modifier + "+,", enabled: !root.dialog-open, separator: true },
         { id: "file.quit", label: @tr("Quit"), shortcut: root.modifier + "+Q", enabled: true, separator: true },
     ];
     property <[MenuEntry]> edit-items: [
@@ -91,7 +93,7 @@ export component MenuOverlay inherits Rectangle {
         { id: "edit.select-all", label: @tr("Select all"), shortcut: root.modifier + "+A", enabled: Editing.text-focused, separator: true },
     ];
     property <[MenuEntry]> help-items: [
-        { id: "help.about", label: @tr("About Auroraw"), shortcut: "F1", enabled: true },
+        { id: "help.about", label: @tr("About Auroraw"), shortcut: "F1", enabled: !root.dialog-open },
     ];
     property <[MenuEntry]> items: root.section == "file" ? root.file-items
         : root.section == "edit" ? root.edit-items : root.help-items;
