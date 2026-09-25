@@ -82,7 +82,7 @@ pub mod qobject {
 
 use core::pin::Pin;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use auroraw_engine::{AddSourceRequest, Engine, LocalDirs, OpenedWorkspace, paths};
 use cxx_qt::CxxQtType;
@@ -102,6 +102,16 @@ pub struct LauncherRust {
     effective_language: QString,
     dirs: Option<LocalDirs>,
     pictures: PathBuf,
+    /// The session this launcher opened, so that destroying it releases the workspace's folder.
+    session: Option<Weak<Session>>,
+}
+
+impl Drop for LauncherRust {
+    fn drop(&mut self) {
+        if let Some(session) = &self.session {
+            session::clear_if_current(session);
+        }
+    }
 }
 
 /// `base`, or `base 2`, `base 3`... when a folder of that name is already in `parent`: the name to
@@ -154,6 +164,7 @@ impl qobject::Launcher {
             thumbs: Collector::new(service),
         });
         bus::start_pump(events, &session);
+        self.as_mut().rust_mut().session = Some(Arc::downgrade(&session));
         session::set_current(Some(session));
         self.as_mut().set_workspace_name(text(&name));
         self.as_mut().set_screen(text("workspace"));

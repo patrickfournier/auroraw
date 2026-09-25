@@ -4,7 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -21,6 +21,18 @@ static CURRENT: Mutex<Option<Arc<Session>>> = Mutex::new(None);
 
 pub fn set_current(session: Option<Arc<Session>>) {
     *CURRENT.lock().unwrap() = session;
+}
+
+/// Lets go of the current session if it is `session` (the one a launcher that is being destroyed
+/// opened; a newer launcher's own session stays).
+pub fn clear_if_current(session: &Weak<Session>) {
+    let mut current = CURRENT.lock().unwrap();
+    if current
+        .as_ref()
+        .is_some_and(|c| std::ptr::eq(Arc::as_ptr(c), session.as_ptr()))
+    {
+        *current = None;
+    }
 }
 
 pub fn current() -> Option<Arc<Session>> {
