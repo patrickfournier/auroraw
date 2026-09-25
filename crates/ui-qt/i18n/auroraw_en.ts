@@ -29,7 +29,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AboutDialog.qml" line="45"/>
+        <location filename="../qml/AboutDialog.qml" line="41"/>
+        <source>Set in IBM Plex Sans, under the SIL Open Font License 1.1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AboutDialog.qml" line="51"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
@@ -153,17 +158,17 @@
 <context>
     <name>AppMenu</name>
     <message>
-        <location filename="../qml/AppMenu.qml" line="25"/>
+        <location filename="../qml/AppMenu.qml" line="27"/>
         <source>&amp;File</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppMenu.qml" line="36"/>
+        <location filename="../qml/AppMenu.qml" line="38"/>
         <source>&amp;Edit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppMenu.qml" line="48"/>
+        <location filename="../qml/AppMenu.qml" line="50"/>
         <source>&amp;Help</source>
         <translation type="unfinished"></translation>
     </message>
@@ -558,42 +563,42 @@
 <context>
     <name>Main</name>
     <message>
-        <location filename="../qml/Main.qml" line="127"/>
+        <location filename="../qml/Main.qml" line="133"/>
         <source>Cannot open the workspace: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="194"/>
+        <location filename="../qml/Main.qml" line="202"/>
         <source>Menu</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="209"/>
+        <location filename="../qml/Main.qml" line="217"/>
         <source>Catalogue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="215"/>
+        <location filename="../qml/Main.qml" line="223"/>
         <source>Cull</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="220"/>
+        <location filename="../qml/Main.qml" line="228"/>
         <source>Develop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="221"/>
+        <location filename="../qml/Main.qml" line="229"/>
         <source>Publish</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="307"/>
+        <location filename="../qml/Main.qml" line="315"/>
         <source>Choose a folder in the folder dialog…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="318"/>
+        <location filename="../qml/Main.qml" line="326"/>
         <source>Open a workspace</source>
         <translation type="unfinished"></translation>
     </message>

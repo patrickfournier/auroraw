@@ -5,9 +5,11 @@ import QtQuick.Controls
 // The hamburger menu (D-090): File, Edit and Help as cascading submenus, each command with its
 // shortcut. Alt and the letter marked with & in a section's title open it (`openSection`), so the
 // letter follows the language (Alt+F, Alt+E, Alt+H; Alt+F, Alt+É, Alt+A in French).
-Menu {
+AppSubMenu {
     id: root
     required property var actions
+    // Every row is one of ours (shortcuts written out, the mnemonics of the sections underlined).
+    delegate: AppMenuItem {}
 
     // The key sequence that opens section `index`: Alt and its mnemonic.
     function sectionKey(index) {
@@ -21,7 +23,7 @@ Menu {
         itemAt(index).subMenu.popup()
     }
 
-    Menu {
+    AppSubMenu {
         title: qsTr("&File")
         AppMenuItem { action: root.actions.newWorkspace }
         AppMenuItem { action: root.actions.openWorkspace }
@@ -32,7 +34,7 @@ Menu {
         MenuSeparator {}
         AppMenuItem { action: root.actions.quit }
     }
-    Menu {
+    AppSubMenu {
         title: qsTr("&Edit")
         AppMenuItem { action: root.actions.undo }
         AppMenuItem { action: root.actions.redo }
@@ -44,7 +46,7 @@ Menu {
         MenuSeparator {}
         AppMenuItem { action: root.actions.selectAll }
     }
-    Menu {
+    AppSubMenu {
         title: qsTr("&Help")
         AppMenuItem { action: root.actions.about }
     }

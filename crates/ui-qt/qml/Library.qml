@@ -79,7 +79,7 @@ FocusScope {
                     id: filterButtons
                     // (The model holds no text, so that a change of language does not rebuild the buttons.)
                     model: 6
-                    Button {
+                    AppButton {
                         required property int index
                         readonly property int minRating: index
                         text: index === 0 ? qsTr("All") : index === 1 ? qsTr("1+") : index === 2 ? qsTr("2+")

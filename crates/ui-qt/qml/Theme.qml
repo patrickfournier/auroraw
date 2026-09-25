@@ -22,8 +22,10 @@ QtObject {
     readonly property color danger: "#e08070"
     readonly property color quiet: "#aaaaaa"
 
-    // The typeface is still being chosen: `AURORAW_FONT` (a family) and `AURORAW_FONT_SIZE` (points)
-    // try others without a rebuild. Empty means the system's own.
+    // The typeface: IBM Plex Sans, carried by the application (`assets/fonts`), at 11 points.
+    // `AURORAW_FONT` (a family) and `AURORAW_FONT_SIZE` (points) try others without a rebuild.
+    readonly property string defaultFamily: "IBM Plex Sans"
+    readonly property int defaultSize: 11
     property string fontFamily: ""
     property int fontSize: 0
 }

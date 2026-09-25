@@ -51,13 +51,13 @@ Item {
         }
         RowLayout {
             spacing: 8
-            Button {
+            AppButton {
                 id: newButton
                 text: qsTr("New workspace…")
                 highlighted: true
                 onClicked: root.newRequested()
             }
-            Button {
+            AppButton {
                 id: openButton
                 text: qsTr("Open workspace…")
                 onClicked: root.openRequested()
@@ -108,7 +108,7 @@ Item {
                         text: qsTr("Not found")
                         color: Theme.danger
                     }
-                    Button {
+                    AppButton {
                         visible: !row.found
                         text: qsTr("Remove from the list")
                         Accessible.name: qsTr("Remove from the list: %1").arg(row.name)

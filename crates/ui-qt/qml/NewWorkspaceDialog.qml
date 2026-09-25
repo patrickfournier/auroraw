@@ -66,7 +66,7 @@ AppDialog {
             objectName: "folderField"
             Layout.fillWidth: true
         }
-        Button {
+        AppButton {
             text: qsTr("Browse…")
             onClicked: browse.pick()
         }
@@ -91,14 +91,14 @@ AppDialog {
     }
 
     footer: DialogButtonBox {
-        Button {
+        AppButton {
             id: createButton
             text: qsTr("Create")
             highlighted: true
             DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
             onClicked: dialog.tryCreate()
         }
-        Button {
+        AppButton {
             id: cancelButton
             text: qsTr("Cancel")
             DialogButtonBox.buttonRole: DialogButtonBox.RejectRole

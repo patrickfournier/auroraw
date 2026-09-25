@@ -17,6 +17,8 @@ pub mod qobject {
         #[qml_element]
         #[qproperty(QString, screen)]
         #[qproperty(QString, workspace_name, cxx_name = "workspaceName")]
+        /// Counts the workspaces opened: it changes when another workspace replaces the open one.
+        #[qproperty(i32, workspace_serial, cxx_name = "workspaceSerial")]
         /// Why the welcome list is shown instead of a workspace: `lost:<folder>` or
         /// `open:<folder><tab><reason>`.
         #[qproperty(QString, note)]
@@ -94,6 +96,7 @@ use crate::{bus, translation_for};
 pub struct LauncherRust {
     screen: QString,
     workspace_name: QString,
+    workspace_serial: i32,
     note: QString,
     language: QString,
     effective_language: QString,
@@ -166,6 +169,8 @@ impl qobject::Launcher {
         self.as_mut().rust_mut().session = Some(Arc::downgrade(&session));
         session::set_current(Some(session));
         self.as_mut().set_workspace_name(text(&name));
+        let serial = *self.workspace_serial() + 1;
+        self.as_mut().set_workspace_serial(serial);
         self.as_mut().set_screen(text("workspace"));
     }
 
@@ -183,6 +188,7 @@ impl qobject::Launcher {
     }
 
     pub fn start(mut self: Pin<&mut Self>) {
+        crate::glue::load_fonts();
         // SAFETY: `self` is a live QObject made by QML, whose engine gets the thumbnail provider.
         unsafe {
             let object = self.as_mut().get_unchecked_mut() as *mut Self as *mut std::ffi::c_void;

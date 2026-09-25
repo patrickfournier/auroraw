@@ -25,7 +25,7 @@ AppDialog {
                 // The model holds no text: it would be rebuilt (and its buttons with it) by every
                 // change of language, which Qt 6.4 lays out badly when the dialog is closed.
                 model: ["system", "en", "fr"]
-                delegate: Button {
+                delegate: AppButton {
                     required property string modelData
                     text: modelData === "system" ? qsTr("System")
                           : modelData === "en" ? "English" : "Français"
@@ -39,7 +39,7 @@ AppDialog {
     }
 
     footer: DialogButtonBox {
-        Button {
+        AppButton {
             text: qsTr("Close")
             DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
             onClicked: dialog.close()

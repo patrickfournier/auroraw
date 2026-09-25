@@ -33,13 +33,13 @@ AppDialog {
     }
 
     footer: DialogButtonBox {
-        Button {
+        AppButton {
             id: newButton
             text: qsTr("Add them as new photos")
             DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
             onClicked: { dialog.answered = true; dialog.close(); dialog.chosen(false) }
         }
-        Button {
+        AppButton {
             id: restoreButton
             text: qsTr("Restore them")
             highlighted: true

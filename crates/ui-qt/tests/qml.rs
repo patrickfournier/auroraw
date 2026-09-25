@@ -57,6 +57,7 @@ fn run_suite(suite: &str, home: &Path, extra: Option<&Path>) {
 #[test]
 fn opening_and_creating_workspaces() {
     let home = temp_dir();
+    support::write_photos(&home.path().join("Template2"), "IMG", 2);
     run_suite("launch", home.path(), None);
 }
 

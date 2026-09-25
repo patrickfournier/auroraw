@@ -48,7 +48,7 @@ AppDialog {
             Layout.fillWidth: true
             onAccepted: dialog.mergeQuestion === "" ? dialog.addRequested() : dialog.mergeRequested()
         }
-        Button {
+        AppButton {
             text: qsTr("Browse…")
             onClicked: browse.pick()
         }
@@ -77,7 +77,7 @@ AppDialog {
     }
 
     footer: DialogButtonBox {
-        Button {
+        AppButton {
             id: addButton
             visible: dialog.mergeQuestion === ""
             text: qsTr("Add")
@@ -85,7 +85,7 @@ AppDialog {
             DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
             onClicked: dialog.addRequested()
         }
-        Button {
+        AppButton {
             id: mergeButton
             visible: dialog.mergeQuestion !== ""
             text: qsTr("Merge and add")
@@ -93,7 +93,7 @@ AppDialog {
             DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
             onClicked: dialog.mergeRequested()
         }
-        Button {
+        AppButton {
             text: qsTr("Cancel")
             DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
             onClicked: dialog.close()

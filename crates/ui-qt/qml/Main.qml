@@ -34,6 +34,12 @@ ApplicationWindow {
         highlight: Theme.accent
         highlightedText: "#ffffff"
         placeholderText: Theme.grey.placeholder
+        // What cannot be used is dimmed (Fusion draws a disabled control from these).
+        disabled {
+            windowText: Theme.grey.placeholder
+            text: Theme.grey.placeholder
+            buttonText: Theme.grey.placeholder
+        }
         toolTipBase: Theme.grey.base
         toolTipText: Theme.grey.text
     }
@@ -128,32 +134,34 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
-        Theme.fontFamily = launcher.env("AURORAW_FONT")
-        Theme.fontSize = parseInt(launcher.env("AURORAW_FONT_SIZE")) || 0
-        if (Theme.fontFamily !== "")
-            window.font.family = Theme.fontFamily
-        if (Theme.fontSize > 0)
-            window.font.pointSize = Theme.fontSize
         // (Always: a test process makes several windows, each on its own machine.)
         launcher.useMachine(machine)
+        // Starting loads the typeface the application carries.
         launcher.start()
+        // IBM Plex Sans at 11 points, unless AURORAW_FONT and AURORAW_FONT_SIZE try another.
+        Theme.fontFamily = launcher.env("AURORAW_FONT") || Theme.defaultFamily
+        Theme.fontSize = parseInt(launcher.env("AURORAW_FONT_SIZE")) || Theme.defaultSize
+        window.font.family = Theme.fontFamily
+        window.font.pointSize = Theme.fontSize
         known.refresh()
     }
     Connections {
         target: launcher
+        // Another workspace replaces the open one (New or Open while one is open): everything that
+        // shows the workspace starts over.
+        function onWorkspaceSerialChanged() {
+            catalogueFlow.status = ""
+            sourceList.job = ""
+            sourceList.refresh()
+            importForm.job = ""
+            importDialog.loadRemembered()
+            cardBanner.rememberCurrent()
+            libraryView.filterBy(0)
+            window.currentTask = photoGrid.count === 0 ? "catalogue" : "cull"
+        }
         function onScreenChanged() {
-            if (launcher.screen === "workspace") {
-                catalogueFlow.status = ""
-                sourceList.job = ""
-                sourceList.refresh()
-                importForm.job = ""
-                importDialog.loadRemembered()
-                cardBanner.rememberCurrent()
-                libraryView.filterBy(0)
-                window.currentTask = photoGrid.count === 0 ? "catalogue" : "cull"
-            } else {
+            if (launcher.screen !== "workspace")
                 known.refresh()
-            }
         }
     }
     // What the engine reports arrives on the Bus (a singleton, created here at the latest).

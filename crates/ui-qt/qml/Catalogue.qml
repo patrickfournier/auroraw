@@ -29,7 +29,7 @@ Item {
                 font.bold: true
                 Layout.fillWidth: true
             }
-            Button {
+            AppButton {
                 id: addButton
                 text: qsTr("Add a source…")
                 highlighted: true
@@ -110,14 +110,14 @@ Item {
                         }
                     }
                     Label { text: qsTr("%n photo(s)", "", row.photos) }
-                    Button {
+                    AppButton {
                         id: rescanButton
                         text: qsTr("Rescan")
                         Accessible.name: qsTr("Rescan: %1").arg(row.name)
                         enabled: !root.flow.busy && row.online
                         onClicked: root.flow.rescan(row.index)
                     }
-                    Button {
+                    AppButton {
                         id: removeButton
                         text: qsTr("Remove")
                         Accessible.name: qsTr("Remove: %1").arg(row.name)

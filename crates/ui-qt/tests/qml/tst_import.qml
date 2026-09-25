@@ -86,6 +86,9 @@ AppTestCase {
         const m = begin("Big")
         openImport()
         verify(d.closeButton.enabled)
+        verify(!d.cancelButton.enabled, "there is nothing to cancel yet")
+        verify(d.cancelButton.opacity < 1 && d.importButton.opacity === 1, "and it looks it: a disabled button is dimmed")
+        snapshot("import-dialog-idle")
         fill(m)
         // Nothing here lets the event loop turn between the click and the checks, so the import is
         // still running.
@@ -97,6 +100,7 @@ AppTestCase {
         verify(d.cancelButton.enabled, "the import can still be cancelled")
         waitForTheImport()
         verify(d.closeButton.enabled)
+        verify(!d.cancelButton.enabled, "nor is there once it ended")
         click(d.closeButton)
         wait(150)
         verify(!d.visible)

@@ -13,9 +13,11 @@ fn main() {
     let qml = [
         QmlFile::from("qml/Main.qml"),
         QmlFile::from("qml/Theme.qml").singleton(true),
+        QmlFile::from("qml/AppButton.qml"),
         QmlFile::from("qml/AppDialog.qml"),
         QmlFile::from("qml/AppActions.qml"),
         QmlFile::from("qml/AppMenu.qml"),
+        QmlFile::from("qml/AppSubMenu.qml"),
         QmlFile::from("qml/AppMenuItem.qml"),
         QmlFile::from("qml/NoticeBar.qml"),
         QmlFile::from("qml/SettingsDialog.qml"),

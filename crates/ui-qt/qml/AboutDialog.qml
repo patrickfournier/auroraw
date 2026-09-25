@@ -35,13 +35,19 @@ AppDialog {
             text: qsTr("Made with Qt, used under the GNU Lesser General Public License 3.0, and Rust.")
         }
         Label {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            color: Theme.quiet
+            text: qsTr("Set in IBM Plex Sans, under the SIL Open Font License 1.1.")
+        }
+        Label {
             text: "https://auroraw.org"
             color: Theme.accent
         }
     }
 
     footer: DialogButtonBox {
-        Button {
+        AppButton {
             text: qsTr("Close")
             highlighted: true
             DialogButtonBox.buttonRole: DialogButtonBox.RejectRole

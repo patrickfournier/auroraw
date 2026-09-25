@@ -210,4 +210,37 @@ AppTestCase {
             found = found || app.known.pathAt(row) === files.canonical(hidden)
         verify(found, "the workspace is listed where it now is")
     }
+
+    function test_the_interface_is_set_in_the_typeface_the_application_carries() {
+        launch(freshMachine())
+        verify(Qt.fontFamilies().indexOf("IBM Plex Sans") >= 0, "the bundled typeface is available")
+        compare(app.font.family, "IBM Plex Sans")
+        compare(app.font.pointSize, 11)
+    }
+
+    // New or Open while a workspace is open: what shows the workspace starts over.
+    function test_another_workspace_replaces_the_open_one_everywhere() {
+        const machine = freshMachine()
+        launch(machine)
+        createWorkspace("Main")
+        const card = machinePath(machine) + "/Card"
+        files.copyDir(home + "/Template2", card)
+        addSource(card)
+        waitForTheScan()
+        app.currentTask = "cull"
+        tryCompare(app.photos, "count", 2)
+        compare(app.sources.count, 1)
+
+        createWorkspace("Second")
+        compare(app.launcher.workspaceName, "Second")
+        compare(app.sources.count, 0, "the sources are the new workspace's")
+        compare(app.photos.count, 0, "so are the photos")
+        compare(app.currentTask, "catalogue", "an empty workspace opens on what fills it")
+
+        app.openFolder(machinePath(machine) + "/Pictures/Auroraw/Main")
+        compare(app.launcher.workspaceName, "Main")
+        compare(app.sources.count, 1)
+        tryCompare(app.photos, "count", 2)
+        compare(app.currentTask, "cull")
+    }
 }

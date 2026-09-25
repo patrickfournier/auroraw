@@ -67,7 +67,7 @@ Rectangle {
             color: "white"
             elide: Text.ElideRight
         }
-        Button {
+        AppButton {
             id: importButton
             text: qsTr("Import…")
             highlighted: true
@@ -78,7 +78,7 @@ Rectangle {
                 banner.importRequested(path)
             }
         }
-        Button {
+        AppButton {
             id: ignoreButton
             text: qsTr("Ignore")
             onClicked: banner.cardPath = ""

@@ -220,7 +220,7 @@ AppDialog {
                 spacing: 8
                 Repeater {
                     model: dialog.volumes
-                    Button {
+                    AppButton {
                         required property var modelData
                         text: modelData.name + " (" + modelData.path + ")"
                         onClicked: {
@@ -234,7 +234,7 @@ AppDialog {
                     text: qsTr("No card detected")
                     color: Theme.grey.placeholder
                 }
-                Button {
+                AppButton {
                     id: refreshButton
                     text: qsTr("Refresh")
                     onClicked: dialog.refreshVolumes()
@@ -249,7 +249,7 @@ AppDialog {
                 Accessible.name: qsTr("Import from (card or folder)")
                 onTextEdited: dialog.fieldsChanged()
             }
-            Button {
+            AppButton {
                 text: qsTr("Browse…")
                 Accessible.name: qsTr("Browse for: %1").arg(qsTr("Import from (card or folder)"))
                 enabled: !dialog.browsing
@@ -272,7 +272,7 @@ AppDialog {
                 Accessible.name: qsTr("Destination folder")
                 onTextEdited: dialog.fieldsChanged()
             }
-            Button {
+            AppButton {
                 text: qsTr("Browse…")
                 Accessible.name: qsTr("Browse for: %1").arg(qsTr("Destination folder"))
                 enabled: !dialog.browsing
@@ -302,13 +302,13 @@ AppDialog {
             RowLayout {
                 Layout.columnSpan: 2
                 spacing: 8
-                Button {
+                AppButton {
                     id: templateButton
                     text: qsTr("Use the template")
                     highlighted: dialog.layoutChoice === "template"
                     onClicked: dialog.layoutChoice = "template"
                 }
-                Button {
+                AppButton {
                     id: foldersButton
                     text: qsTr("Keep the source's folders")
                     highlighted: dialog.layoutChoice === "folders"
@@ -336,7 +336,7 @@ AppDialog {
                 Layout.fillWidth: true
                 Accessible.name: qsTr("Backup folder (optional)")
             }
-            Button {
+            AppButton {
                 text: qsTr("Browse…")
                 Accessible.name: qsTr("Browse for: %1").arg(qsTr("Backup folder (optional)"))
                 enabled: !dialog.browsing
@@ -386,21 +386,21 @@ AppDialog {
     }
 
     footer: DialogButtonBox {
-        Button {
+        AppButton {
             id: showPhotosButton
             visible: dialog.finished && dialog.registering
             text: qsTr("Show photos")
             DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
             onClicked: dialog.host.showPhotos()
         }
-        Button {
+        AppButton {
             id: cancelButton
             text: qsTr("Cancel import")
             enabled: dialog.importing
             DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
             onClicked: dialog.form.cancel()
         }
-        Button {
+        AppButton {
             id: importButton
             text: qsTr("Import")
             highlighted: true
@@ -409,7 +409,7 @@ AppDialog {
             onClicked: dialog.start()
         }
         // An import that runs is stopped with "Cancel import", not by closing the window over it.
-        Button {
+        AppButton {
             id: closeButton
             text: qsTr("Close")
             enabled: !dialog.importing

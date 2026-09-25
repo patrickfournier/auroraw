@@ -16,6 +16,7 @@ unsafe extern "C" {
     fn auroraw_add_import_path(engine: *mut c_void, path: *const u8, len: usize);
     fn auroraw_install_thumbnails(object: *mut c_void);
     fn auroraw_quit_after(ms: i32);
+    fn auroraw_add_font(data: *const u8, len: usize);
     fn auroraw_set_translation(data: *const u8, len: usize, object: *mut c_void);
     fn auroraw_thumbnail_ready(token: u64, bytes: *const u8, len: usize);
     fn auroraw_shortcut_text(
@@ -42,6 +43,24 @@ pub fn shortcut_text(standard: i32, text: &str) -> String {
         )
     };
     String::from_utf8_lossy(&out[..written.min(out.len())]).into_owned()
+}
+
+/// The typeface the interface is set in (IBM Plex Sans, SIL Open Font License 1.1: `assets/fonts/OFL.txt`),
+/// carried in the executable so that it looks the same everywhere. Made available once, by its family
+/// name (`FONT_FAMILY`).
+pub fn load_fonts() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        for font in [
+            &include_bytes!("../assets/fonts/IBMPlexSans-Regular.ttf")[..],
+            &include_bytes!("../assets/fonts/IBMPlexSans-Italic.ttf")[..],
+            &include_bytes!("../assets/fonts/IBMPlexSans-Bold.ttf")[..],
+            &include_bytes!("../assets/fonts/IBMPlexSans-BoldItalic.ttf")[..],
+        ] {
+            // SAFETY: the bytes are valid for the call (the glue copies them).
+            unsafe { auroraw_add_font(font.as_ptr(), font.len()) }
+        }
+    });
 }
 
 /// Tests: has the application quit by itself after `ms` milliseconds.

@@ -3,6 +3,7 @@
 // cannot take bytes from Rust directly, and a translation loader, because cxx-qt-lib has no QTranslator.
 // Everything else is Rust and QML.
 #include <QCoreApplication>
+#include <QFontDatabase>
 #include <QImage>
 #include <QKeySequence>
 #include <QQmlApplicationEngine>
@@ -106,6 +107,13 @@ extern "C" void auroraw_thumbnail_ready(unsigned long long token, const unsigned
 extern "C" void auroraw_add_import_path(void *engine, const unsigned char *path, size_t len) {
     static_cast<QQmlApplicationEngine *>(engine)->addImportPath(
         QString::fromUtf8(reinterpret_cast<const char *>(path), static_cast<qsizetype>(len)));
+}
+
+// Makes a font the application carries (TrueType bytes that stay valid for the life of the program)
+// available by its family name.
+extern "C" void auroraw_add_font(const unsigned char *data, size_t len) {
+    QFontDatabase::addApplicationFontFromData(
+        QByteArray(reinterpret_cast<const char *>(data), static_cast<qsizetype>(len)));
 }
 
 // Tests: quits the application after `ms` milliseconds of its event loop.

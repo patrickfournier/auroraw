@@ -38,14 +38,14 @@ AppDialog {
     }
 
     footer: DialogButtonBox {
-        Button {
+        AppButton {
             id: removeButton
             text: qsTr("Remove")
             highlighted: true
             DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
             onClicked: dialog.confirmed()
         }
-        Button {
+        AppButton {
             text: qsTr("Cancel")
             DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
             onClicked: dialog.close()

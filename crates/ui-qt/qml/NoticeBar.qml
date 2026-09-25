@@ -27,7 +27,7 @@ Rectangle {
             color: "white"
             Accessible.role: Accessible.StaticText
         }
-        Button {
+        AppButton {
             id: dismissButton
             text: qsTr("Dismiss")
             onClicked: root.dismissed()

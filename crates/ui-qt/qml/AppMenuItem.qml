@@ -9,11 +9,22 @@ import org.auroraw.ui
 MenuItem {
     id: item
 
+    function underlined(title) {
+        const escape = t => t.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        const at = title.indexOf("&")
+        if (at < 0 || at + 1 >= title.length)
+            return escape(title)
+        return escape(title.substring(0, at)) + "<u>" + escape(title.charAt(at + 1)) + "</u>"
+               + escape(title.substring(at + 2))
+    }
+
     contentItem: RowLayout {
         spacing: 24
         Label {
             Layout.fillWidth: true
-            text: item.text
+            // A section's mnemonic (`&File`) is underlined: Alt and that letter open it.
+            textFormat: item.subMenu ? Text.StyledText : Text.PlainText
+            text: item.subMenu ? item.underlined(item.text) : item.text
             elide: Text.ElideRight
             color: item.enabled ? item.palette.windowText : item.palette.placeholderText
         }
