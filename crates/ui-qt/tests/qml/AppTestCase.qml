@@ -44,6 +44,12 @@ TestCase {
 
     function cleanup() { quit() }
 
+    // Moves a folder that a workspace has just closed. Windows keeps it until the event loop has
+    // destroyed the window's objects, so this retries between turns of the loop.
+    function move(from, to) {
+        tryVerify(() => files.exists(to) || files.rename(from, to), 10000, "the folder could be moved")
+    }
+
     // Clicks the centre of an item as a person would.
     function click(item) {
         mouseClick(item)

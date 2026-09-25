@@ -30,7 +30,8 @@ pub mod qobject {
         #[qinvokable]
         fn read(self: &Files, path: &QString) -> QString;
 
-        /// Moves a folder, waiting for a workspace that has just closed to let go of it (Windows).
+        /// Moves a folder, once: a workspace that has just closed may not have let go of it yet
+        /// (Windows), and letting go takes the event loop, so tests retry with `tryVerify`.
         #[qinvokable]
         fn rename(self: &Files, from: &QString, to: &QString) -> bool;
 
@@ -41,7 +42,6 @@ pub mod qobject {
 }
 
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
 
 use auroraw_engine::paths;
 use cxx_qt_lib::QString;
@@ -83,16 +83,7 @@ impl qobject::Files {
     }
 
     pub fn rename(&self, from: &QString, to: &QString) -> bool {
-        let deadline = Instant::now() + Duration::from_secs(10);
-        loop {
-            if std::fs::rename(path(from), path(to)).is_ok() {
-                return true;
-            }
-            if Instant::now() > deadline {
-                return false;
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
+        std::fs::rename(path(from), path(to)).is_ok()
     }
 
     pub fn canonical(&self, target: &QString) -> QString {

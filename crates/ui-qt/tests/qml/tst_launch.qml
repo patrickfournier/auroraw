@@ -25,7 +25,7 @@ AppTestCase {
         // The folder is the one that will hold the workspace's own folder, named after it.
         const parent = machinePath(machine) + "/Pictures/Auroraw"
         compare(app.newDialog.nameField.text, "Main")
-        compare(app.newDialog.folderField.text, parent)
+        compare(files.canonical(app.newDialog.folderField.text), files.canonical(parent))
         compare(files.canonical(app.launcher.preview("Main", parent)), files.canonical(parent + "/Main"))
 
         click(app.newDialog.createButton)
@@ -43,8 +43,8 @@ AppTestCase {
         launch(machine)
         const parent = machinePath(machine) + "/Pictures/Auroraw"
         const preview = (name, folder) => app.launcher.preview(name, folder)
-        compare(preview("Family", parent), files.canonical(parent) + "/Family")
-        compare(preview("Family / trips: 2026", parent), files.canonical(parent) + "/Family _ trips_ 2026",
+        compare(files.canonical(preview("Family", parent)), files.canonical(parent + "/Family"))
+        compare(files.canonical(preview("Family / trips: 2026", parent)), files.canonical(parent + "/Family _ trips_ 2026"),
                 "what a file system refuses is replaced")
         // Nothing to show while the name is empty or the folder is not a full path.
         compare(preview("  ", parent), "")
@@ -65,7 +65,7 @@ AppTestCase {
         app.newDialog.openWith()
         wait(200)
         compare(app.newDialog.nameField.text, "Main 2")
-        compare(app.newDialog.folderField.text, parent)
+        compare(files.canonical(app.newDialog.folderField.text), files.canonical(parent))
         click(app.newDialog.createButton)
         compare(app.launcher.screen, "workspace")
         verify(files.exists(parent + "/Main 2/workspace.json"))
@@ -101,7 +101,7 @@ AppTestCase {
 
         // An empty one is fine.
         files.write(parent + "/Main/notes.txt", "")
-        verify(files.rename(parent + "/Main", parent + "/Main-old"))
+        move(parent + "/Main", parent + "/Main-old")
         files.mkdir(parent + "/Main")
         click(dialog.createButton)
         compare(app.launcher.screen, "workspace")
@@ -143,7 +143,7 @@ AppTestCase {
         createWorkspace("Main")
         quit()
         const parent = machinePath(machine) + "/Pictures/Auroraw"
-        verify(files.rename(parent + "/Main", parent + "/Moved"))
+        move(parent + "/Main", parent + "/Moved")
 
         launch(machine)
         compare(app.launcher.screen, "welcome")
@@ -167,7 +167,7 @@ AppTestCase {
         createWorkspace("Second")
         quit()
         const parent = machinePath(machine) + "/Pictures/Auroraw"
-        verify(files.rename(parent + "/Second", parent + "/Hidden"))
+        move(parent + "/Second", parent + "/Hidden")
         return parent + "/Hidden"
     }
 
