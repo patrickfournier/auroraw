@@ -173,6 +173,7 @@ pub mod qobject {
 use core::pin::Pin;
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::time::{Duration, Instant};
 
 use auroraw_catalogue::Cursor;
 use auroraw_engine::{Command, Engine, KnownWorkspace};
@@ -201,7 +202,13 @@ pub struct PhotoGridRust {
     items: Vec<Item>,
     /// Where each listed photo is.
     rows: HashMap<PhotoId, usize>,
+    /// The ratings this grid asked the engine for and has not seen it confirm: until the catalogue
+    /// says the same (or a moment passes), what it says is an older rating, not to be shown.
+    pending: HashMap<PhotoId, (u8, Instant)>,
 }
+
+/// How long an unconfirmed rating is trusted over the catalogue (a command the engine refused).
+const PENDING_FOR: Duration = Duration::from_secs(2);
 
 /// Every photo the catalogue lists in the grid's own order (spike 3: the whole ordered list is cheap
 /// even at 100,000 photos; only thumbnails are lazy), rated `min_rating` or more.
@@ -240,7 +247,17 @@ fn load_items(min_rating: u8) -> Vec<Item> {
 
 impl qobject::PhotoGrid {
     pub fn load(mut self: Pin<&mut Self>) {
-        let items = load_items(self.min_rating.clamp(0, 5) as u8);
+        let mut items = load_items(self.min_rating.clamp(0, 5) as u8);
+        // A rating asked for a moment ago may not be in the catalogue yet: it stays what was asked.
+        self.as_mut()
+            .rust_mut()
+            .pending
+            .retain(|_, (_, at)| at.elapsed() < PENDING_FOR);
+        for item in &mut items {
+            if let Some(&(asked, _)) = self.pending.get(&item.id) {
+                item.rating = asked;
+            }
+        }
         let count = items.len() as i32;
         let rows = items
             .iter()
@@ -296,6 +313,13 @@ impl qobject::PhotoGrid {
         else {
             return;
         };
+        if let Some(&(asked, at)) = self.pending.get(&id) {
+            if photo.effective_rating != asked && at.elapsed() < PENDING_FOR {
+                // An older rating of a quick series of keys: the last one's own event follows.
+                return;
+            }
+            self.as_mut().rust_mut().pending.remove(&id);
+        }
         if self.items[row].rating != photo.effective_rating {
             self.as_mut().rust_mut().items[row].rating = photo.effective_rating;
             self.redraw_rating(row);
@@ -375,6 +399,10 @@ impl qobject::PhotoGrid {
         });
         // The cell shows the new rating at once; the engine's own event confirms it.
         self.as_mut().rust_mut().items[row as usize].rating = rating;
+        self.as_mut()
+            .rust_mut()
+            .pending
+            .insert(id, (rating, Instant::now()));
         self.redraw_rating(row as usize);
     }
 
