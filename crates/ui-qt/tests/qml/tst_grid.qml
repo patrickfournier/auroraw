@@ -181,6 +181,7 @@ AppTestCase {
         app.launcher.chooseLanguage("en")
         wait(200)
         compare(grid.itemAtIndex(0).Accessible.name, "Photo, 2 stars")
+        grid.forceActiveFocus()
         rateSelected(1)
         compare(grid.itemAtIndex(0).Accessible.name, "Photo, 1 star")
     }
