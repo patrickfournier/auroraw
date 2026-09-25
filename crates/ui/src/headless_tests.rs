@@ -1055,7 +1055,10 @@ fn a_typed_folder_is_shown_back_canonical() {
     type_into(&app, "Name", "Main");
     assert_eq!(
         app.ui().get_new_preview(),
-        format!("Workspace folder: {}", f.workspace.display())
+        format!(
+            "Workspace folder: {}",
+            canonical(workspaces).join("Main").display()
+        )
     );
 
     // Once shown back (an error keeps the dialog open), the field holds the clean path.
