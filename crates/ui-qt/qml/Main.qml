@@ -117,7 +117,7 @@ ApplicationWindow {
         target: launcher
         function onScreenChanged() {
             if (launcher.screen === "workspace") {
-                photoGrid.load()
+                libraryView.filterBy(0)
                 window.currentTask = photoGrid.count === 0 ? "catalogue" : "cull"
             } else {
                 known.refresh()
@@ -127,8 +127,11 @@ ApplicationWindow {
     // What the engine reports arrives on the Bus (a singleton, created here at the latest).
     Connections {
         target: Bus
-        function onIndexFinished() { photoGrid.load() }
+        function onIndexFinished() { libraryView.reload() }
+        function onPhotoChanged(photoId) { libraryView.photoChanged(photoId) }
     }
+    // Photos may have arrived while another task was showing.
+    onCurrentTaskChanged: if (currentTask === "cull" && inWorkspace) libraryView.reload()
 
     // Alt and a section's mnemonic open it.
     Repeater {

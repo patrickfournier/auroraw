@@ -4,17 +4,16 @@
 //! The only module with `unsafe` besides the cxx-qt bridges (D-094).
 
 use std::ffi::c_void;
-use std::pin::Pin;
 use std::str::FromStr;
 
 use auroraw_types::PhotoId;
-use cxx_qt_lib::QQmlApplicationEngine;
 
 use crate::session;
 
 unsafe extern "C" {
-    fn auroraw_setup_engine(engine: *mut c_void);
+    fn auroraw_install_thumbnails(object: *mut c_void);
     fn auroraw_set_translation(data: *const u8, len: usize, object: *mut c_void);
+    fn auroraw_thumbnail_ready(token: u64, bytes: *const u8, len: usize);
     fn auroraw_shortcut_text(
         standard: i32,
         text: *const u8,
@@ -41,21 +40,13 @@ pub fn shortcut_text(standard: i32, text: &str) -> String {
     String::from_utf8_lossy(&out[..written.min(out.len())]).into_owned()
 }
 
-/// Registers the thumbnail provider on `engine` and remembers it, so that a change of language can
-/// retranslate what is on screen. The engine must outlive the application's event loop.
-pub fn setup_engine(mut engine: Pin<&mut QQmlApplicationEngine>) {
-    // SAFETY: the pointer is only handed to the glue, which keeps it for the application's life; the
-    // engine is not moved (it is a C++ object behind a pin).
-    unsafe {
-        let raw = engine.as_mut().get_unchecked_mut() as *mut QQmlApplicationEngine;
-        auroraw_setup_engine(raw as *mut c_void)
-    }
-}
-
-/// Installs the translation in `qm` before any screen exists (nothing to retranslate).
-pub fn install_translation(qm: Option<&'static [u8]>) {
-    // SAFETY: a null object is allowed.
-    unsafe { set_translation(qm, std::ptr::null_mut()) }
+/// Registers the thumbnail provider (`image://thumbs/<photo id>`) on the engine of `object`.
+///
+/// # Safety
+/// `object` points at a live QObject made by QML.
+pub unsafe fn install_thumbnails(object: *mut c_void) {
+    // SAFETY: the caller guarantees `object`.
+    unsafe { auroraw_install_thumbnails(object) }
 }
 
 /// Installs the translation in `qm` (compiled `.qm` bytes, `'static` because Qt reads them in place)
@@ -71,42 +62,34 @@ pub unsafe fn set_translation(qm: Option<&'static [u8]>, object: *mut c_void) {
     unsafe { auroraw_set_translation(data, len, object) }
 }
 
-/// The thumbnail of the photo named `id` (UTF-8, `len` bytes), as a JPEG the caller must give back
-/// to `auroraw_free_bytes`; null when there is none.
-///
-/// # Safety
-/// `id` points at `len` readable bytes and `out_len` at a writable `usize`.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn auroraw_thumbnail_jpeg(
-    id: *const u8,
-    len: usize,
-    out_len: *mut usize,
-) -> *mut u8 {
-    // SAFETY: the caller guarantees `id` and `len`.
-    let name = unsafe { std::slice::from_raw_parts(id, len) };
-    let bytes = std::str::from_utf8(name)
-        .ok()
-        .and_then(|text| PhotoId::from_str(text).ok())
-        .and_then(|id| session::current()?.thumbs.jpeg(id));
-    match bytes {
-        Some(bytes) => {
-            let boxed = bytes.into_boxed_slice();
-            // SAFETY: the caller guarantees `out_len`.
-            unsafe { *out_len = boxed.len() };
-            Box::into_raw(boxed) as *mut u8
-        }
-        None => std::ptr::null_mut(),
-    }
+/// How the collector answers the image provider's requests: the C++ side decodes the JPEG (on the
+/// collector's thread, off the interface's) and hands the image to the request that waits for it.
+pub fn thumbnail_deliverer() -> session::Deliver {
+    std::sync::Arc::new(|token, jpeg| {
+        let (bytes, len) = jpeg.map_or((std::ptr::null(), 0), |b| (b.as_ptr(), b.len()));
+        // SAFETY: `bytes` and `len` describe `jpeg` (or nothing, null with 0), which outlives the call.
+        unsafe { auroraw_thumbnail_ready(token, bytes, len) }
+    })
 }
 
-/// Gives back the bytes `auroraw_thumbnail_jpeg` returned.
+/// A request of the image provider (`image://thumbs/<photo id>`, the id being `id`, UTF-8, `len`
+/// bytes) for a thumbnail; the answer goes to `auroraw_thumbnail_ready` under `token`.
 ///
 /// # Safety
-/// `bytes` and `len` are exactly what `auroraw_thumbnail_jpeg` returned, and are given back once.
+/// `id` points at `len` readable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn auroraw_free_bytes(bytes: *mut u8, len: usize) {
-    // SAFETY: the caller guarantees the pair came from `auroraw_thumbnail_jpeg`.
-    drop(unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(bytes, len)) });
+pub unsafe extern "C" fn auroraw_thumbnail_request(id: *const u8, len: usize, token: u64) {
+    // SAFETY: the caller guarantees `id` and `len`.
+    let name = unsafe { std::slice::from_raw_parts(id, len) };
+    let asked = std::str::from_utf8(name)
+        .ok()
+        .and_then(|text| PhotoId::from_str(text).ok())
+        .zip(session::current());
+    match asked {
+        Some((id, session)) => session.thumbs.request(id, token),
+        // SAFETY: no bytes (null, 0) is allowed.
+        None => unsafe { auroraw_thumbnail_ready(token, std::ptr::null(), 0) },
+    }
 }
 
 #[cfg(feature = "quicktest")]

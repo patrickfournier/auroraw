@@ -4,9 +4,9 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, Weak};
+use std::sync::{Arc, Mutex, Weak};
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use auroraw_engine::{Engine, ThumbnailService};
 use auroraw_types::PhotoId;
@@ -42,38 +42,60 @@ pub fn current() -> Option<Arc<Session>> {
 #[derive(Default)]
 struct Done {
     ready: HashMap<PhotoId, Vec<u8>>,
+    /// Photos no thumbnail can be made for: not asked for again until the photo changes.
     failed: HashSet<PhotoId>,
+    /// The requests (tokens of the image provider's responses) waiting for a photo's thumbnail.
+    waiting: HashMap<PhotoId, Vec<u64>>,
 }
 
-/// Turns the thumbnail service's poll-based delivery into something a blocking caller can wait on.
+/// Turns the thumbnail service's poll-based delivery into an answer for each request: a thread polls
+/// the service and hands every waiting request its thumbnail (or its failure) through `deliver`.
 pub struct Collector {
     service: Arc<ThumbnailService>,
-    done: Arc<(Mutex<Done>, Condvar)>,
+    done: Arc<Mutex<Done>>,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
+    deliver: Deliver,
 }
 
+/// Answers one request: its token, and the JPEG of the thumbnail or `None` when there is none.
+pub type Deliver = Arc<dyn Fn(u64, Option<&[u8]>) + Send + Sync>;
+
 impl Collector {
-    pub fn new(service: ThumbnailService) -> Self {
+    pub fn new(service: ThumbnailService, deliver: Deliver) -> Self {
         let service = Arc::new(service);
-        let done: Arc<(Mutex<Done>, Condvar)> = Arc::default();
+        let done: Arc<Mutex<Done>> = Arc::default();
         let stop = Arc::new(AtomicBool::new(false));
         let thread = {
-            let (service, done, stop) = (service.clone(), done.clone(), stop.clone());
+            let (service, done, stop, deliver) =
+                (service.clone(), done.clone(), stop.clone(), deliver.clone());
             std::thread::spawn(move || {
                 while !stop.load(Ordering::Relaxed) {
                     let arrived = service.poll();
                     let failed = service.poll_failed();
                     if !arrived.is_empty() || !failed.is_empty() {
-                        let mut state = done.0.lock().unwrap();
-                        if state.ready.len() > 4096 {
-                            state.ready.clear();
+                        let mut answers: Vec<(u64, Option<Vec<u8>>)> = Vec::new();
+                        {
+                            let mut state = done.lock().unwrap();
+                            if state.ready.len() > 4096 {
+                                state.ready.clear();
+                            }
+                            for (id, thumbnail) in arrived {
+                                for token in state.waiting.remove(&id).unwrap_or_default() {
+                                    answers.push((token, Some(thumbnail.jpeg.clone())));
+                                }
+                                state.ready.insert(id, thumbnail.jpeg);
+                            }
+                            for id in failed {
+                                for token in state.waiting.remove(&id).unwrap_or_default() {
+                                    answers.push((token, None));
+                                }
+                                state.failed.insert(id);
+                            }
                         }
-                        for (id, thumbnail) in arrived {
-                            state.ready.insert(id, thumbnail.jpeg);
+                        for (token, jpeg) in answers {
+                            deliver(token, jpeg.as_deref());
                         }
-                        state.failed.extend(failed);
-                        done.1.notify_all();
                     }
                     std::thread::sleep(Duration::from_millis(4));
                 }
@@ -84,35 +106,35 @@ impl Collector {
             done,
             stop,
             thread: Some(thread),
+            deliver,
         }
     }
 
     /// Makes a photo's thumbnail ahead of anybody asking for it (a photo that just entered the
-    /// catalogue), behind whatever the grid asks for.
+    /// catalogue), behind whatever the grid asks for. A photo that changed may have a thumbnail
+    /// now, so an earlier failure is forgotten.
     pub fn warm(&self, id: PhotoId) {
+        self.done.lock().unwrap().failed.remove(&id);
         self.service.warm(id);
     }
 
-    /// The JPEG of a photo's thumbnail, made if need be; `None` when it cannot be made.
-    pub fn jpeg(&self, id: PhotoId) -> Option<Vec<u8>> {
-        let (lock, cv) = &*self.done;
-        {
-            let state = lock.lock().unwrap();
+    /// Asks for a photo's thumbnail on behalf of the request `token`, answered through the collector's
+    /// `deliver` (from this call, when the thumbnail is already known, or later from the collector's thread).
+    pub fn request(&self, id: PhotoId, token: u64) {
+        let known = {
+            let mut state = self.done.lock().unwrap();
             if let Some(bytes) = state.ready.get(&id) {
-                return Some(bytes.clone());
+                Some(Some(bytes.clone()))
+            } else if state.failed.contains(&id) {
+                Some(None)
+            } else {
+                state.waiting.entry(id).or_default().push(token);
+                None
             }
-        }
-        self.service.request(id);
-        let deadline = Instant::now() + Duration::from_secs(15);
-        let mut state = lock.lock().unwrap();
-        loop {
-            if let Some(bytes) = state.ready.get(&id) {
-                return Some(bytes.clone());
-            }
-            if state.failed.contains(&id) || Instant::now() > deadline {
-                return None;
-            }
-            state = cv.wait_timeout(state, Duration::from_millis(50)).unwrap().0;
+        };
+        match known {
+            Some(jpeg) => (self.deliver)(token, jpeg.as_deref()),
+            None => self.service.request(id),
         }
     }
 }

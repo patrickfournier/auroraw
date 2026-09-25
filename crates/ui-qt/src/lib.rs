@@ -31,13 +31,11 @@ use std::sync::Mutex;
 use auroraw_engine::LocalDirs;
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QQuickStyle, QString, QUrl};
 
-use crate::app_settings::{AppSettings, resolve_language};
-
 mod translations {
     include!(concat!(env!("OUT_DIR"), "/translations.rs"));
 }
 
-/// The compiled translation for a language code (`None` for English, which is the source text).
+/// The compiled translation for a language code (`None` when there is none: the source texts).
 pub(crate) fn translation_for(code: &str) -> Option<&'static [u8]> {
     translations::TRANSLATIONS
         .iter()
@@ -116,11 +114,6 @@ fn prepare_style() {
     QQuickStyle::set_style(&QString::from("Fusion"));
 }
 
-fn install_language(launch: &Launch) {
-    let settings = AppSettings::load(&launch.dirs.data.join("app-settings.json"));
-    glue::install_translation(translation_for(resolve_language(&settings.language)));
-}
-
 /// Opens the window (the last workspace, or the welcome list) and runs until the application is quit
 /// or its window closed.
 pub fn run(launch: Launch) -> Result<(), UiError> {
@@ -128,12 +121,10 @@ pub fn run(launch: Launch) -> Result<(), UiError> {
     *LAUNCH.lock().unwrap() = Some(launch);
     prepare_style();
     let mut app = QGuiApplication::new();
-    install_language(&crate::launch());
     let mut engine = QQmlApplicationEngine::new();
-    let Some(mut engine) = engine.as_mut() else {
+    let Some(engine) = engine.as_mut() else {
         return Err(UiError("the QML engine could not be created".into()));
     };
-    glue::setup_engine(engine.as_mut());
     engine.load(&QUrl::from("qrc:/qt/qml/org/auroraw/ui/qml/Main.qml"));
     match app.as_mut() {
         Some(app) => {

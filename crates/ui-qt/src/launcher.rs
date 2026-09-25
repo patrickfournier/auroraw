@@ -89,6 +89,7 @@ use cxx_qt::CxxQtType;
 use cxx_qt_lib::{QString, QStringList};
 
 use crate::app_settings::{AppSettings, LANGUAGES, resolve_language};
+use crate::glue;
 use crate::session::{self, Collector, Session};
 use crate::{bus, translation_for};
 
@@ -161,7 +162,7 @@ impl qobject::Launcher {
             .expect("the previews database opens");
         let session = Arc::new(Session {
             engine,
-            thumbs: Collector::new(service),
+            thumbs: Collector::new(service, glue::thumbnail_deliverer()),
         });
         bus::start_pump(events, &session);
         self.as_mut().rust_mut().session = Some(Arc::downgrade(&session));
@@ -184,6 +185,11 @@ impl qobject::Launcher {
     }
 
     pub fn start(mut self: Pin<&mut Self>) {
+        // SAFETY: `self` is a live QObject made by QML, whose engine gets the thumbnail provider.
+        unsafe {
+            let object = self.as_mut().get_unchecked_mut() as *mut Self as *mut std::ffi::c_void;
+            crate::glue::install_thumbnails(object);
+        }
         let launch = crate::launch();
         {
             let mut rust = self.as_mut().rust_mut();
@@ -191,9 +197,16 @@ impl qobject::Launcher {
             rust.pictures = launch.pictures.clone();
         }
         let settings = AppSettings::load(&self.settings_path());
+        let effective = resolve_language(&settings.language);
+        // The language is installed before the first screen exists, so that nothing is drawn in
+        // another one (and so that every window of a test process starts from its own machine's).
+        // SAFETY: `self` is a live QObject made by QML; its engine retranslates.
+        unsafe {
+            let object = self.as_mut().get_unchecked_mut() as *mut Self as *mut std::ffi::c_void;
+            crate::glue::set_translation(translation_for(effective), object);
+        }
         self.as_mut().set_language(text(&settings.language));
-        self.as_mut()
-            .set_effective_language(text(resolve_language(&settings.language)));
+        self.as_mut().set_effective_language(text(effective));
         self.as_mut().set_screen(text("welcome"));
 
         // A workspace named at launch first, else the last one opened.

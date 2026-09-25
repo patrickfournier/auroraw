@@ -38,6 +38,12 @@ pub mod qobject {
         /// The canonical form of a path, as the application understands it.
         #[qinvokable]
         fn canonical(self: &Files, path: &QString) -> QString;
+
+        /// How many thumbnails the previews database of the only workspace under the cache folder
+        /// `cache` holds (-1 when there is none).
+        #[qinvokable]
+        #[cxx_name = "previewsCount"]
+        fn previews_count(self: &Files, cache: &QString) -> i32;
     }
 }
 
@@ -84,6 +90,20 @@ impl qobject::Files {
 
     pub fn rename(&self, from: &QString, to: &QString) -> bool {
         std::fs::rename(path(from), path(to)).is_ok()
+    }
+
+    pub fn previews_count(&self, cache: &QString) -> i32 {
+        let Some(previews) = std::fs::read_dir(path(cache).join("catalogues"))
+            .ok()
+            .and_then(|mut entries| entries.next())
+            .and_then(Result::ok)
+            .map(|entry| entry.path().join("previews.db"))
+        else {
+            return -1;
+        };
+        auroraw_imaging::PreviewsDb::open(&previews)
+            .and_then(|db| db.count())
+            .map_or(-1, |count| count as i32)
     }
 
     pub fn canonical(&self, target: &QString) -> QString {

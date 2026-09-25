@@ -42,12 +42,28 @@ TestCase {
         }
     }
 
-    function cleanup() { quit() }
+    // The translation is the process's, not the window's: a test that changed the language must not
+    // leave it to the next one.
+    function cleanup() {
+        if (app)
+            app.launcher.chooseLanguage("en")
+        quit()
+    }
 
     // Moves a folder that a workspace has just closed. Windows keeps it until the event loop has
     // destroyed the window's objects, so this retries between turns of the loop.
     function move(from, to) {
         tryVerify(() => files.exists(to) || files.rename(from, to), 10000, "the folder could be moved")
+    }
+
+    // Writes what the window shows to `<AUR_SNAPSHOT_DIR>/<name>.png`, when that variable names a
+    // folder (to look at what a run draws).
+    function snapshot(name) {
+        const dir = files.env("AUR_SNAPSHOT_DIR")
+        if (dir === "")
+            return
+        files.mkdir(dir)
+        grabImage(app.contentItem).save(dir + "/" + name + ".png")
     }
 
     // Clicks the centre of an item as a person would.

@@ -58,22 +58,55 @@ fn unescape(xml: &str) -> String {
         .replace("&amp;", "&")
 }
 
-/// `(source, translation element, translation text)` of every message of a `.ts`.
-fn messages(ts: &str) -> Vec<(String, String, String)> {
+/// One message of a `.ts` file.
+struct Message {
+    source: String,
+    /// It has plural forms (`%n`).
+    numerus: bool,
+    /// The translation is marked neither unfinished nor vanished.
+    finished: bool,
+    /// The translation's text: one entry, or one per plural form.
+    forms: Vec<String>,
+}
+
+fn messages(ts: &str) -> Vec<Message> {
     ts.split("<message")
         .skip(1)
         .map(|message| {
-            let between = |open: &str, close: &str| {
-                let start = message.find(open).unwrap() + open.len();
+            let between = |open: &str, close: &str, from: usize| {
+                let start = from + message[from..].find(open).unwrap() + open.len();
                 let end = start + message[start..].find(close).unwrap();
                 message[start..end].to_string()
             };
-            let source = unescape(&between("<source>", "</source>"));
-            let element_start = message.find("<translation").unwrap();
-            let element_end = element_start + message[element_start..].find('>').unwrap();
-            let element = message[element_start..=element_end].to_string();
-            let text = unescape(&between(&element, "</translation>"));
-            (source, element, text)
+            let source = unescape(&between("<source>", "</source>", 0));
+            let numerus = message.trim_start().starts_with("numerus=\"yes\"");
+            let at = message.find("<translation").unwrap();
+            let tag_end = at + message[at..].find('>').unwrap();
+            let tag = &message[at..=tag_end];
+            let finished = !tag.contains("type=");
+            let forms = if tag.ends_with("/>") {
+                Vec::new()
+            } else if numerus {
+                message[tag_end..]
+                    .split("<numerusform")
+                    .skip(1)
+                    .map(|form| {
+                        let text = &form[form.find('>').unwrap() + 1..];
+                        unescape(&text[..text.find("</numerusform>").unwrap_or(text.len())])
+                    })
+                    .collect()
+            } else {
+                let text = &message[tag_end + 1..];
+                vec![unescape(
+                    &text[..text.find("</translation>").unwrap_or(text.len())],
+                )]
+            };
+            Message {
+                source,
+                numerus,
+                finished,
+                forms,
+            }
         })
         .collect()
 }
@@ -97,8 +130,11 @@ fn every_translation_file_covers_the_screens_exactly_and_is_finished() {
     let files = read_dir("i18n", "ts");
     assert!(!files.is_empty(), "there is at least one translation");
     for (name, ts) in files {
+        // English is what the screens are written in: its file only carries the plural forms, which
+        // a source text cannot hold (`%n photo(s)`), and the rest of it stays as lupdate leaves it.
+        let source_language = ts.contains(" language=\"en\"");
         let messages = messages(&ts);
-        let have: BTreeSet<String> = messages.iter().map(|(s, _, _)| s.clone()).collect();
+        let have: BTreeSet<String> = messages.iter().map(|m| m.source.clone()).collect();
         assert_eq!(
             wanted.difference(&have).collect::<Vec<_>>(),
             Vec::<&String>::new(),
@@ -109,20 +145,37 @@ fn every_translation_file_covers_the_screens_exactly_and_is_finished() {
             Vec::<&String>::new(),
             "{name}: strings no screen uses any more (run lupdate -no-obsolete)"
         );
-        for (source, element, text) in messages {
+        for message in messages {
+            if source_language && !message.numerus {
+                continue;
+            }
+            let source = &message.source;
+            assert!(message.finished, "{name}: {source:?} is not finished");
             assert!(
-                !element.contains("type="),
-                "{name}: {source:?} is {element}: not finished"
-            );
-            assert!(
-                !text.trim().is_empty(),
+                !message.forms.is_empty() && message.forms.iter().all(|f| !f.trim().is_empty()),
                 "{name}: {source:?} has no translation"
             );
-            assert_eq!(
-                placeholders(&source),
-                placeholders(&text),
-                "{name}: {source:?} and its translation differ in their placeholders"
-            );
+            if message.numerus {
+                // A plural form may leave %n out ("one photo"), but adds no other placeholder.
+                assert!(
+                    message.forms.len() >= 2 || source_language,
+                    "{name}: {source:?} has one plural form"
+                );
+                for form in &message.forms {
+                    for placeholder in placeholders(form) {
+                        assert!(
+                            placeholders(source).contains(&placeholder),
+                            "{name}: a form of {source:?} has {placeholder}, which the source lacks"
+                        );
+                    }
+                }
+            } else {
+                assert_eq!(
+                    placeholders(source),
+                    placeholders(&message.forms[0]),
+                    "{name}: {source:?} and its translation differ in their placeholders"
+                );
+            }
         }
     }
 }

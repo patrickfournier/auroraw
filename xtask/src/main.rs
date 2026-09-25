@@ -63,7 +63,12 @@ const ALLOWED: &[(&str, &[&str])] = &[
     ),
     (
         "auroraw-ui-qt",
-        &["auroraw-catalogue", "auroraw-engine", "auroraw-types"],
+        &[
+            "auroraw-catalogue",
+            "auroraw-engine",
+            "auroraw-imaging",
+            "auroraw-types",
+        ],
     ),
     (
         "auroraw-cli",

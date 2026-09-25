@@ -27,9 +27,14 @@ fn run_suite(suite: &str, home: &Path, extra: Option<&Path>) {
         )
         .arg("-o")
         .arg(format!("{},txt", report.display()))
+        // The report goes to the console too, since a run that dies leaves the file empty.
+        .arg("-o")
+        .arg("-,txt")
         .env("QT_QPA_PLATFORM", "offscreen")
         .env("QT_QUICK_BACKEND", "software")
         .env("QT_QUICK_CONTROLS_STYLE", "Fusion")
+        // The machine's own language must not change what the suites read.
+        .env("LC_ALL", "C.UTF-8")
         .env("AURORAW_TEST_HOME", home);
     if let Some(extra) = extra {
         command.env("AURORAW_TEST_EXTRA", extra);
@@ -41,8 +46,9 @@ fn run_suite(suite: &str, home: &Path, extra: Option<&Path>) {
         .any(|line| line.starts_with("Totals: ") && line.contains(" 0 failed"));
     assert!(
         output.status.success() && clean,
-        "suite {suite} failed ({}):\n{text}\n{}",
+        "suite {suite} failed ({}):\n{text}\n{}\n{}",
         output.status,
+        String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
 }
@@ -73,4 +79,23 @@ fn the_grid_on_a_machine_with_photos() {
     let extra = home.path().join("Extra");
     support::write_photos(&extra, "EXTRA", 5);
     run_suite("grid", home.path(), Some(&extra));
+}
+
+/// A photo whose file has gone (an unplugged card, a deleted picture) is listed but has no thumbnail
+/// to make: its cell says so, and the others show theirs.
+#[test]
+fn a_photo_that_no_thumbnail_can_be_made_for_says_so() {
+    let home = temp_dir();
+    support::machine_with_photos(home.path(), 12);
+    std::fs::remove_file(home.path().join("Card").join("IMG_0005.jpg")).unwrap();
+    run_suite("thumbnails", home.path(), None);
+}
+
+#[test]
+fn a_scan_reaches_the_grid_and_makes_thumbnails_ahead() {
+    let home = temp_dir();
+    support::machine_with_photos(home.path(), 20);
+    let extra = home.path().join("Extra");
+    support::write_photos(&extra, "EXTRA", 5);
+    run_suite("scan", home.path(), Some(&extra));
 }

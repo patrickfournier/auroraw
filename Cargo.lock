@@ -673,6 +673,7 @@ version = "0.0.0"
 dependencies = [
  "auroraw-catalogue",
  "auroraw-engine",
+ "auroraw-imaging",
  "auroraw-testkit",
  "auroraw-types",
  "cxx",

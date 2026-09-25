@@ -20,6 +20,7 @@ quicktest = []
 [dependencies]
 auroraw-catalogue = { path = "../catalogue" }
 auroraw-engine = { path = "../engine" }
+auroraw-imaging = { path = "../imaging" }
 auroraw-types = { path = "../types" }
 cxx = "1"
 cxx-qt = "0.10"

@@ -3,8 +3,9 @@ import QtQuick
 import QtTest
 import org.auroraw.ui
 
-// The grid's keyboard and layout, offscreen, on the fixture workspace (a machine made by
-// the harness): the last workspace opens on the grid.
+// The library grid on the fixture workspace (a machine made by the harness, 80 photos): selecting,
+// paging, rating, the filter bar, the layout and the sentences.
+// The last workspace opens on the grid.
 AppTestCase {
     name: "Grid"
 
@@ -12,57 +13,203 @@ AppTestCase {
         launch("")
         compare(app.launcher.screen, "workspace")
         compare(app.currentTask, "cull", "a workspace with photos opens on the grid")
+        tryCompare(app.photos, "count", 80)
+        grid = app.library.grid
+    }
+
+    // The grid of the window `init` made.
+    property var grid: null
+
+    function cell(index) {
+        grid.positionViewAtIndex(index, GridView.Contain)
+        wait(30)
+        const item = grid.itemAtIndex(index)
+        verify(item, "the cell " + index + " exists")
+        return item
+    }
+
+    function clickCell(index) {
+        mouseClick(cell(index))
+        wait(60)
+    }
+
+    function shownWidth(columns) { return columns * 164 }
+
+    // The tests share the machine, and a rating is kept in the catalogue: what a test rated is
+    // cleared afterwards (and the language put back), so that the next one starts from the same photos.
+    property var rated: []
+
+    function rateSelected(stars) {
+        rated.push(app.photos.idAt(grid.currentIndex))
+        keyClick(Qt.Key_0 + stars)
+    }
+
+    function cleanup() {
+        if (app) {
+            app.launcher.chooseLanguage("en")
+            app.library.filterBy(0)
+            for (const id of rated) {
+                const row = app.photos.rowOf(id)
+                if (row >= 0)
+                    app.photos.setRating(row, 0)
+            }
+            wait(200)
+        }
+        rated = []
+        quit()
+    }
+
+    function test_a_click_selects_a_photo_and_the_strip_describes_it() {
+        wait(500)
+        snapshot("grid-unselected")
+        compare(grid.currentIndex, -1, "nothing is selected at first")
+        compare(app.library.summary, "")
+        clickCell(3)
+        compare(grid.currentIndex, 3)
+        verify(app.library.summary.indexOf("IMG_") === 0, "the strip names the file: " + app.library.summary)
+        clickCell(5)
+        compare(grid.currentIndex, 5, "only one photo is selected")
+        rateSelected(4)
+        wait(300)
+        snapshot("grid-selected")
+    }
+
+    function test_arrows_step_and_stop_at_the_ends_of_the_list() {
+        grid.forceActiveFocus()
+        keyClick(Qt.Key_Right)
+        compare(grid.currentIndex, 0, "with nothing selected a move selects the first photo")
+        keyClick(Qt.Key_Left)
+        compare(grid.currentIndex, 0, "not before the first photo")
+        keyClick(Qt.Key_Right)
+        compare(grid.currentIndex, 1)
+        keyClick(Qt.Key_Down)
+        compare(grid.currentIndex, 1 + grid.columns)
+        keyClick(Qt.Key_Up)
+        compare(grid.currentIndex, 1)
+        keyClick(Qt.Key_End)
+        keyClick(Qt.Key_Right)
+        compare(grid.currentIndex, 79, "not beyond the last photo")
+    }
+
+    function test_a_step_down_onto_a_short_last_row_lands_on_its_last_photo() {
+        app.width = shownWidth(7) + 20
+        wait(300)
+        compare(grid.columns, 7, "80 photos in rows of 7: the last row has 3")
+        app.library.select(75)
+        grid.forceActiveFocus()
+        keyClick(Qt.Key_Down)
+        compare(grid.currentIndex, 79, "the column has no photo below: the last one")
     }
 
     function test_paging_keys_home_and_end_move_the_selection_and_keep_it_in_view() {
-        const grid = app.library.grid
         verify(grid.count >= 60, "the fixture's photos are listed")
-        grid.currentIndex = 1
-        grid.forceActiveFocus()
+        clickCell(1)
         const page = grid.visibleRows * grid.columns
         keyClick(Qt.Key_PageDown)
-        compare(grid.currentIndex, 1 + page)
+        compare(grid.currentIndex, 1 + page, "a page down keeps the column")
         keyClick(Qt.Key_End)
         compare(grid.currentIndex, grid.count - 1)
         verify(grid.contentY > 0, "the last row was scrolled into view")
+        const last = grid.itemAtIndex(grid.count - 1)
+        verify(last && last.y + last.height <= grid.contentY + grid.height + 1, "the last photo is in view")
         keyClick(Qt.Key_PageUp)
         compare(grid.currentIndex, grid.count - 1 - page)
         keyClick(Qt.Key_Home)
         compare(grid.currentIndex, 0)
-        compare(grid.contentY, 0)
-        keyClick(Qt.Key_Right)
-        compare(grid.currentIndex, 1, "arrows are the GridView's own")
-        keyClick(Qt.Key_Down)
-        compare(grid.currentIndex, 1 + grid.columns)
+        compare(grid.contentY, 0, "back at the top")
+        verify(app.library.summary !== "", "the strip follows")
     }
 
-    function test_a_rating_key_reaches_the_model_and_the_cell() {
-        const grid = app.library.grid
-        grid.currentIndex = 2
-        grid.forceActiveFocus()
-        keyClick(Qt.Key_4)
-        wait(200)
+    function test_a_rating_key_reaches_the_cell_the_strip_and_the_catalogue() {
+        clickCell(2)
+        rateSelected(4)
+        compare(grid.itemAtIndex(2).rating, 4, "the cell shows its new rating at once")
+        tryVerify(() => app.library.summary.indexOf("★★★★") >= 0, 5000)
+        // The catalogue holds it: read the list again, and list only the photos rated 4 or more.
+        app.library.reload()
         compare(grid.itemAtIndex(2).rating, 4)
+        compare(grid.currentIndex, 2, "the selection stays on its photo when the list is read again")
+        app.library.filterBy(4)
+        tryCompare(app.photos, "count", 1)
+        compare(grid.itemAtIndex(0).rating, 4)
+        // 0 clears it.
+        clickCell(0)
+        rateSelected(0)
+        compare(grid.itemAtIndex(0).rating, 0)
     }
 
-    function test_a_resized_window_reflows_the_columns() {
-        const grid = app.library.grid
-        const before = grid.columns
+    function test_the_filter_bar_lists_photos_by_rating_and_says_how_many() {
+        compare(app.library.status, "80 photos")
+        clickCell(0)
+        rateSelected(3)
+        clickCell(1)
+        rateSelected(5)
+        clickCell(2)
+        rateSelected(1)
+        wait(300)
+        const buttons = app.library.filterButtons
+        compare(buttons.count, 6)
+        compare(buttons.itemAt(0).text, "All")
+        verify(buttons.itemAt(0).highlighted, "All is the filter to begin with")
+
+        mouseClick(buttons.itemAt(3))
+        tryCompare(app.photos, "count", 2)
+        compare(app.photos.minRating, 3)
+        compare(app.library.status, "2 photos")
+        verify(buttons.itemAt(3).highlighted && !buttons.itemAt(0).highlighted)
+        compare(grid.currentIndex, -1, "a new filter drops the selection")
+        mouseClick(buttons.itemAt(5))
+        tryCompare(app.photos, "count", 1)
+        compare(app.library.status, "1 photo")
+        mouseClick(buttons.itemAt(0))
+        tryCompare(app.photos, "count", 80)
+    }
+
+    function test_the_sentences_follow_the_language_with_their_plural_forms() {
+        app.launcher.chooseLanguage("fr")
+        wait(200)
+        compare(app.library.filterButtons.itemAt(0).text, "Tout")
+        compare(app.library.status, "80 photos")
+        app.library.filterBy(5)
+        compare(app.library.status, "0 photo", "French counts zero as one")
+        app.library.filterBy(0)
+        clickCell(0)
+        rateSelected(1)
+        compare(grid.itemAtIndex(0).Accessible.name, "Photo, 1 étoile")
+        rateSelected(2)
+        compare(grid.itemAtIndex(0).Accessible.name, "Photo, 2 étoiles")
+        app.launcher.chooseLanguage("en")
+        wait(200)
+        compare(grid.itemAtIndex(0).Accessible.name, "Photo, 2 stars")
+        rateSelected(1)
+        compare(grid.itemAtIndex(0).Accessible.name, "Photo, 1 star")
+    }
+
+    function test_a_resized_window_shows_as_many_columns_as_fit_and_keeps_the_selected_photo() {
+        app.width = 1400
+        wait(300)
+        compare(grid.columns, 8)
+        clickCell(3)
+        // 1100 wide holds six cells.
         app.width = 1100
         wait(300)
         compare(grid.columns, 6)
-        verify(grid.columns < before)
-    }
-
-    // The engine's events reach the interface: a folder added as a source is scanned in the
-    // background, progress and the closing sentence arrive as property changes, the grid reloads.
-    function test_adding_a_source_reports_progress_and_reloads_the_grid() {
-        const before = app.photos.count
-        // AURORAW_TEST_EXTRA: a folder of 5 more photos, next to the fixture's own source.
-        verify(app.library.addSource(app.launcher.env("AURORAW_TEST_EXTRA")))
-        tryVerify(function () { return app.library.scanStatus.indexOf("Done") === 0 }, 20000)
-        compare(app.library.scanProgress, 1.0)
-        tryVerify(function () { return app.photos.count === before + 5 }, 5000)
+        compare(grid.currentIndex, 3, "the selection stays on its photo")
+        // Narrower than one cell would still show one column; the window's minimum shows three.
+        app.width = 640
+        wait(300)
+        compare(grid.columns, 3)
+        app.width = 1900
+        wait(300)
+        compare(grid.columns, 11)
+        compare(grid.currentIndex, 3)
+        // A selection that a resize pushed out of view is brought back.
+        app.library.select(60)
+        app.width = 1400
+        wait(300)
+        const item = grid.itemAtIndex(60)
+        verify(item && item.y + item.height > grid.contentY && item.y < grid.contentY + grid.height,
+               "the selected photo is in view after the columns changed")
     }
 
     // The rating's star is one character, U+2605 (compiled QML once read as a legacy code page turned

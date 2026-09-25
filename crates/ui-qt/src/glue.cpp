@@ -1,48 +1,114 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The C++ the interface needs (D-094, spike 5): an image provider, because a QML Image cannot take
-// bytes from Rust directly, and a translation loader, because cxx-qt-lib has no QTranslator.
+// The C++ the interface needs (D-094, spike 5): an asynchronous image provider, because a QML Image
+// cannot take bytes from Rust directly, and a translation loader, because cxx-qt-lib has no QTranslator.
 // Everything else is Rust and QML.
 #include <QCoreApplication>
 #include <QImage>
+#include <QKeySequence>
 #include <QQmlApplicationEngine>
 #include <QQmlEngine>
 #include <QQuickImageProvider>
+#include <QQuickTextureFactory>
 #include <QTranslator>
+#include <algorithm>
+#include <atomic>
+#include <cstring>
+#include <mutex>
+#include <unordered_map>
 
 extern "C" {
-unsigned char *auroraw_thumbnail_jpeg(const unsigned char *id, size_t len, size_t *out_len);
-void auroraw_free_bytes(unsigned char *bytes, size_t len);
+void auroraw_thumbnail_request(const unsigned char *id, size_t len, unsigned long long token);
 }
 
 namespace {
 QTranslator *g_translator = nullptr;
 
-class ThumbProvider : public QQuickImageProvider {
-public:
-    ThumbProvider() : QQuickImageProvider(QQuickImageProvider::Image) {}
+class ThumbResponse;
 
-    // Called on Qt's image loading threads, so waiting for the thumbnail here blocks nothing visible.
-    QImage requestImage(const QString &id, QSize *size, const QSize &) override {
+// The responses waiting for their thumbnail, by the token the Rust side answers to. The collector's
+// thread looks one up and posts to it under the lock, and a response leaves the table (under the
+// lock) before it is destroyed, so an answer never reaches a response that is gone.
+std::mutex g_mutex;
+std::unordered_map<unsigned long long, ThumbResponse *> g_responses;
+std::atomic<unsigned long long> g_next{1};
+
+class ThumbResponse : public QQuickImageResponse {
+public:
+    explicit ThumbResponse(const QString &id) : m_token(g_next++) {
+        {
+            std::lock_guard<std::mutex> lock(g_mutex);
+            g_responses[m_token] = this;
+        }
         const QByteArray name = id.toUtf8();
-        size_t length = 0;
-        unsigned char *bytes = auroraw_thumbnail_jpeg(
-            reinterpret_cast<const unsigned char *>(name.constData()), name.size(), &length);
-        QImage image;
-        if (bytes) {
-            image = QImage::fromData(bytes, static_cast<int>(length), "JPEG");
-            auroraw_free_bytes(bytes, length);
-        }
-        if (size) {
-            *size = image.size();
-        }
-        return image;
+        auroraw_thumbnail_request(reinterpret_cast<const unsigned char *>(name.constData()),
+                                  static_cast<size_t>(name.size()), m_token);
+    }
+
+    ~ThumbResponse() override { forget(); }
+
+    QQuickTextureFactory *textureFactory() const override {
+        return m_image.isNull() ? nullptr : QQuickTextureFactory::textureFactoryForImage(m_image);
+    }
+
+    QString errorString() const override {
+        return m_image.isNull() ? QStringLiteral("no thumbnail") : QString();
+    }
+
+    // The cell went away or scrolled off: nobody needs the answer any more.
+    void cancel() override { forget(); }
+
+    void done(const QImage &image) {
+        m_image = image;
+        emit finished();
+    }
+
+private:
+    void forget() {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        g_responses.erase(m_token);
+    }
+
+    unsigned long long m_token;
+    QImage m_image;
+};
+
+// A request for a thumbnail does not wait: the answer arrives from the collector's thread, so the
+// thumbnails of a screenful are made side by side and none of Qt's image threads is held up.
+class ThumbProvider : public QQuickAsyncImageProvider {
+public:
+    QQuickImageResponse *requestImageResponse(const QString &id, const QSize &) override {
+        return new ThumbResponse(id);
     }
 };
 } // namespace
 
-extern "C" void auroraw_setup_engine(void *engine) {
-    static_cast<QQmlApplicationEngine *>(engine)->addImageProvider(QStringLiteral("thumbs"),
-                                                                    new ThumbProvider);
+// Called by the Rust collector, on its own thread: `bytes` is the JPEG (null when there is no
+// thumbnail). Decoding happens here, off the GUI thread, and the finished image is handed over.
+extern "C" void auroraw_thumbnail_ready(unsigned long long token, const unsigned char *bytes,
+                                        size_t len) {
+    QImage image;
+    if (bytes) {
+        image = QImage::fromData(bytes, static_cast<int>(len), "JPEG");
+    }
+    std::lock_guard<std::mutex> lock(g_mutex);
+    const auto found = g_responses.find(token);
+    if (found == g_responses.end()) {
+        return;
+    }
+    ThumbResponse *response = found->second;
+    QMetaObject::invokeMethod(
+        response, [response, image]() { response->done(image); }, Qt::QueuedConnection);
+}
+
+// Registers `image://thumbs` on the engine of `object` (an object made by QML: the launcher, at the
+// start of the window), unless it is there already. The application and QtQuickTest's runner make
+// their engines differently, so the provider is installed from inside the engine.
+extern "C" void auroraw_install_thumbnails(QObject *object) {
+    if (QQmlEngine *engine = qmlEngine(object)) {
+        if (!engine->imageProvider(QStringLiteral("thumbs"))) {
+            engine->addImageProvider(QStringLiteral("thumbs"), new ThumbProvider);
+        }
+    }
 }
 
 // `data` stays valid for the life of the program (it is static in the Rust binary); null removes the
@@ -70,7 +136,6 @@ extern "C" void auroraw_set_translation(const unsigned char *data, size_t len, Q
     }
 }
 
-#include <QKeySequence>
 
 // A shortcut written the way this platform writes it (Ctrl+N, ⌘N). `standard` is a
 // QKeySequence::StandardKey, or negative to read `text` (UTF-8, "Ctrl+I") as a sequence. Qt Quick's
