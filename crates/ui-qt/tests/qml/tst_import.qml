@@ -66,6 +66,22 @@ AppTestCase {
         snapshot("import-done")
     }
 
+    function test_a_workspace_that_is_empty_opens_on_what_fills_it_and_one_with_photos_on_the_grid() {
+        const m = begin("Template2")
+        compare(app.currentTask, "catalogue", "an empty workspace opens on what fills it")
+        openImport()
+        fill(m)
+        click(d.importButton)
+        waitForTheImport()
+        waitForTheScan()
+        // The next launch reopens it, on the grid, because it now has photos.
+        launchApp(m.machine)
+        compare(app.launcher.screen, "workspace")
+        compare(app.currentTask, "cull")
+        tryCompare(app.photos, "count", 2)
+        compare(app.library.status, "2 photos")
+    }
+
     function test_the_dialog_cannot_be_closed_while_an_import_runs() {
         const m = begin("Big")
         openImport()
@@ -355,6 +371,10 @@ AppTestCase {
         d.backupPicker.choose(existing)
         compare(d.backupField.text, existing)
         compare(d.backupPicker.title, "Choose the backup folder")
+
+        // A dialog that is cancelled leaves the field alone.
+        d.backupPicker.rejected()
+        compare(d.backupField.text, existing)
 
         // Paths and URLs, the way a dialog gives and takes them.
         compare(d.sourcePicker.pathOf("file:///home/me/My%20Photos"), "/home/me/My Photos")

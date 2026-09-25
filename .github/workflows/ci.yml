@@ -112,6 +112,16 @@ jobs:
           AUR_REQUIRE_EXIFTOOL: "1"
           AUR_REQUIRE_SAMPLES: "1"
           AUR_REQUIRE_PLUGINS: "1"
+          # The interface tests draw every view to a PNG here (kept below).
+          AUR_SNAPSHOT_DIR: ${{ github.workspace }}/snapshots
+      - name: Keep the pictures of the views
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: views-${{ matrix.name }}
+          path: snapshots
+          if-no-files-found: ignore
+          retention-days: 14
       - run: cargo test --workspace --doc --locked
       - name: Launch test
         run: cargo run --locked --package auroraw-app -- --self-test

@@ -15,6 +15,17 @@ Item {
     property alias newButton: newButton
     property alias openButton: openButton
     property alias list: list
+    // The launcher's note, as a sentence.
+    readonly property string noteText: {
+        const note = root.launcher.note
+        if (note.indexOf("lost:") === 0)
+            return qsTr("The last workspace could not be found: %1").arg(note.substring(5))
+        if (note.indexOf("open:") === 0) {
+            const parts = note.substring(5).split("\t")
+            return qsTr("Cannot open %1: %2").arg(parts[0]).arg(parts[1])
+        }
+        return ""
+    }
 
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
@@ -32,8 +43,8 @@ Item {
             color: Theme.quiet
         }
         Label {
-            visible: root.launcher.note !== ""
-            text: root.launcher.note
+            visible: root.noteText !== ""
+            text: root.noteText
             color: Theme.warning
             wrapMode: Text.Wrap
             Layout.fillWidth: true

@@ -37,7 +37,7 @@
 | **Plugin** | The host's limits and permissions, and each plugin family's interface | `plugin-host` tests with hostile plugins; a conformance kit for plugin authors | Every change |
 | **Fuzz** | Parsers and decoders given hostile input: no crash, no hang, no memory growth | `cargo-fuzz` targets | Nightly, a few minutes each |
 | **Crash consistency** | A process killed at any point of a write leaves a workspace and catalogue that reconcile | fault-injection tests | Every change (short), nightly (long) |
-| **Interface** | The accessibility tree, the translations, the models; screenshots of key views | Slint tests, the AT-SPI script | Every change (model level), release (screenshots) |
+| **Interface** | The accessibility tree, the translations, the models; screenshots of key views | Qt Quick Test, the AT-SPI script | Every change (model level), release (screenshots) |
 | **Performance** | Budgets of the specification | The benchmark harness of the spikes | Nightly on Patrick's machines; trend on CI |
 | **Manual** | Colour on a real display, screen readers, feel of the drag, packaging | A checklist | Each release, and when a risky area changes |
 
@@ -180,27 +180,28 @@ translation can fail unnoticed. What is checked:
 - **Responsiveness**: an instrumented build reports the longest interface-thread stall; the
   interface test scenarios fail if it exceeds a frame budget with the engine under load
   (spike 2: nothing heavy on the interface thread).
-- **The interface is tested without a display first, on a real machine second.** Slint's testing
-  backend (`i-slint-backend-testing`, pinned to Slint's exact version) runs the whole shell with
-  no window and no display: elements are found by their accessible labels (what a screen reader
-  sees), clicks are real pointer events at an element's centre, keys are dispatched to the
-  window, and time is advanced by hand. `ui/src/headless_tests.rs` drives an import end to end
-  (fill the form, click Import, watch the progress, "Show photos", thumbnails in the grid), the
-  welcome list and workspace lifecycle (first launch, new workspace, last workspace reopened or lost),
-  every menu command and shortcut, the Edit items on a focused field, the catalogue panel (add, scan,
-  refuse, merge, remove, restore), the import dialog (destination kinds, plain copy, card folders) and
-  the card banner (the folder dialog and the mounted cards are injected, so nothing touches the
-  machine), the refusal messages, rating and paging from the keyboard, a resized window's columns,
-  the menus' separators (by the rows' positions), thumbnails made while a source is scanned and the
-  run-time translations with their plural forms, on every CI platform. With the software rasteriser it also draws each
-  view to a PNG (`AUR_SNAPSHOT_DIR=<folder> cargo test -p auroraw-ui headless`), which is how
-  layout, clipping and French text are looked at without touching anyone's desktop.
+- **The interface is tested without a display first, on a real machine second.** Qt Quick Test
+  (D-094) runs the whole interface offscreen with the software renderer, in a process of its own per
+  suite (`crates/ui-qt/tests/qml/tst_*.qml`, started by `tests/qml.rs`, so `cargo nextest run` runs
+  them): each test makes the real window on a machine of its own (a folder standing for a person's
+  computer, made by the harness), clicks and keys are real events sent to the window, and the
+  engine's events arrive through the real event bus. The suites cover the welcome list and workspace
+  lifecycle, every menu command and shortcut (and their writing), the Edit items on a focused field,
+  the modal behaviour of dialogs, the catalogue task (add, scan, refuse, merge, remove, restore), the
+  Import dialog (destination kinds, plain copy, camera folders, the form remembered), the card banner
+  and the folder pickers (the mounted cards are injected; no native dialog opens offscreen), rating and
+  paging from the keyboard, a resized window's columns, thumbnails made while a source is scanned,
+  the language applied live with its plural forms, and the application's own start-up, which must say
+  nothing about its QML. `docs/ui-parity-checklist.md` maps the 54 scenarios of the Slint shell to them.
+  With `AUR_SNAPSHOT_DIR=<folder>` every view is also drawn to a PNG, in English and in French
+  (CI keeps them as artifacts), which is how layout, clipping and French text are looked at without
+  touching anyone's desktop.
 - **What only a real machine shows**, checked by a person before a release: GPU rendering, the
   platform's input methods (ibus, IME), real fonts and scaling, frame rate, AT-SPI/NVDA/VoiceOver.
   **An automated session never drives a person's own desktop with synthetic input**: on
   2026-09-23 `xdotool type` into the import view froze that display twice and forced a restart
   each time (`xdotool type` hanging GNOME/X11 desktops on long strings is a known upstream
-  problem, and a Slint text field with ibus was never ruled out). The person runs the application
+  problem, and a text field with ibus was never ruled out). The person runs the application
   and types in its fields by hand, and a window is captured alone, never the whole screen.
 
 ## 7. Performance [proposed]

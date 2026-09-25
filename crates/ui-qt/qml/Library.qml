@@ -77,21 +77,17 @@ FocusScope {
                 spacing: 6
                 Repeater {
                     id: filterButtons
-                    model: [
-                        { min: 0, name: qsTr("All") },
-                        { min: 1, name: qsTr("1+") },
-                        { min: 2, name: qsTr("2+") },
-                        { min: 3, name: qsTr("3+") },
-                        { min: 4, name: qsTr("4+") },
-                        { min: 5, name: qsTr("5") }
-                    ]
+                    // (The model holds no text, so that a change of language does not rebuild the buttons.)
+                    model: 6
                     Button {
-                        required property var modelData
-                        text: modelData.name
-                        highlighted: root.photoGrid.minRating === modelData.min
+                        required property int index
+                        readonly property int minRating: index
+                        text: index === 0 ? qsTr("All") : index === 1 ? qsTr("1+") : index === 2 ? qsTr("2+")
+                              : index === 3 ? qsTr("3+") : index === 4 ? qsTr("4+") : qsTr("5")
+                        highlighted: root.photoGrid.minRating === minRating
                         focusPolicy: Qt.NoFocus
                         onClicked: {
-                            root.filterBy(modelData.min)
+                            root.filterBy(minRating)
                             grid.forceActiveFocus()
                         }
                     }

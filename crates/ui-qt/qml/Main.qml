@@ -134,8 +134,8 @@ ApplicationWindow {
             window.font.family = Theme.fontFamily
         if (Theme.fontSize > 0)
             window.font.pointSize = Theme.fontSize
-        if (machine !== "")
-            launcher.useMachine(machine)
+        // (Always: a test process makes several windows, each on its own machine.)
+        launcher.useMachine(machine)
         launcher.start()
         known.refresh()
     }

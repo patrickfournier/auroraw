@@ -59,9 +59,11 @@ TestCase {
     // Writes what the window shows to `<AUR_SNAPSHOT_DIR>/<name>.png`, when that variable names a
     // folder (to look at what a run draws).
     function snapshot(name) {
-        const dir = files.env("AUR_SNAPSHOT_DIR")
-        if (dir === "")
+        const root = files.env("AUR_SNAPSHOT_DIR")
+        if (root === "")
             return
+        // (Its own folder: the Slint shell's tests, until they go, write theirs beside.)
+        const dir = root + "/qt"
         files.mkdir(dir)
         grabImage(app.contentItem).save(dir + "/" + name + ".png")
         // Dialogs and menus live in the overlay, above the content.

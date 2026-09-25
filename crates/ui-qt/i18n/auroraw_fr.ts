@@ -507,27 +507,27 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="81"/>
+        <location filename="../qml/Library.qml" line="85"/>
         <source>All</source>
         <translation>Tout</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="82"/>
+        <location filename="../qml/Library.qml" line="85"/>
         <source>1+</source>
         <translation>1+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="83"/>
+        <location filename="../qml/Library.qml" line="85"/>
         <source>2+</source>
         <translation>2+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="84"/>
+        <location filename="../qml/Library.qml" line="86"/>
         <source>3+</source>
         <translation>3+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="85"/>
+        <location filename="../qml/Library.qml" line="86"/>
         <source>4+</source>
         <translation>4+</translation>
     </message>
@@ -537,7 +537,7 @@
         <translation>5</translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="189"/>
+        <location filename="../qml/Library.qml" line="185"/>
         <source>Photo, %n star(s)</source>
         <translation>
             <numerusform>Photo, %n étoile</numerusform>
@@ -545,12 +545,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="189"/>
+        <location filename="../qml/Library.qml" line="185"/>
         <source>Photo</source>
         <translation>Photo</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="208"/>
+        <location filename="../qml/Library.qml" line="204"/>
         <source>No preview</source>
         <translation>Aucun aperçu</translation>
     </message>
@@ -716,17 +716,17 @@
         <translation>Photos retirées auparavant</translation>
     </message>
     <message>
-        <location filename="../qml/RestoreDialog.qml" line="28"/>
+        <location filename="../qml/RestoreDialog.qml" line="30"/>
         <source>%1 of the %2 photos in this folder were in the catalogue before, with their ratings, keywords and versions.</source>
         <translation>%1 des %2 photos de ce dossier étaient déjà dans le catalogue, avec leurs cotes, mots-clés et versions.</translation>
     </message>
     <message>
-        <location filename="../qml/RestoreDialog.qml" line="35"/>
+        <location filename="../qml/RestoreDialog.qml" line="38"/>
         <source>Add them as new photos</source>
         <translation>Les ajouter comme nouvelles photos</translation>
     </message>
     <message>
-        <location filename="../qml/RestoreDialog.qml" line="41"/>
+        <location filename="../qml/RestoreDialog.qml" line="44"/>
         <source>Restore them</source>
         <translation>Les restaurer</translation>
     </message>
@@ -744,12 +744,12 @@
         <translation>Langue</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsDialog.qml" line="26"/>
+        <location filename="../qml/SettingsDialog.qml" line="30"/>
         <source>System</source>
         <translation>Système</translation>
     </message>
     <message>
-        <location filename="../qml/SettingsDialog.qml" line="44"/>
+        <location filename="../qml/SettingsDialog.qml" line="43"/>
         <source>Close</source>
         <translation>Fermer</translation>
     </message>
@@ -757,47 +757,57 @@
 <context>
     <name>Welcome</name>
     <message>
-        <location filename="../qml/Welcome.qml" line="26"/>
+        <location filename="../qml/Welcome.qml" line="22"/>
+        <source>The last workspace could not be found: %1</source>
+        <translation>Le dernier workspace est introuvable : %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/Welcome.qml" line="25"/>
+        <source>Cannot open %1: %2</source>
+        <translation>Impossible d&apos;ouvrir %1 : %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/Welcome.qml" line="37"/>
         <source>Welcome to Auroraw</source>
         <translation>Bienvenue dans Auroraw</translation>
     </message>
     <message>
-        <location filename="../qml/Welcome.qml" line="31"/>
+        <location filename="../qml/Welcome.qml" line="42"/>
         <source>Open a workspace, or create a new one.</source>
         <translation>Ouvrez un workspace, ou créez-en un nouveau.</translation>
     </message>
     <message>
-        <location filename="../qml/Welcome.qml" line="45"/>
+        <location filename="../qml/Welcome.qml" line="56"/>
         <source>New workspace…</source>
         <translation>Nouveau workspace…</translation>
     </message>
     <message>
-        <location filename="../qml/Welcome.qml" line="51"/>
+        <location filename="../qml/Welcome.qml" line="62"/>
         <source>Open workspace…</source>
         <translation>Ouvrir un workspace…</translation>
     </message>
     <message>
-        <location filename="../qml/Welcome.qml" line="56"/>
+        <location filename="../qml/Welcome.qml" line="67"/>
         <source>Recent workspaces</source>
         <translation>Workspaces récents</translation>
     </message>
     <message>
-        <location filename="../qml/Welcome.qml" line="97"/>
+        <location filename="../qml/Welcome.qml" line="108"/>
         <source>Not found</source>
         <translation>Introuvable</translation>
     </message>
     <message>
-        <location filename="../qml/Welcome.qml" line="102"/>
+        <location filename="../qml/Welcome.qml" line="113"/>
         <source>Remove from the list</source>
         <translation>Retirer de la liste</translation>
     </message>
     <message>
-        <location filename="../qml/Welcome.qml" line="103"/>
+        <location filename="../qml/Welcome.qml" line="114"/>
         <source>Remove from the list: %1</source>
         <translation>Retirer de la liste : %1</translation>
     </message>
     <message>
-        <location filename="../qml/Welcome.qml" line="56"/>
+        <location filename="../qml/Welcome.qml" line="67"/>
         <source>No workspace yet.</source>
         <translation>Aucun workspace pour l&apos;instant.</translation>
     </message>

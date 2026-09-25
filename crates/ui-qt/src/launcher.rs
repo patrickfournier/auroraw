@@ -17,6 +17,8 @@ pub mod qobject {
         #[qml_element]
         #[qproperty(QString, screen)]
         #[qproperty(QString, workspace_name, cxx_name = "workspaceName")]
+        /// Why the welcome list is shown instead of a workspace: `lost:<folder>` or
+        /// `open:<folder><tab><reason>`.
         #[qproperty(QString, note)]
         #[qproperty(QString, language)]
         #[qproperty(QString, effective_language, cxx_name = "effectiveLanguage")]
@@ -208,7 +210,8 @@ impl qobject::Launcher {
         // A workspace named at launch first, else the last one opened.
         if let Some(path) = &launch.open {
             if let Some(reason) = self.as_mut().open_root(path) {
-                let note = format!("Cannot open {}: {reason}", path.display());
+                // (A code and its details: the sentence is QML's, so that it is translated.)
+                let note = format!("open:{}\t{reason}", path.display());
                 self.as_mut().set_note(text(&note));
             }
             return;
@@ -216,10 +219,7 @@ impl qobject::Launcher {
         if let Some(last) = Engine::last_opened_workspace(&launch.dirs) {
             let shown = last.found && self.as_mut().open_root(&last.path).is_none();
             if !shown {
-                let note = format!(
-                    "The last workspace could not be found: {}",
-                    last.path.display()
-                );
+                let note = format!("lost:{}", last.path.display());
                 self.as_mut().set_note(text(&note));
             }
         }

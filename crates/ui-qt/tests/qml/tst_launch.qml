@@ -147,7 +147,7 @@ AppTestCase {
 
         launch(machine)
         compare(app.launcher.screen, "welcome")
-        verify(app.launcher.note.indexOf("The last workspace could not be found:") === 0, app.launcher.note)
+        verify(app.welcome.noteText.indexOf("The last workspace could not be found:") === 0, app.welcome.noteText)
         compare(app.known.count, 1)
         const removeButton = app.welcome.list.itemAtIndex(0)
         verify(removeButton, "the lost workspace is listed")

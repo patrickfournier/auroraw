@@ -150,3 +150,14 @@ fn the_application_starts_without_a_word_about_its_qml() {
         about_qml.join("\n")
     );
 }
+
+/// Every view drawn (to PNG when `AUR_SNAPSHOT_DIR` says where), in English and in French.
+#[test]
+fn every_view_can_be_shown_and_drawn_in_both_languages() {
+    let home = temp_dir();
+    support::machine_with_photos(home.path(), 60);
+    support::write_photos(&home.path().join("Template3"), "IMG", 3);
+    support::write_photos(&home.path().join("Cam100"), "IMG", 1);
+    support::write_photos(&home.path().join("Cam101"), "CAM", 1);
+    run_suite("views", home.path(), None);
+}

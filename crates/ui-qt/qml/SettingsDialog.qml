@@ -22,18 +22,17 @@ AppDialog {
             spacing: 8
             Repeater {
                 id: languages
-                model: [
-                    { code: "system", label: qsTr("System") },
-                    { code: "en", label: "English" },
-                    { code: "fr", label: "Français" }
-                ]
+                // The model holds no text: it would be rebuilt (and its buttons with it) by every
+                // change of language, which Qt 6.4 lays out badly when the dialog is closed.
+                model: ["system", "en", "fr"]
                 delegate: Button {
-                    required property var modelData
-                    text: modelData.label
+                    required property string modelData
+                    text: modelData === "system" ? qsTr("System")
+                          : modelData === "en" ? "English" : "Français"
                     checkable: true
                     autoExclusive: true
-                    checked: dialog.launcher.language === modelData.code
-                    onClicked: dialog.launcher.chooseLanguage(modelData.code)
+                    checked: dialog.launcher.language === modelData
+                    onClicked: dialog.launcher.chooseLanguage(modelData)
                 }
             }
         }
