@@ -128,10 +128,18 @@ pub fn run(launch: Launch) -> Result<(), UiError> {
     *LAUNCH.lock().unwrap() = Some(launch);
     prepare_style();
     let mut app = QGuiApplication::new();
+    // A test that starts the application asks it to stop by itself.
+    if let Some(ms) = std::env::var("AURORAW_TEST_QUIT_MS")
+        .ok()
+        .and_then(|ms| ms.parse().ok())
+    {
+        glue::quit_after(ms);
+    }
     let mut engine = QQmlApplicationEngine::new();
-    let Some(engine) = engine.as_mut() else {
+    let Some(mut engine) = engine.as_mut() else {
         return Err(UiError("the QML engine could not be created".into()));
     };
+    glue::add_import_path(engine.as_mut(), "qrc:/qt/qml");
     engine.load(&QUrl::from("qrc:/qt/qml/org/auroraw/ui/qml/Main.qml"));
     match app.as_mut() {
         Some(app) => {

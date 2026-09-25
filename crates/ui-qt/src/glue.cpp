@@ -9,6 +9,7 @@
 #include <QQmlEngine>
 #include <QQuickImageProvider>
 #include <QQuickTextureFactory>
+#include <QTimer>
 #include <QTranslator>
 #include <algorithm>
 #include <atomic>
@@ -98,6 +99,18 @@ extern "C" void auroraw_thumbnail_ready(unsigned long long token, const unsigned
     ThumbResponse *response = found->second;
     QMetaObject::invokeMethod(
         response, [response, image]() { response->done(image); }, Qt::QueuedConnection);
+}
+
+// Lets the engine find the application's QML module (`import org.auroraw.ui`, with its singleton `Theme`)
+// where the build put it, in the executable's resources: Qt 6.5 looks there by itself, 6.4 does not.
+extern "C" void auroraw_add_import_path(void *engine, const unsigned char *path, size_t len) {
+    static_cast<QQmlApplicationEngine *>(engine)->addImportPath(
+        QString::fromUtf8(reinterpret_cast<const char *>(path), static_cast<qsizetype>(len)));
+}
+
+// Tests: quits the application after `ms` milliseconds of its event loop.
+extern "C" void auroraw_quit_after(int ms) {
+    QTimer::singleShot(ms, QCoreApplication::instance(), &QCoreApplication::quit);
 }
 
 // Registers `image://thumbs` on the engine of `object` (an object made by QML: the launcher, at the

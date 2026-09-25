@@ -121,3 +121,26 @@ fn importing_photos_from_a_card_or_a_folder() {
     support::write_photos(&home.path().join("Cam101"), "CAM", 1);
     run_suite("import", home.path(), None);
 }
+
+/// The application itself, started the way `auroraw-app` does (not through QtQuickTest, which sets
+/// the QML import path for it), says nothing about its QML: no unresolved theme, no failed binding.
+#[test]
+fn the_application_starts_without_a_word_about_its_qml() {
+    let home = temp_dir();
+    support::machine_with_photos(home.path(), 6);
+    let output = Command::new(env!("CARGO_BIN_EXE_qml-test-runner"))
+        .arg("--app")
+        .env("QT_QPA_PLATFORM", "offscreen")
+        .env("QT_QUICK_BACKEND", "software")
+        .env("LC_ALL", "C.UTF-8")
+        .env("AURORAW_TEST_HOME", home.path())
+        .env("AURORAW_TEST_QUIT_MS", "3000")
+        .output()
+        .expect("the application starts");
+    let said = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "the application failed:\n{said}");
+    assert!(
+        said.trim().is_empty(),
+        "the application said something about its QML:\n{said}"
+    );
+}

@@ -4,14 +4,18 @@
 //! The only module with `unsafe` besides the cxx-qt bridges (D-094).
 
 use std::ffi::c_void;
+use std::pin::Pin;
 use std::str::FromStr;
 
 use auroraw_types::PhotoId;
+use cxx_qt_lib::QQmlApplicationEngine;
 
 use crate::session;
 
 unsafe extern "C" {
+    fn auroraw_add_import_path(engine: *mut c_void, path: *const u8, len: usize);
     fn auroraw_install_thumbnails(object: *mut c_void);
+    fn auroraw_quit_after(ms: i32);
     fn auroraw_set_translation(data: *const u8, len: usize, object: *mut c_void);
     fn auroraw_thumbnail_ready(token: u64, bytes: *const u8, len: usize);
     fn auroraw_shortcut_text(
@@ -38,6 +42,22 @@ pub fn shortcut_text(standard: i32, text: &str) -> String {
         )
     };
     String::from_utf8_lossy(&out[..written.min(out.len())]).into_owned()
+}
+
+/// Tests: has the application quit by itself after `ms` milliseconds.
+pub fn quit_after(ms: i32) {
+    // SAFETY: only called once the application object exists.
+    unsafe { auroraw_quit_after(ms) }
+}
+
+/// Adds `path` (such as `qrc:/qt/qml`) where `engine` looks for QML modules.
+pub fn add_import_path(mut engine: Pin<&mut QQmlApplicationEngine>, path: &str) {
+    // SAFETY: the pointer is only used for this call (the engine is a C++ object behind a pin), and
+    // `path` is valid for its length.
+    unsafe {
+        let raw = engine.as_mut().get_unchecked_mut() as *mut QQmlApplicationEngine;
+        auroraw_add_import_path(raw as *mut c_void, path.as_ptr(), path.len())
+    }
 }
 
 /// Registers the thumbnail provider (`image://thumbs/<photo id>`) on the engine of `object`.
