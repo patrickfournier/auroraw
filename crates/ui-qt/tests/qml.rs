@@ -139,8 +139,14 @@ fn the_application_starts_without_a_word_about_its_qml() {
         .expect("the application starts");
     let said = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "the application failed:\n{said}");
+    // What the platform says of itself (fonts, plug-ins) is not the QML's.
+    let about_qml: Vec<&str> = said
+        .lines()
+        .filter(|line| line.contains("qrc:") || line.contains("QML") || line.contains("TypeError"))
+        .collect();
     assert!(
-        said.trim().is_empty(),
-        "the application said something about its QML:\n{said}"
+        about_qml.is_empty(),
+        "the application said something about its QML:\n{}",
+        about_qml.join("\n")
     );
 }
