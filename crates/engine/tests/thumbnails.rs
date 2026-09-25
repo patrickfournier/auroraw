@@ -222,3 +222,21 @@ fn a_warmed_photo_that_cannot_be_made_does_not_stop_the_others() {
         std::thread::sleep(Duration::from_millis(5));
     }
 }
+
+#[test]
+fn starting_and_dropping_the_service_over_and_over_never_hangs() {
+    // A worker that had just looked at the stop flag and not yet begun to wait used to miss the
+    // notification sent when the service was dropped, and `drop` waited for it for ever.
+    let (engine, _events, dir) = new_engine();
+    let (finished_tx, finished_rx) = std::sync::mpsc::channel();
+    let previews = dir.path().join("previews.db");
+    std::thread::spawn(move || {
+        for _ in 0..300 {
+            drop(engine.start_thumbnails(&previews, 4).unwrap());
+        }
+        let _ = finished_tx.send(());
+    });
+    finished_rx
+        .recv_timeout(Duration::from_secs(120))
+        .expect("dropping the service hung");
+}

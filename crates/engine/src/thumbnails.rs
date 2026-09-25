@@ -156,7 +156,12 @@ impl ThumbnailService {
 
 impl Drop for ThumbnailService {
     fn drop(&mut self) {
-        self.shared.stop.store(true, Ordering::Relaxed);
+        // Set under the queue's lock: a worker that has just seen `stop` clear is about to wait, and
+        // would sleep through a notification sent in that gap (a lost wake-up that hung `join`).
+        {
+            let _queue = self.shared.queue.lock().expect("not poisoned");
+            self.shared.stop.store(true, Ordering::Relaxed);
+        }
         self.shared.cv.notify_all();
         for handle in self.workers.drain(..) {
             let _ = handle.join();
