@@ -23,10 +23,13 @@ AppDialog {
     onAboutToShow: answered = false
     onClosed: if (!answered) cancelled()
 
-    contentItem: Label {
-        wrapMode: Text.Wrap
-        text: qsTr("%1 of the %2 photos in this folder were in the catalogue before, with their ratings, keywords and versions.")
-            .arg(dialog.restorable).arg(dialog.total)
+    contentItem: ColumnLayout {
+        Label {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            text: qsTr("%1 of the %2 photos in this folder were in the catalogue before, with their ratings, keywords and versions.")
+                .arg(dialog.restorable).arg(dialog.total)
+        }
     }
 
     footer: DialogButtonBox {
