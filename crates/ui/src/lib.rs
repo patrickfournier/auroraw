@@ -10,7 +10,9 @@ mod app;
 mod app_settings;
 pub mod commands;
 mod grid;
-#[cfg(test)]
+// Without a display, elements are found through the compiler's debug info, which a release build
+// leaves out (`build.rs`): these tests run in debug builds only.
+#[cfg(all(test, debug_assertions))]
 mod headless_tests;
 #[cfg(test)]
 mod i18n_check;
