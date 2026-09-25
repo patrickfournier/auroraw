@@ -1,0 +1,441 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import org.auroraw.ui
+
+// Import (spec §5.2): copies the photos of a card or folder to another folder, verified, with an
+// optional second destination. It is separate from the catalogue: the destination need not be one of
+// its sources. When it is (or is added as one) the photos also enter the catalogue. `ImportForm` (Rust)
+// does the work and answers with codes; the sentences are here, so that they are translated.
+AppDialog {
+    id: dialog
+    required property var form
+    required property var sources
+    required property var flow
+    required property var host
+    property var hostWindow: null
+
+    preferredWidth: 880
+    title: qsTr("Import")
+
+    // The fields, for the tests.
+    property alias sourceField: sourceField
+    property alias destinationField: destinationField
+    property alias backupField: backupField
+    property alias templateField: templateField
+    property alias shootField: shootField
+    property alias creatorField: creatorField
+    property alias rightsField: rightsField
+    property alias importButton: importButton
+    property alias cancelButton: cancelButton
+    property alias closeButton: closeButton
+    property alias showPhotosButton: showPhotosButton
+    property alias templateButton: templateButton
+    property alias foldersButton: foldersButton
+    property alias addDestinationBox: addDestinationBox
+    property alias sourcePicker: sourcePicker
+    property alias destinationPicker: destinationPicker
+    property alias backupPicker: backupPicker
+    // A native folder dialog is open for one of the fields (the window waits for it).
+    readonly property bool browsing: sourcePicker.visible || destinationPicker.visible || backupPicker.visible
+
+    // "template" (the folders and names below) or "folders" (the card's own).
+    property string layoutChoice: "template"
+    property bool addDestination: true
+    // What the fields mean for the catalogue (see `ImportForm.inspect`).
+    property bool hasFolders: false
+    property string folders: ""
+    property string kind: ""
+    property string kindNames: ""
+    property bool registering: false
+    // The cards and drives mounted now.
+    property var volumes: []
+
+    readonly property bool importing: form.job !== ""
+    property bool finished: false
+    property string status: ""
+    property real progress: 0
+
+    readonly property string destinationNote: {
+        if (kind === "covered")
+            return qsTr("This folder is part of the source \"%1\": the photos also enter the catalogue.").arg(kindNames)
+        if (kind === "not-covered")
+            return addDestination
+                ? qsTr("This folder becomes a source: the photos also enter the catalogue.")
+                : qsTr("This folder is not in the catalogue: the photos are only copied.")
+        if (kind === "contains")
+            return qsTr("This folder contains the sources %1: the photos are only copied.").arg(kindNames)
+        return ""
+    }
+
+    closePolicy: importing ? Popup.NoAutoClose : Popup.CloseOnEscape
+
+    // What was typed last time in this workspace.
+    function loadRemembered() {
+        const saved = JSON.parse(form.loadRemembered())
+        sourceField.text = saved.source
+        destinationField.text = saved.destination
+        backupField.text = saved.backup
+        templateField.text = saved.template
+        creatorField.text = saved.creator
+        rightsField.text = saved.rights
+        shootField.text = ""
+        layoutChoice = saved.layout
+        addDestination = saved.add_destination
+        finished = false
+        status = ""
+        progress = 0
+        refreshVolumes()
+        fieldsChanged()
+    }
+
+    function openWith(source) {
+        if (source !== "")
+            sourceField.text = source
+        refreshVolumes()
+        fieldsChanged()
+        open()
+    }
+
+    function refreshVolumes() {
+        try {
+            volumes = JSON.parse(form.volumes())
+        } catch (e) {
+            volumes = []
+        }
+        // A single card, and nothing typed yet: offer it (one click to import).
+        if (sourceField.text === "" && volumes.length === 1)
+            sourceField.text = volumes[0].path
+    }
+
+    // What the source and the destination are, now that they were typed.
+    function fieldsChanged() {
+        const info = JSON.parse(form.inspect(sourceField.text, destinationField.text, addDestination))
+        hasFolders = info.hasFolders
+        folders = info.folders
+        kind = info.kind
+        kindNames = info.names
+        registering = info.registering
+    }
+
+    function fields() {
+        return {
+            source: sourceField.text.trim(),
+            destination: destinationField.text.trim(),
+            backup: backupField.text.trim(),
+            template: templateField.text.trim(),
+            creator: creatorField.text.trim(),
+            rights: rightsField.text.trim(),
+            layout: layoutChoice,
+            add_destination: addDestination,
+            shoot: shootField.text.trim()
+        }
+    }
+
+    // Shows the folder a field was understood as (nothing changes when it cannot be understood: the
+    // import says why not).
+    function showUnderstood(field) {
+        const understood = sources.resolve(field.text)
+        if (understood.indexOf("error:") !== 0)
+            field.text = understood
+    }
+
+    function start() {
+        fieldsChanged()
+        showUnderstood(sourceField)
+        showUnderstood(destinationField)
+        const reason = form.start(JSON.stringify(fields()))
+        if (reason !== "") {
+            status = qsTr("Cannot start the import: %1").arg(reason)
+            return
+        }
+        finished = false
+        progress = 0
+        status = qsTr("Reading the card…")
+        sources.refresh()
+    }
+
+    Connections {
+        target: Bus
+        function onJobProgress(job, done, total) {
+            if (job !== dialog.form.job || total <= 0)
+                return
+            dialog.progress = done / total
+            dialog.status = qsTr("Importing %1 of %2…").arg(done).arg(total)
+        }
+        function onImportFinished(job, copied, skipped, failed) {
+            if (job !== dialog.form.job)
+                return
+            dialog.form.job = ""
+            dialog.finished = true
+            dialog.status = skipped === 0 && failed === 0
+                ? qsTr("All %n file(s) copied and verified.", "", copied)
+                : qsTr("%1 copied, %2 already in the library, %3 failed. Run it again to retry.")
+                    .arg(copied).arg(skipped).arg(failed)
+            // A destination made a source for this import: its other photos, if any, are scanned now
+            // (the imported ones are known already).
+            const added = dialog.form.takeAddedSource()
+            if (added !== "")
+                dialog.flow.scanFolder(added)
+            else
+                dialog.sources.refresh()
+        }
+        function onImportAborted(job, reason) {
+            if (job !== dialog.form.job)
+                return
+            dialog.form.job = ""
+            dialog.status = qsTr("The import stopped: %1").arg(reason)
+        }
+        function onJobCancelled(job) {
+            if (job !== dialog.form.job)
+                return
+            dialog.form.job = ""
+            dialog.finished = true
+            dialog.status = qsTr("Import cancelled. Running it again resumes where it stopped.")
+        }
+    }
+
+    contentItem: ScrollView {
+        id: scroller
+        clip: true
+        contentWidth: availableWidth
+        implicitHeight: Math.min(grid.implicitHeight,
+                                 (Overlay.overlay ? Overlay.overlay.height : 700) - 220)
+
+        GridLayout {
+            id: grid
+            width: scroller.availableWidth
+            columns: 3
+            columnSpacing: 8
+            rowSpacing: 8
+
+            Label {
+                Layout.columnSpan: 3
+                text: qsTr("Cards and drives")
+                font.bold: true
+            }
+            RowLayout {
+                Layout.columnSpan: 3
+                spacing: 8
+                Repeater {
+                    model: dialog.volumes
+                    Button {
+                        required property var modelData
+                        text: modelData.name + " (" + modelData.path + ")"
+                        onClicked: {
+                            sourceField.text = modelData.path
+                            dialog.fieldsChanged()
+                        }
+                    }
+                }
+                Label {
+                    visible: dialog.volumes.length === 0
+                    text: qsTr("No card detected")
+                    color: Theme.grey.placeholder
+                }
+                Button {
+                    id: refreshButton
+                    text: qsTr("Refresh")
+                    onClicked: dialog.refreshVolumes()
+                }
+                Item { Layout.fillWidth: true }
+            }
+
+            Label { text: qsTr("Import from (card or folder)") }
+            TextField {
+                id: sourceField
+                Layout.fillWidth: true
+                Accessible.name: qsTr("Import from (card or folder)")
+                onTextEdited: dialog.fieldsChanged()
+            }
+            Button {
+                text: qsTr("Browse…")
+                Accessible.name: qsTr("Browse for: %1").arg(qsTr("Import from (card or folder)"))
+                enabled: !dialog.browsing
+                onClicked: sourcePicker.pick()
+            }
+            Label {
+                Layout.columnSpan: 3
+                Layout.fillWidth: true
+                visible: dialog.hasFolders
+                wrapMode: Text.Wrap
+                color: Theme.quiet
+                text: qsTr("The photos are in camera folders (%1).").arg(dialog.folders)
+            }
+
+            Label { text: qsTr("Destination folder") }
+            TextField {
+                id: destinationField
+                Layout.fillWidth: true
+                placeholderText: qsTr("Where the photos are copied to")
+                Accessible.name: qsTr("Destination folder")
+                onTextEdited: dialog.fieldsChanged()
+            }
+            Button {
+                text: qsTr("Browse…")
+                Accessible.name: qsTr("Browse for: %1").arg(qsTr("Destination folder"))
+                enabled: !dialog.browsing
+                onClicked: destinationPicker.pick()
+            }
+            Label {
+                Layout.columnSpan: 3
+                Layout.fillWidth: true
+                visible: dialog.destinationNote !== ""
+                wrapMode: Text.Wrap
+                color: dialog.kind === "covered" ? Theme.quiet : Theme.warning
+                text: dialog.destinationNote
+            }
+            CheckBox {
+                id: addDestinationBox
+                Layout.columnSpan: 3
+                visible: dialog.kind === "not-covered"
+                text: qsTr("Add this folder to the catalogue's sources")
+                checked: dialog.addDestination
+                onToggled: {
+                    dialog.addDestination = checked
+                    dialog.fieldsChanged()
+                }
+            }
+
+            Label { text: qsTr("Folder layout") }
+            RowLayout {
+                Layout.columnSpan: 2
+                spacing: 8
+                Button {
+                    id: templateButton
+                    text: qsTr("Use the template")
+                    highlighted: dialog.layoutChoice === "template"
+                    onClicked: dialog.layoutChoice = "template"
+                }
+                Button {
+                    id: foldersButton
+                    text: qsTr("Keep the source's folders")
+                    highlighted: dialog.layoutChoice === "folders"
+                    onClicked: dialog.layoutChoice = "folders"
+                }
+                Item { Layout.fillWidth: true }
+            }
+
+            Label {
+                visible: dialog.layoutChoice === "template"
+                text: qsTr("Folders and file names")
+            }
+            TextField {
+                id: templateField
+                visible: dialog.layoutChoice === "template"
+                Layout.fillWidth: true
+                Layout.columnSpan: 2
+                placeholderText: "{year}/{date}/{original}.{ext}"
+                Accessible.name: qsTr("Folders and file names")
+            }
+
+            Label { text: qsTr("Backup folder (optional)") }
+            TextField {
+                id: backupField
+                Layout.fillWidth: true
+                Accessible.name: qsTr("Backup folder (optional)")
+            }
+            Button {
+                text: qsTr("Browse…")
+                Accessible.name: qsTr("Browse for: %1").arg(qsTr("Backup folder (optional)"))
+                enabled: !dialog.browsing
+                onClicked: backupPicker.pick()
+            }
+
+            Label { text: qsTr("Shoot name (optional)") }
+            TextField {
+                id: shootField
+                Layout.fillWidth: true
+                Layout.columnSpan: 2
+                Accessible.name: qsTr("Shoot name (optional)")
+            }
+
+            Label { visible: dialog.registering; text: qsTr("Creator") }
+            TextField {
+                id: creatorField
+                visible: dialog.registering
+                Layout.fillWidth: true
+                Layout.columnSpan: 2
+                Accessible.name: qsTr("Creator")
+            }
+            Label { visible: dialog.registering; text: qsTr("Copyright") }
+            TextField {
+                id: rightsField
+                visible: dialog.registering
+                Layout.fillWidth: true
+                Layout.columnSpan: 2
+                Accessible.name: qsTr("Copyright")
+            }
+
+            ProgressBar {
+                Layout.columnSpan: 3
+                Layout.fillWidth: true
+                visible: dialog.importing
+                value: dialog.progress
+            }
+            Label {
+                Layout.columnSpan: 3
+                Layout.fillWidth: true
+                visible: dialog.status !== ""
+                wrapMode: Text.Wrap
+                color: Theme.quiet
+                text: dialog.status
+            }
+        }
+    }
+
+    footer: DialogButtonBox {
+        Button {
+            id: showPhotosButton
+            visible: dialog.finished && dialog.registering
+            text: qsTr("Show photos")
+            DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+            onClicked: dialog.host.showPhotos()
+        }
+        Button {
+            id: cancelButton
+            text: qsTr("Cancel import")
+            enabled: dialog.importing
+            DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+            onClicked: dialog.form.cancel()
+        }
+        Button {
+            id: importButton
+            text: qsTr("Import")
+            highlighted: true
+            enabled: !dialog.importing
+            DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+            onClicked: dialog.start()
+        }
+        // An import that runs is stopped with "Cancel import", not by closing the window over it.
+        Button {
+            id: closeButton
+            text: qsTr("Close")
+            enabled: !dialog.importing
+            DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            onClicked: dialog.close()
+        }
+    }
+
+    FolderPicker {
+        id: sourcePicker
+        field: sourceField
+        hostWindow: dialog.hostWindow
+        title: qsTr("Choose the card or folder to import from")
+        onChosen: dialog.fieldsChanged()
+    }
+    FolderPicker {
+        id: destinationPicker
+        field: destinationField
+        hostWindow: dialog.hostWindow
+        title: qsTr("Choose the destination folder")
+        onChosen: dialog.fieldsChanged()
+    }
+    FolderPicker {
+        id: backupPicker
+        field: backupField
+        hostWindow: dialog.hostWindow
+        title: qsTr("Choose the backup folder")
+    }
+}

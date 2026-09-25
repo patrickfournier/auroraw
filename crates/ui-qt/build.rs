@@ -25,6 +25,9 @@ fn main() {
         QmlFile::from("qml/AddSourceDialog.qml"),
         QmlFile::from("qml/RemoveSourceDialog.qml"),
         QmlFile::from("qml/RestoreDialog.qml"),
+        QmlFile::from("qml/FolderPicker.qml"),
+        QmlFile::from("qml/ImportDialog.qml"),
+        QmlFile::from("qml/CardBanner.qml"),
         QmlFile::from("qml/Welcome.qml"),
         QmlFile::from("qml/NewWorkspaceDialog.qml"),
         QmlFile::from("qml/Library.qml"),
@@ -34,6 +37,8 @@ fn main() {
         .files([
             "src/bus.rs",
             "src/files.rs",
+            "src/folders.rs",
+            "src/import_form.rs",
             "src/models.rs",
             "src/shortcuts.rs",
             "src/launcher.rs",

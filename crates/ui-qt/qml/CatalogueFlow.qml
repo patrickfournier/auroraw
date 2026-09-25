@@ -37,6 +37,13 @@ Item {
 
     function openAdd() { addDialog.openWith() }
 
+    // Scans the folder an import has just made a source of (its other photos, if any).
+    function scanFolder(folder) {
+        if (sources.rescanFolder(folder) === "")
+            begin()
+        sources.refresh()
+    }
+
     function askRemove(row, name) {
         removingRow = row
         removingName = name

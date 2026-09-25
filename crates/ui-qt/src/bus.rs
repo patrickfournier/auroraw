@@ -43,6 +43,22 @@ pub mod qobject {
         #[cxx_name = "sourceRemoved"]
         fn source_removed(self: Pin<&mut Bus>, job: &QString, removed: i32, kept: i32);
 
+        /// An import finished.
+        #[qsignal]
+        #[cxx_name = "importFinished"]
+        fn import_finished(
+            self: Pin<&mut Bus>,
+            job: &QString,
+            copied: i32,
+            skipped: i32,
+            failed: i32,
+        );
+
+        /// An import could not run at all.
+        #[qsignal]
+        #[cxx_name = "importAborted"]
+        fn import_aborted(self: Pin<&mut Bus>, job: &QString, reason: &QString);
+
         /// A job was cancelled before its end.
         #[qsignal]
         #[cxx_name = "jobCancelled"]
@@ -186,6 +202,31 @@ fn dispatch(event: Event, session: &Session) {
             let job = job.to_string();
             on_gui(move |bus| {
                 bus.source_removed(&QString::from(job.as_str()), removed as i32, kept as i32)
+            });
+        }
+        Event::ImportFinished {
+            job,
+            copied,
+            skipped,
+            failed,
+        } => {
+            let job = job.to_string();
+            on_gui(move |bus| {
+                bus.import_finished(
+                    &QString::from(job.as_str()),
+                    copied as i32,
+                    skipped as i32,
+                    failed as i32,
+                )
+            });
+        }
+        Event::ImportAborted { job, reason } => {
+            let job = job.to_string();
+            on_gui(move |bus| {
+                bus.import_aborted(
+                    &QString::from(job.as_str()),
+                    &QString::from(reason.as_str()),
+                )
             });
         }
         Event::JobCancelled(job) => {

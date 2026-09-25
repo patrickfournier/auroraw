@@ -109,3 +109,15 @@ fn the_catalogue_task_adds_scans_removes_and_restores_sources() {
     support::write_photos(&home.path().join("One"), "NEW", 1);
     run_suite("catalogue", home.path(), None);
 }
+
+/// Import, on machines that start empty: folders of generated photos to copy from.
+#[test]
+fn importing_photos_from_a_card_or_a_folder() {
+    let home = temp_dir();
+    support::write_photos(&home.path().join("Template2"), "IMG", 2);
+    support::write_photos(&home.path().join("Template3"), "IMG", 3);
+    support::write_photos(&home.path().join("Big"), "IMG", 40);
+    support::write_photos(&home.path().join("Cam100"), "IMG", 1);
+    support::write_photos(&home.path().join("Cam101"), "CAM", 1);
+    run_suite("import", home.path(), None);
+}

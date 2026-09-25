@@ -15,8 +15,13 @@ mod commands;
 #[allow(unsafe_code)]
 mod files;
 #[allow(unsafe_code)]
+mod folders;
+#[allow(unsafe_code)]
 mod glue;
 mod gridmath;
+#[allow(unsafe_code)]
+mod import_form;
+mod import_settings;
 #[allow(unsafe_code)]
 mod launcher;
 #[allow(unsafe_code)]

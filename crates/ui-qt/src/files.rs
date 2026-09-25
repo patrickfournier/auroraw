@@ -40,6 +40,10 @@ pub mod qobject {
         #[cxx_name = "copyDir"]
         fn copy_dir(self: &Files, from: &QString, to: &QString);
 
+        /// Deletes a file.
+        #[qinvokable]
+        fn remove(self: &Files, path: &QString);
+
         /// Copies one file.
         #[qinvokable]
         #[cxx_name = "copyFile"]
@@ -113,6 +117,10 @@ impl qobject::Files {
                 let _ = std::fs::copy(entry.path(), path(to).join(entry.file_name()));
             }
         }
+    }
+
+    pub fn remove(&self, target: &QString) {
+        let _ = std::fs::remove_file(path(target));
     }
 
     pub fn copy_file(&self, from: &QString, to: &QString) {

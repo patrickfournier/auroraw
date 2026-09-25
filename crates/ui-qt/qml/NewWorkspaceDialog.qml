@@ -3,7 +3,6 @@ import QtQuick
 import QtQuick.Controls
 import org.auroraw.ui
 import QtQuick.Layouts
-import QtQuick.Dialogs
 
 // The Qt twin of the Slint NewWorkspaceDialog: a real modal Dialog, and the system's folder dialog.
 AppDialog {
@@ -18,6 +17,7 @@ AppDialog {
     property alias cancelButton: cancelButton
     // A native folder dialog is open (its own window: the main window has to be blocked by hand).
     property alias browsing: browse.visible
+    property alias picker: browse
 
     title: qsTr("New workspace")
 
@@ -68,7 +68,7 @@ AppDialog {
         }
         Button {
             text: qsTr("Browse…")
-            onClicked: browse.open()
+            onClicked: browse.pick()
         }
         Label {
             Layout.columnSpan: 3
@@ -106,10 +106,10 @@ AppDialog {
         }
     }
 
-    FolderDialog {
+    FolderPicker {
         id: browse
-        parentWindow: dialog.hostWindow
-        title: qsTr("Choose a folder")
-        onAccepted: folderField.text = selectedFolder.toString().replace(/^file:\/\//, "")
+        field: folderField
+        hostWindow: dialog.hostWindow
+        title: qsTr("Choose the workspace folder")
     }
 }

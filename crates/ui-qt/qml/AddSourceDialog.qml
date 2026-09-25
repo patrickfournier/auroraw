@@ -2,7 +2,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
 import org.auroraw.ui
 
 // Adding a folder as a source of the catalogue. It only asks; `CatalogueFlow` does the adding, and
@@ -18,6 +17,7 @@ AppDialog {
     property alias mergeButton: mergeButton
     // A native folder dialog is open (its own window: the main window has to be blocked by hand).
     property alias browsing: browse.visible
+    property alias picker: browse
     signal addRequested
     signal mergeRequested
 
@@ -50,7 +50,7 @@ AppDialog {
         }
         Button {
             text: qsTr("Browse…")
-            onClicked: browse.open()
+            onClicked: browse.pick()
         }
         Label { text: qsTr("Name (optional)") }
         TextField {
@@ -100,10 +100,10 @@ AppDialog {
         }
     }
 
-    FolderDialog {
+    FolderPicker {
         id: browse
-        parentWindow: dialog.hostWindow
-        title: qsTr("Add a source")
-        onAccepted: folderField.text = selectedFolder.toString().replace(/^file:\/\//, "")
+        field: folderField
+        hostWindow: dialog.hostWindow
+        title: qsTr("Choose the folder to add to the catalogue")
     }
 }

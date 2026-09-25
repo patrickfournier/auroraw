@@ -14,6 +14,8 @@ use auroraw_types::PhotoId;
 /// An open workspace. It is dropped as soon as another opens, which releases the workspace's folder.
 pub struct Session {
     pub engine: Engine,
+    /// This machine's folder for what the workspace remembers (the import form, resumable imports).
+    pub data_dir: std::path::PathBuf,
     pub thumbs: Collector,
 }
 

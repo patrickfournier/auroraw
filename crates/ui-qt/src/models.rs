@@ -218,6 +218,11 @@ pub mod qobject {
         #[qinvokable]
         fn rescan(self: Pin<&mut SourceList>, row: i32) -> QString;
 
+        /// Scans the source whose folder is `folder` (an import made it a source); empty, or why not.
+        #[qinvokable]
+        #[cxx_name = "rescanFolder"]
+        fn rescan_folder(self: Pin<&mut SourceList>, folder: &QString) -> QString;
+
         /// Answers the scan's question about photos removed earlier.
         #[qinvokable]
         #[cxx_name = "continueScan"]

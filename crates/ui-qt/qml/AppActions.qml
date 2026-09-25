@@ -24,12 +24,12 @@ QtObject {
         enabled: !root.host.dialogOpen
         onTriggered: root.host.openWorkspace()
     }
-    // (The Import dialog arrives with the port's milestone Q5.)
     readonly property Action importPhotos: Action {
         property string commandId: "file.import"
         text: qsTr("Import…")
         shortcut: "Ctrl+I"
-        enabled: false
+        enabled: root.host.inWorkspace && !root.host.dialogOpen
+        onTriggered: root.host.showImport()
     }
     readonly property Action settings: Action {
         property string commandId: "file.settings"

@@ -149,6 +149,7 @@ impl qobject::Launcher {
             events,
             name,
             previews_path,
+            workspace_id,
             ..
         } = opened;
         let service = engine
@@ -156,6 +157,7 @@ impl qobject::Launcher {
             .expect("the previews database opens");
         let session = Arc::new(Session {
             engine,
+            data_dir: self.dirs().workspace_data(workspace_id),
             thumbs: Collector::new(service, glue::thumbnail_deliverer()),
         });
         bus::start_pump(events, &session);

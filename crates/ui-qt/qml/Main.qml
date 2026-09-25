@@ -49,6 +49,9 @@ ApplicationWindow {
     property alias settingsDialog: settingsDialog
     property alias aboutDialog: aboutDialog
     property alias openDialog: openDialog
+    property alias importDialog: importDialog
+    property alias cardBanner: cardBanner
+    property alias importForm: importForm
     property alias waiting: waiting
     property alias launcher: launcher
     property alias known: known
@@ -63,6 +66,7 @@ ApplicationWindow {
     KnownWorkspaces { id: known }
     PhotoGrid { id: photoGrid }
     SourceList { id: sourceList }
+    ImportForm { id: importForm }
     CatalogueFlow {
         id: catalogueFlow
         host: window
@@ -85,7 +89,8 @@ ApplicationWindow {
     // (`nativeDialogForced` stands for one in the tests: none can open off screen.)
     property bool nativeDialogForced: false
     readonly property bool nativeDialogOpen: nativeDialogForced || openDialog.visible || catalogueFlow.browsing || newDialog.browsing
-    readonly property bool dialogOpen: newDialog.visible || settingsDialog.visible
+                                            || importDialog.browsing
+    readonly property bool dialogOpen: newDialog.visible || settingsDialog.visible || importDialog.visible
                                        || aboutDialog.visible || catalogueFlow.dialogOpen || nativeDialogOpen
     readonly property bool inWorkspace: launcher.screen === "workspace"
 
@@ -101,9 +106,20 @@ ApplicationWindow {
 
     // Commands (what `AppActions` calls).
     function newWorkspace() { newDialog.openWith() }
-    function openWorkspace() { openDialog.open() }
+    function openWorkspace() { openDialog.pick() }
     function showSettings() { settingsDialog.open() }
     function showAbout() { aboutDialog.open() }
+    // The Import dialog, on `source` (a card) when given.
+    function showImport(source) {
+        if (inWorkspace && !dialogOpen)
+            importDialog.openWith(source === undefined ? "" : source)
+    }
+    // Once photos were imported: the grid, with them.
+    function showPhotos() {
+        importDialog.close()
+        currentTask = "cull"
+        libraryView.reload()
+    }
     // Opens the workspace in `folder`, or says why not.
     function openFolder(folder) {
         const reason = launcher.openPath(folder)
@@ -130,6 +146,9 @@ ApplicationWindow {
                 catalogueFlow.status = ""
                 sourceList.job = ""
                 sourceList.refresh()
+                importForm.job = ""
+                importDialog.loadRemembered()
+                cardBanner.rememberCurrent()
                 libraryView.filterBy(0)
                 window.currentTask = photoGrid.count === 0 ? "catalogue" : "cull"
             } else {
@@ -142,6 +161,7 @@ ApplicationWindow {
         target: Bus
         function onIndexFinished() { libraryView.reload() }
         function onSourceRemoved() { libraryView.reload() }
+        function onImportFinished() { libraryView.reload() }
         function onJobCancelled() { libraryView.reload() }
         function onPhotoChanged(photoId) { libraryView.photoChanged(photoId) }
     }
@@ -215,6 +235,14 @@ ApplicationWindow {
             onDismissed: window.notice = ""
         }
 
+        CardBanner {
+            id: cardBanner
+            Layout.fillWidth: true
+            form: importForm
+            host: window
+            onImportRequested: path => window.showImport(path)
+        }
+
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -252,6 +280,14 @@ ApplicationWindow {
         onCreated: window.currentTask = "catalogue"
     }
     SettingsDialog { id: settingsDialog; launcher: launcher }
+    ImportDialog {
+        id: importDialog
+        form: importForm
+        sources: sourceList
+        flow: catalogueFlow
+        host: window
+        hostWindow: window
+    }
     AboutDialog { id: aboutDialog; launcher: launcher }
 
     Popup {
@@ -276,10 +312,10 @@ ApplicationWindow {
     }
 
     // The system's own folder dialog (a Qt Quick one where the platform has none), modal to the window.
-    FolderDialog {
+    FolderPicker {
         id: openDialog
-        parentWindow: window
+        hostWindow: window
         title: qsTr("Open a workspace")
-        onAccepted: window.openFolder(selectedFolder.toString().replace(/^file:\/\//, ""))
+        onChosen: path => window.openFolder(path)
     }
 }

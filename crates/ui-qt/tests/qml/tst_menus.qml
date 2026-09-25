@@ -125,8 +125,15 @@ AppTestCase {
         compare(field.selectedText, field.text)
     }
 
-    function test_the_import_command_waits_for_the_import_dialog() {
+    function test_importing_is_available_once_a_workspace_is_open_and_no_dialog_is() {
         launch(freshMachine())
-        verify(!app.actions.importPhotos.enabled, "the Import dialog comes with milestone Q5")
+        verify(!app.actions.importPhotos.enabled, "no workspace yet")
+        createWorkspace("Main")
+        verify(app.actions.importPhotos.enabled)
+        keyClick(Qt.Key_I, Qt.ControlModifier)
+        wait(200)
+        verify(app.importDialog.visible, "Ctrl+I opens the Import dialog")
+        verify(!app.actions.importPhotos.enabled, "not over a dialog")
+        verify(!app.actions.newWorkspace.enabled)
     }
 }

@@ -161,6 +161,20 @@ impl SourceList {
         }
     }
 
+    pub fn rescan_folder(mut self: Pin<&mut Self>, folder: &QString) -> QString {
+        self.as_mut().refresh();
+        let Ok(wanted) = paths::resolve(&folder.to_string()) else {
+            return text("no such folder");
+        };
+        let row = self.sources.iter().position(|source| {
+            paths::resolve(&source.path.to_string_lossy()).is_ok_and(|path| path == wanted)
+        });
+        match row {
+            Some(row) => self.rescan(row as i32),
+            None => text("no such source"),
+        }
+    }
+
     pub fn continue_scan(&self, restore: bool) {
         if let (Some(engine), Some(job_id)) = (engine(), self.running) {
             let _ = engine.submit(Command::ContinueIndex { job_id, restore });
