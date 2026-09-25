@@ -912,7 +912,10 @@ fn creating_a_workspace_from_the_dialog_opens_it_and_remembers_it() {
     assert_eq!(app.ui().get_new_location(), parent.to_string_lossy());
     assert_eq!(
         app.ui().get_new_preview(),
-        format!("Workspace folder: {}", parent.join("Main").display())
+        format!(
+            "Workspace folder: {}",
+            canonical(&parent).join("Main").display()
+        )
     );
 
     click(&app, "Create");
@@ -941,7 +944,9 @@ fn the_preview_follows_the_name_and_the_folder_and_the_folder_is_left_alone() {
     let app = launch(&f);
     click(&app, "New workspace…");
     let parent = f.pictures.join("Auroraw");
-    let preview = |path: &Path| format!("Workspace folder: {}", path.display());
+    // The preview shows the path as understood: canonical (a temporary folder is behind a symlink on
+    // macOS, and Windows expands short names).
+    let preview = |path: &Path| format!("Workspace folder: {}", canonical(path).display());
 
     type_into(&app, "Name", "Family");
     assert_eq!(app.ui().get_new_location(), parent.to_string_lossy());
