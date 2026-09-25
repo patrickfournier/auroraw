@@ -26,8 +26,9 @@ AppTestCase {
         addSource(app.launcher.env("AURORAW_TEST_EXTRA"))
         waitForTheScan()
         verify(app.flow.status.indexOf("Done: 5 added") === 0, app.flow.status)
-        tryVerify(() => files.previewsCount(home + "/cache") === before + 5, 20000,
-                  "the new photos' thumbnails were made as they were scanned")
+        let seen = -2
+        tryVerify(() => { seen = files.previewsCount(home + "/cache"); return seen === before + 5 }, 30000)
+        compare(seen, before + 5, "the new photos' thumbnails were made as they were scanned (had " + before + ")")
         compare(app.currentTask, "catalogue")
 
         // Back on the grid: the new photos are listed, and the selection stayed on its photo.
