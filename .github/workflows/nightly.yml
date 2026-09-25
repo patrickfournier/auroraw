@@ -36,6 +36,13 @@ jobs:
         with:
           version: 6.8.3
           cache: true
+      # The Slint interface's headless test backend needs fontconfig's headers (as in ci.yml).
+      - name: Install Slint's Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libxcb1-dev \
+            libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxrandr-dev \
+            libxi-dev libxcursor-dev libfontconfig1-dev libgl1-mesa-dev libegl1-mesa-dev
       - run: cargo test --workspace --release --locked
         env:
           PROPTEST_CASES: "5000"
