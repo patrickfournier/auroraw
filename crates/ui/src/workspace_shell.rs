@@ -150,8 +150,13 @@ fn settings_from(ui: &MainWindow) -> Settings {
 fn reload(engine: &Engine, state: &GridState, ui: &MainWindow) {
     let items = load_items(engine, 0).unwrap_or_default();
     ui.set_status(ui.global::<Texts>().invoke_photos(items.len() as i32));
-    ui.set_selected_summary(SharedString::new());
-    state.set_items(items);
+    state.refresh_items(items);
+    ui.set_selected_summary(
+        state
+            .selected_id()
+            .map(|id| summary_of(engine, id).into())
+            .unwrap_or_default(),
+    );
 }
 
 /// Builds the window of an open workspace and connects it to its engine: what a person works in

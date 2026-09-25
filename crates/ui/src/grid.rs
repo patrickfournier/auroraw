@@ -135,12 +135,29 @@ impl GridState {
     /// were cached for photos no longer shown, so the cache cannot grow without bound across
     /// many filter changes.
     pub fn set_items(&self, items: Vec<Item>) {
+        self.replace_items(items, None);
+    }
+
+    /// Replaces the list as [`Self::set_items`] does, for a list that only changed because photos
+    /// arrived or were rated: the selection stays on its photo (if it is still listed) instead of
+    /// being lost every time the grid reloads.
+    pub fn refresh_items(&self, items: Vec<Item>) {
+        let keep = self.selected_id();
+        self.replace_items(items, keep);
+    }
+
+    fn replace_items(&self, items: Vec<Item>, keep: Option<PhotoId>) {
         *self.index.borrow_mut() = items.iter().enumerate().map(|(i, it)| (it.id, i)).collect();
-        let keep: std::collections::HashSet<PhotoId> = items.iter().map(|it| it.id).collect();
-        self.cache.borrow_mut().retain(|id, _| keep.contains(id));
-        self.unavailable.borrow_mut().retain(|id| keep.contains(id));
+        let keep_cached: std::collections::HashSet<PhotoId> =
+            items.iter().map(|it| it.id).collect();
+        self.cache
+            .borrow_mut()
+            .retain(|id, _| keep_cached.contains(id));
+        self.unavailable
+            .borrow_mut()
+            .retain(|id| keep_cached.contains(id));
         *self.items.borrow_mut() = items;
-        *self.selected.borrow_mut() = None;
+        *self.selected.borrow_mut() = keep.and_then(|id| self.index.borrow().get(&id).copied());
         self.notify.reset();
     }
 
@@ -452,5 +469,33 @@ mod tests {
             "a page is a row at least"
         );
         assert_eq!(jump(Jump::End, 0, 8, 5, 0), 0, "an empty list");
+    }
+
+    #[test]
+    fn a_refresh_keeps_the_selection_on_its_photo_and_a_replacement_drops_it() {
+        let state = GridState::default();
+        let ids: Vec<PhotoId> = (0..4).map(|_| PhotoId::random()).collect();
+        let items = |order: &[usize]| -> Vec<Item> {
+            order
+                .iter()
+                .map(|&i| Item {
+                    id: ids[i],
+                    rating: 0,
+                })
+                .collect()
+        };
+        state.set_items(items(&[0, 1, 2]));
+        state.select(Some(1));
+        // A new photo arrives first: the selected one moves down a place and stays selected.
+        state.refresh_items(items(&[3, 0, 1, 2]));
+        assert_eq!(state.selected_id(), Some(ids[1]));
+        assert_eq!(state.selected_index(), Some(2));
+        // The selected photo left the list: nothing is selected.
+        state.refresh_items(items(&[3, 0, 2]));
+        assert_eq!(state.selected_id(), None);
+        // A filter replaces the list and starts again.
+        state.select(Some(0));
+        state.set_items(items(&[0, 2]));
+        assert_eq!(state.selected_id(), None);
     }
 }
