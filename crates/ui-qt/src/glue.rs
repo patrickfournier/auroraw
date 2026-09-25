@@ -15,6 +15,30 @@ use crate::session;
 unsafe extern "C" {
     fn auroraw_setup_engine(engine: *mut c_void);
     fn auroraw_set_translation(data: *const u8, len: usize, object: *mut c_void);
+    fn auroraw_shortcut_text(
+        standard: i32,
+        text: *const u8,
+        len: usize,
+        out: *mut u8,
+        cap: usize,
+    ) -> usize;
+}
+
+/// A shortcut as this platform writes it (`Ctrl+N`, `⌘N`): `standard` is a `QKeySequence::StandardKey`,
+/// or negative to read `text` as a key sequence.
+pub fn shortcut_text(standard: i32, text: &str) -> String {
+    let mut out = [0u8; 64];
+    // SAFETY: `text` and `out` are valid for the lengths given; the glue writes at most `out.len()`.
+    let written = unsafe {
+        auroraw_shortcut_text(
+            standard,
+            text.as_ptr(),
+            text.len(),
+            out.as_mut_ptr(),
+            out.len(),
+        )
+    };
+    String::from_utf8_lossy(&out[..written.min(out.len())]).into_owned()
 }
 
 /// Registers the thumbnail provider on `engine` and remembers it, so that a change of language can

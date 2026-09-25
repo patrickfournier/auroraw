@@ -9,14 +9,21 @@
 mod app_settings;
 #[allow(unsafe_code)]
 mod bus;
+// The table is read by its own checks only, until a command palette reads it too.
+#[cfg(test)]
+mod commands;
+#[allow(unsafe_code)]
+mod files;
 #[allow(unsafe_code)]
 mod glue;
-#[allow(unsafe_code)]
-mod grid;
 mod gridmath;
 #[allow(unsafe_code)]
 mod launcher;
+#[allow(unsafe_code)]
+mod models;
 mod session;
+#[allow(unsafe_code)]
+mod shortcuts;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -53,6 +60,15 @@ pub struct Launch {
 
 static LAUNCH: Mutex<Option<Launch>> = Mutex::new(None);
 
+/// A sub-folder of `AURORAW_TEST_HOME` a test chose as its machine (`Launcher.useMachine`).
+static MACHINE: Mutex<Option<String>> = Mutex::new(None);
+
+/// Chooses the machine the tests run on: a folder named `name` under `AURORAW_TEST_HOME` (the folder
+/// itself for an empty name).
+pub(crate) fn use_machine(name: &str) {
+    *MACHINE.lock().unwrap() = Some(name.to_string());
+}
+
 /// The launch in force. `AURORAW_TEST_HOME`, when set, moves the data, cache and Pictures folders
 /// under it (a hook for the tests, which each get a machine of their own).
 pub(crate) fn launch() -> Launch {
@@ -62,7 +78,10 @@ pub(crate) fn launch() -> Launch {
         .clone()
         .expect("run() or quick_test() stored the launch");
     if let Some(home) = std::env::var_os("AURORAW_TEST_HOME") {
-        let home = PathBuf::from(home);
+        let mut home = PathBuf::from(home);
+        if let Some(name) = MACHINE.lock().unwrap().as_deref() {
+            home = home.join(name);
+        }
         launch.dirs = LocalDirs {
             data: home.join("data"),
             cache: home.join("cache"),

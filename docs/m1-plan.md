@@ -740,6 +740,7 @@ launcher, menus and dialogs, Q3 the grid, Q4 the catalogue panel, Q5 import and 
 Slint headless scenarios ported, three platforms green, a manual pass), Q7 cutover (Slint deleted, merged
 into `dev`). The Slint shell gets bug fixes only meanwhile, and the interface work of the later work
 packages (WP9 onward) is built on the Qt shell.
+**Progress:** Q0 and Q1 are done; Q2 (2026-09-25) has the launcher, the welcome list, New and Open workspace, Settings with a language applied at once, About, notices, and the hamburger menu with the shortcuts written next to each command and Alt mnemonics that follow the language (Alt+F, Alt+É, Alt+A in French). A dialog blocks the mouse by itself but not always the keyboard, so every command that opens a window checks a guard; a native folder dialog is covered by a waiting popup. The commands table is checked against `AppActions.qml` and `AppMenu.qml`, and both list models share one cxx-qt bridge (a base class can only be declared once per link).
 
 ### WP9 Culling (XL). Needs WP5, WP8
 

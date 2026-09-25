@@ -18,8 +18,6 @@ pub mod qobject {
         #[qproperty(QString, screen)]
         #[qproperty(QString, workspace_name, cxx_name = "workspaceName")]
         #[qproperty(QString, note)]
-        #[qproperty(QStringList, known_names, cxx_name = "knownNames")]
-        #[qproperty(QStringList, known_paths, cxx_name = "knownPaths")]
         #[qproperty(QString, language)]
         #[qproperty(QString, effective_language, cxx_name = "effectiveLanguage")]
         type Launcher = super::LauncherRust;
@@ -27,6 +25,15 @@ pub mod qobject {
         /// Opens the workspace named at launch, else the last one, or leaves the welcome screen.
         #[qinvokable]
         fn start(self: Pin<&mut Launcher>);
+
+        /// The application's version.
+        #[qinvokable]
+        fn version(self: &Launcher) -> QString;
+
+        /// Tests: the machine to use, a folder under `AURORAW_TEST_HOME` (call before `start`).
+        #[qinvokable]
+        #[cxx_name = "useMachine"]
+        fn use_machine(self: &Launcher, name: &QString);
 
         /// An environment variable (the tests are given their folders that way).
         #[qinvokable]
@@ -49,11 +56,6 @@ pub mod qobject {
         /// Creates and opens a workspace; an empty text, or why not.
         #[qinvokable]
         fn create(self: Pin<&mut Launcher>, name: &QString, parent: &QString) -> QString;
-
-        /// Opens the known workspace at `index` in the list; an empty text, or why not.
-        #[qinvokable]
-        #[cxx_name = "openKnown"]
-        fn open_known(self: Pin<&mut Launcher>, index: i32) -> QString;
 
         /// Opens the workspace in the folder `path`; an empty text, or why not.
         #[qinvokable]
@@ -96,8 +98,6 @@ pub struct LauncherRust {
     screen: QString,
     workspace_name: QString,
     note: QString,
-    known_names: QStringList,
-    known_paths: QStringList,
     language: QString,
     effective_language: QString,
     dirs: Option<LocalDirs>,
@@ -136,17 +136,6 @@ impl qobject::Launcher {
 
     fn settings_path(&self) -> PathBuf {
         self.dirs().data.join("app-settings.json")
-    }
-
-    fn refresh_known(mut self: Pin<&mut Self>) {
-        let known = Engine::known_workspaces(&self.dirs());
-        let names: QStringList = known.iter().map(|k| text(&k.name)).collect();
-        let paths: QStringList = known
-            .iter()
-            .map(|k| text(&k.path.to_string_lossy()))
-            .collect();
-        self.as_mut().set_known_names(names);
-        self.as_mut().set_known_paths(paths);
     }
 
     fn show(mut self: Pin<&mut Self>, opened: OpenedWorkspace) {
@@ -195,7 +184,6 @@ impl qobject::Launcher {
         self.as_mut()
             .set_effective_language(text(resolve_language(&settings.language)));
         self.as_mut().set_screen(text("welcome"));
-        self.as_mut().refresh_known();
 
         // A workspace named at launch first, else the last one opened.
         if let Some(path) = &launch.open {
@@ -215,6 +203,14 @@ impl qobject::Launcher {
                 self.as_mut().set_note(text(&note));
             }
         }
+    }
+
+    pub fn version(&self) -> QString {
+        text(Engine::version())
+    }
+
+    pub fn use_machine(&self, name: &QString) {
+        crate::use_machine(&name.to_string());
     }
 
     pub fn env(&self, name: &QString) -> QString {
@@ -261,20 +257,6 @@ impl qobject::Launcher {
                 QString::default()
             }
             Err(e) => text(&e.to_string()),
-        }
-    }
-
-    pub fn open_known(mut self: Pin<&mut Self>, index: i32) -> QString {
-        let path = self
-            .known_paths
-            .get(index as isize)
-            .map(|p| PathBuf::from(p.to_string()));
-        match path {
-            Some(path) => match self.as_mut().open_root(&path) {
-                Some(reason) => text(&reason),
-                None => QString::default(),
-            },
-            None => QString::default(),
         }
     }
 

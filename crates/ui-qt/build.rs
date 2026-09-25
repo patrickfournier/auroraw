@@ -14,13 +14,26 @@ fn main() {
         QmlFile::from("qml/Main.qml"),
         QmlFile::from("qml/Theme.qml").singleton(true),
         QmlFile::from("qml/AppDialog.qml"),
+        QmlFile::from("qml/AppActions.qml"),
+        QmlFile::from("qml/AppMenu.qml"),
+        QmlFile::from("qml/AppMenuItem.qml"),
+        QmlFile::from("qml/NoticeBar.qml"),
+        QmlFile::from("qml/SettingsDialog.qml"),
+        QmlFile::from("qml/AboutDialog.qml"),
+        QmlFile::from("qml/Catalogue.qml"),
         QmlFile::from("qml/Welcome.qml"),
         QmlFile::from("qml/NewWorkspaceDialog.qml"),
         QmlFile::from("qml/Library.qml"),
     ];
     let mut builder = CxxQtBuilder::new_qml_module(QmlModule::new("org.auroraw.ui").qml_files(qml))
         .qt_module("Quick")
-        .files(["src/bus.rs", "src/grid.rs", "src/launcher.rs"])
+        .files([
+            "src/bus.rs",
+            "src/files.rs",
+            "src/models.rs",
+            "src/shortcuts.rs",
+            "src/launcher.rs",
+        ])
         .cpp_file("src/glue.cpp");
     if std::env::var_os("CARGO_FEATURE_QUICKTEST").is_some() {
         builder = builder.qt_module("QuickTest").cpp_file("src/quicktest.cpp");

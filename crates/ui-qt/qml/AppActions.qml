@@ -1,0 +1,118 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import QtQuick
+import QtQuick.Controls
+
+// Every command the menus and the keyboard reach (spec §3, `commands.rs`): one Action each, with its
+// shortcut and when it is available. The menu lists them and the shortcuts fire them, so the two
+// cannot drift apart. `host` is the main window: it says whether a dialog is open, whether a
+// workspace is, and which text field the Edit commands act on, and it carries out the commands.
+QtObject {
+    id: root
+    required property var host
+
+    readonly property Action newWorkspace: Action {
+        property string commandId: "file.new-workspace"
+        text: qsTr("New workspace…")
+        shortcut: StandardKey.New
+        enabled: !root.host.dialogOpen
+        onTriggered: root.host.newWorkspace()
+    }
+    readonly property Action openWorkspace: Action {
+        property string commandId: "file.open-workspace"
+        text: qsTr("Open workspace…")
+        shortcut: StandardKey.Open
+        enabled: !root.host.dialogOpen
+        onTriggered: root.host.openWorkspace()
+    }
+    // (The Import dialog arrives with the port's milestone Q5.)
+    readonly property Action importPhotos: Action {
+        property string commandId: "file.import"
+        text: qsTr("Import…")
+        shortcut: "Ctrl+I"
+        enabled: false
+    }
+    readonly property Action settings: Action {
+        property string commandId: "file.settings"
+        text: qsTr("Settings…")
+        shortcut: "Ctrl+,"
+        enabled: !root.host.dialogOpen
+        onTriggered: root.host.showSettings()
+    }
+    readonly property Action quit: Action {
+        property string commandId: "file.quit"
+        text: qsTr("Quit")
+        shortcut: StandardKey.Quit
+        onTriggered: Qt.quit()
+    }
+
+    // The Edit commands act on the text field that had the keyboard (the menu itself takes it while
+    // open, so the host remembers the field). Nothing else of the interface is editable: Delete only
+    // deletes a text selection, never a photo (D-018).
+    readonly property Action undo: Action {
+        property string commandId: "edit.undo"
+        text: qsTr("Undo")
+        shortcut: StandardKey.Undo
+        enabled: root.host.editTarget && root.host.editTarget.canUndo === true
+        onTriggered: root.host.editTarget.undo()
+    }
+    readonly property Action redo: Action {
+        property string commandId: "edit.redo"
+        text: qsTr("Redo")
+        shortcut: StandardKey.Redo
+        enabled: root.host.editTarget && root.host.editTarget.canRedo === true
+        onTriggered: root.host.editTarget.redo()
+    }
+    readonly property Action cut: Action {
+        property string commandId: "edit.cut"
+        text: qsTr("Cut")
+        shortcut: StandardKey.Cut
+        enabled: root.host.editTarget !== null
+        onTriggered: root.host.editTarget.cut()
+    }
+    readonly property Action copy: Action {
+        property string commandId: "edit.copy"
+        text: qsTr("Copy")
+        shortcut: StandardKey.Copy
+        enabled: root.host.editTarget !== null
+        onTriggered: root.host.editTarget.copy()
+    }
+    readonly property Action paste: Action {
+        property string commandId: "edit.paste"
+        text: qsTr("Paste")
+        shortcut: StandardKey.Paste
+        enabled: root.host.editTarget && root.host.editTarget.canPaste === true
+        onTriggered: root.host.editTarget.paste()
+    }
+    readonly property Action deleteSelection: Action {
+        property string commandId: "edit.delete"
+        text: qsTr("Delete")
+        shortcut: StandardKey.Delete
+        enabled: root.host.editTarget !== null
+        onTriggered: {
+            // By the selected text and the cursor, which is at one end of it: Qt 6.4 leaves
+            // selectionStart and selectionEnd stale (0) after an undo restored a selection.
+            const field = root.host.editTarget
+            const length = field.selectedText.length
+            if (length === 0)
+                return
+            const cursor = field.cursorPosition
+            const before = field.getText(cursor - length, cursor) === field.selectedText
+            field.remove(before ? cursor - length : cursor, before ? cursor : cursor + length)
+        }
+    }
+    readonly property Action selectAll: Action {
+        property string commandId: "edit.select-all"
+        text: qsTr("Select all")
+        shortcut: StandardKey.SelectAll
+        enabled: root.host.editTarget !== null
+        onTriggered: root.host.editTarget.selectAll()
+    }
+
+    readonly property Action about: Action {
+        property string commandId: "help.about"
+        text: qsTr("About Auroraw")
+        shortcut: StandardKey.HelpContents
+        enabled: !root.host.dialogOpen
+        onTriggered: root.host.showAbout()
+    }
+}

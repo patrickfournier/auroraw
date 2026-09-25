@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import QtQuick
+import QtQuick.Controls
+
+// The hamburger menu (D-090): File, Edit and Help as cascading submenus, each command with its
+// shortcut. Alt and the letter marked with & in a section's title open it (`openSection`), so the
+// letter follows the language (Alt+F, Alt+E, Alt+H; Alt+F, Alt+É, Alt+A in French).
+Menu {
+    id: root
+    required property var actions
+
+    // The key sequence that opens section `index`: Alt and its mnemonic.
+    function sectionKey(index) {
+        const title = itemAt(index) ? itemAt(index).subMenu.title : ""
+        const at = title.indexOf("&")
+        return at >= 0 && at + 1 < title.length ? "Alt+" + title[at + 1].toUpperCase() : ""
+    }
+
+    function openSection(index) {
+        popup(parent, 0, parent ? parent.height : 0)
+        itemAt(index).subMenu.popup()
+    }
+
+    Menu {
+        title: qsTr("&File")
+        AppMenuItem { action: root.actions.newWorkspace }
+        AppMenuItem { action: root.actions.openWorkspace }
+        MenuSeparator {}
+        AppMenuItem { action: root.actions.importPhotos }
+        MenuSeparator {}
+        AppMenuItem { action: root.actions.settings }
+        MenuSeparator {}
+        AppMenuItem { action: root.actions.quit }
+    }
+    Menu {
+        title: qsTr("&Edit")
+        AppMenuItem { action: root.actions.undo }
+        AppMenuItem { action: root.actions.redo }
+        MenuSeparator {}
+        AppMenuItem { action: root.actions.cut }
+        AppMenuItem { action: root.actions.copy }
+        AppMenuItem { action: root.actions.paste }
+        AppMenuItem { action: root.actions.deleteSelection }
+        MenuSeparator {}
+        AppMenuItem { action: root.actions.selectAll }
+    }
+    Menu {
+        title: qsTr("&Help")
+        AppMenuItem { action: root.actions.about }
+    }
+}

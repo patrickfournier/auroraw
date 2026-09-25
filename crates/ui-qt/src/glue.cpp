@@ -69,3 +69,21 @@ extern "C" void auroraw_set_translation(const unsigned char *data, size_t len, Q
         }
     }
 }
+
+#include <QKeySequence>
+
+// A shortcut written the way this platform writes it (Ctrl+N, ⌘N). `standard` is a
+// QKeySequence::StandardKey, or negative to read `text` (UTF-8, "Ctrl+I") as a sequence. Qt Quick's
+// own Shortcut item can say it too, but warns for every key with several bindings (Undo, Cut...).
+// Returns the length of the UTF-8 answer, cut to `cap` bytes.
+extern "C" size_t auroraw_shortcut_text(int standard, const unsigned char *text, size_t len,
+                                        unsigned char *out, size_t cap) {
+    const QKeySequence sequence =
+        standard >= 0 ? QKeySequence(static_cast<QKeySequence::StandardKey>(standard))
+                      : QKeySequence(QString::fromUtf8(reinterpret_cast<const char *>(text),
+                                                       static_cast<qsizetype>(len)));
+    const QByteArray answer = sequence.toString(QKeySequence::NativeText).toUtf8();
+    const size_t n = std::min(static_cast<size_t>(answer.size()), cap);
+    memcpy(out, answer.constData(), n);
+    return n;
+}

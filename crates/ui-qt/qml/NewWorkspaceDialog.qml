@@ -11,6 +11,11 @@ AppDialog {
     required property var launcher
     property string error: ""
     property var hostWindow: null
+    signal created
+    property alias nameField: nameField
+    property alias folderField: folderField
+    property alias createButton: createButton
+    property alias cancelButton: cancelButton
     // A native folder dialog is open (its own window: the main window has to be blocked by hand).
     property alias browsing: browse.visible
 
@@ -33,6 +38,7 @@ AppDialog {
         var reason = launcher.create(nameField.text, folderField.text)
         if (reason === "") {
             close()
+            created()
         } else if (reason.indexOf("taken:") === 0) {
             error = qsTr("The folder %1 already exists and is not empty. Choose another name or folder.")
                 .arg(reason.substring(6))
@@ -49,6 +55,7 @@ AppDialog {
         Label { text: qsTr("Name") }
         TextField {
             id: nameField
+            objectName: "nameField"
             Layout.fillWidth: true
             Layout.columnSpan: 2
             onAccepted: dialog.tryCreate()
@@ -56,6 +63,7 @@ AppDialog {
         Label { text: qsTr("Folder") }
         TextField {
             id: folderField
+            objectName: "folderField"
             Layout.fillWidth: true
         }
         Button {
@@ -84,12 +92,14 @@ AppDialog {
 
     footer: DialogButtonBox {
         Button {
+            id: createButton
             text: qsTr("Create")
             highlighted: true
             DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
             onClicked: dialog.tryCreate()
         }
         Button {
+            id: cancelButton
             text: qsTr("Cancel")
             DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
             onClicked: dialog.close()

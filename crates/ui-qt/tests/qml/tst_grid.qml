@@ -5,28 +5,13 @@ import org.auroraw.ui
 
 // The grid's keyboard and layout, offscreen, on the fixture workspace (a machine made by
 // the harness): the last workspace opens on the grid.
-TestCase {
-    id: tc
+AppTestCase {
     name: "Grid"
-    when: windowShown
-
-    // (QML files are not types of the module for an outside importer: loaded by URL.)
-    property var appComponent: Qt.createComponent("qrc:/qt/qml/org/auroraw/ui/qml/Main.qml")
-    property var app
 
     function init() {
-        app = createTemporaryObject(appComponent, tc)
-        verify(app)
-        wait(500)
-        app.requestActivate()
-        wait(100)
-    }
-
-    function cleanup() {
-        if (app) {
-            app.close()
-            app.destroy()
-        }
+        launch("")
+        compare(app.launcher.screen, "workspace")
+        compare(app.currentTask, "cull", "a workspace with photos opens on the grid")
     }
 
     function test_paging_keys_home_and_end_move_the_selection_and_keep_it_in_view() {

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! The library grid's model: a `QAbstractListModel` over the open workspace's photos. The Qt-side
-//! twin of `crates/ui/src/grid.rs` (which has the selection and the paging keys too; here the
-//! `GridView` in QML has them).
+//! The list models: the library grid's (`PhotoGrid`, over the open workspace's photos; the Qt-side twin
+//! of `crates/ui/src/grid.rs`, whose selection and paging keys are the `GridView`'s here) and the
+//! welcome list's (`KnownWorkspaces`, over the registry). Both are `QAbstractListModel`s, and the base
+//! class can only be declared once per link, so they share this bridge.
 
 #[cxx_qt::bridge]
 pub mod qobject {
@@ -87,12 +88,60 @@ pub mod qobject {
         #[cxx_name = "rowCount"]
         fn row_count(self: &PhotoGrid, _parent: &QModelIndex) -> i32;
     }
+    extern "RustQt" {
+        #[qobject]
+        #[base = QAbstractListModel]
+        #[qml_element]
+        #[qproperty(i32, count)]
+        type KnownWorkspaces = super::KnownWorkspacesRust;
+
+        /// Reads the registry again.
+        #[qinvokable]
+        fn refresh(self: Pin<&mut KnownWorkspaces>);
+
+        /// The folder of the workspace in `row`.
+        #[qinvokable]
+        #[cxx_name = "pathAt"]
+        fn path_at(self: &KnownWorkspaces, row: i32) -> QString;
+
+        /// Takes the workspace in `row` off the list (its folder is not touched).
+        #[qinvokable]
+        fn forget(self: Pin<&mut KnownWorkspaces>, row: i32);
+    }
+
+    unsafe extern "RustQt" {
+        #[inherit]
+        #[cxx_name = "beginResetModel"]
+        unsafe fn begin_reset_model(self: Pin<&mut KnownWorkspaces>);
+        #[inherit]
+        #[cxx_name = "endResetModel"]
+        unsafe fn end_reset_model(self: Pin<&mut KnownWorkspaces>);
+    }
+
+    extern "RustQt" {
+        #[qinvokable]
+        #[cxx_override]
+        fn data(self: &KnownWorkspaces, index: &QModelIndex, role: i32) -> QVariant;
+
+        #[qinvokable]
+        #[cxx_override]
+        #[cxx_name = "roleNames"]
+        fn role_names(self: &KnownWorkspaces) -> QHash_i32_QByteArray;
+
+        #[qinvokable]
+        #[cxx_override]
+        #[cxx_name = "rowCount"]
+        fn row_count(self: &KnownWorkspaces, _parent: &QModelIndex) -> i32;
+    }
+
+    // Reads the registry once the object exists.
+    impl cxx_qt::Initialize for KnownWorkspaces {}
 }
 
 use core::pin::Pin;
 
 use auroraw_catalogue::Cursor;
-use auroraw_engine::Command;
+use auroraw_engine::{Command, Engine, KnownWorkspace};
 use auroraw_types::PhotoId;
 use cxx_qt::CxxQtType;
 use cxx_qt_lib::{
@@ -206,5 +255,84 @@ impl qobject::PhotoGrid {
 
     pub fn row_count(&self, _parent: &QModelIndex) -> i32 {
         self.items.len() as i32
+    }
+}
+
+/// Qt::UserRole and the next ones.
+const ROLE_NAME: i32 = 0x0100;
+const ROLE_PATH: i32 = 0x0101;
+const ROLE_OPENED: i32 = 0x0102;
+const ROLE_FOUND: i32 = 0x0103;
+
+/// The Rust side of the model.
+#[derive(Default)]
+pub struct KnownWorkspacesRust {
+    count: i32,
+    known: Vec<KnownWorkspace>,
+}
+
+impl cxx_qt::Initialize for qobject::KnownWorkspaces {
+    fn initialize(self: Pin<&mut Self>) {
+        self.refresh();
+    }
+}
+
+impl qobject::KnownWorkspaces {
+    pub fn refresh(mut self: Pin<&mut Self>) {
+        let known = Engine::known_workspaces(&crate::launch().dirs);
+        let count = known.len() as i32;
+        // SAFETY: every begin is followed by its end, with nothing in between that can fail.
+        unsafe {
+            self.as_mut().begin_reset_model();
+            self.as_mut().rust_mut().known = known;
+            self.as_mut().end_reset_model();
+        }
+        self.set_count(count);
+    }
+
+    pub fn path_at(&self, row: i32) -> QString {
+        self.known
+            .get(row as usize)
+            .map(|k| QString::from(k.path.to_string_lossy().as_ref()))
+            .unwrap_or_default()
+    }
+
+    pub fn forget(mut self: Pin<&mut Self>, row: i32) {
+        if let Some(entry) = self.known.get(row as usize) {
+            let _ = Engine::forget_workspace(&crate::launch().dirs, entry.workspace_id);
+        }
+        self.as_mut().refresh();
+    }
+
+    pub fn data(&self, index: &QModelIndex, role: i32) -> QVariant {
+        let Some(entry) = self.known.get(index.row() as usize) else {
+            return QVariant::default();
+        };
+        match role {
+            ROLE_NAME => QVariant::from(&QString::from(entry.name.as_str())),
+            ROLE_PATH => QVariant::from(&QString::from(entry.path.to_string_lossy().as_ref())),
+            ROLE_OPENED => QVariant::from(&QString::from(
+                entry
+                    .opened
+                    .map(|when| when.to_string().chars().take(10).collect::<String>())
+                    .unwrap_or_default()
+                    .as_str(),
+            )),
+            ROLE_FOUND => QVariant::from(&entry.found),
+            _ => QVariant::default(),
+        }
+    }
+
+    pub fn role_names(&self) -> QHash<QHashPair_i32_QByteArray> {
+        let mut roles = QHash::<QHashPair_i32_QByteArray>::default();
+        roles.insert(ROLE_NAME, QByteArray::from("name"));
+        roles.insert(ROLE_PATH, QByteArray::from("path"));
+        roles.insert(ROLE_OPENED, QByteArray::from("opened"));
+        roles.insert(ROLE_FOUND, QByteArray::from("found"));
+        roles
+    }
+
+    pub fn row_count(&self, _parent: &QModelIndex) -> i32 {
+        self.known.len() as i32
     }
 }

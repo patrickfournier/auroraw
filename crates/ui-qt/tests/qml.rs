@@ -16,6 +16,9 @@ fn run_suite(suite: &str, home: &Path, extra: Option<&Path>) {
     let report = home.join(format!("{suite}.txt"));
     let mut command = Command::new(env!("CARGO_BIN_EXE_qml-test-runner"));
     command
+        // The module is built into the runner (its QML is in the executable's resources).
+        .arg("-import")
+        .arg("qrc:/qt/qml")
         .arg("-input")
         .arg(
             Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -44,10 +47,23 @@ fn run_suite(suite: &str, home: &Path, extra: Option<&Path>) {
     );
 }
 
+/// The suites that make their own machines (folders under the one they are given).
 #[test]
-fn modality_and_menus_on_an_empty_machine() {
+fn opening_and_creating_workspaces() {
     let home = temp_dir();
-    run_suite("modality", home.path(), None);
+    run_suite("launch", home.path(), None);
+}
+
+#[test]
+fn the_hamburger_menu_and_its_commands() {
+    let home = temp_dir();
+    run_suite("menus", home.path(), None);
+}
+
+#[test]
+fn modal_dialogs_settings_and_the_language() {
+    let home = temp_dir();
+    run_suite("dialogs", home.path(), None);
 }
 
 #[test]
@@ -57,10 +73,4 @@ fn the_grid_on_a_machine_with_photos() {
     let extra = home.path().join("Extra");
     support::write_photos(&extra, "EXTRA", 5);
     run_suite("grid", home.path(), Some(&extra));
-}
-
-#[test]
-fn the_language_can_be_switched_live() {
-    let home = temp_dir();
-    run_suite("language", home.path(), None);
 }

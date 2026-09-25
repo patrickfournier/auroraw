@@ -1,0 +1,219 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//! The command set (spec §3: "every action is a command reachable by keyboard, menu and later a
+//! palette"): a small, explicit table so "every command has a keyboard shortcut" is something a
+//! test can check by listing the table, rather than something only a person clicking through the
+//! interface could notice was missing (testing strategy §6). The QML side is `qml/AppActions.qml`
+//! (one `Action` per menu command, with its `commandId`) and `qml/AppMenu.qml`; the tests below hold
+//! the two together. The grid's keys (rating, moving the selection) are the library view's own and
+//! join the cross-check with it (milestone Q3).
+//!
+//! Grows with later work packages: WP9's cull mode adds flags, labels and series commands to this
+//! same table; a menu and a command palette read it too, once built.
+
+/// One command the interface can carry out and how a person reaches it from the keyboard.
+pub struct CommandSpec {
+    /// A stable identifier: the `commandId` of its `Action` in QML.
+    pub id: &'static str,
+    /// A name, for a future palette.
+    pub name: &'static str,
+    /// The keyboard shortcut, as shown to a person (not parsed).
+    pub shortcut: &'static str,
+    /// Whether the hamburger menu lists it (`qml/AppMenu.qml`).
+    pub menu: bool,
+}
+
+const fn command(
+    id: &'static str,
+    name: &'static str,
+    shortcut: &'static str,
+    menu: bool,
+) -> CommandSpec {
+    CommandSpec {
+        id,
+        name,
+        shortcut,
+        menu,
+    }
+}
+
+/// Every command the shell currently exposes.
+pub const COMMANDS: &[CommandSpec] = &[
+    command("grid.rate-0", "Rate 0 (clear)", "0", false),
+    command("grid.rate-1", "Rate 1", "1", false),
+    command("grid.rate-2", "Rate 2", "2", false),
+    command("grid.rate-3", "Rate 3", "3", false),
+    command("grid.rate-4", "Rate 4", "4", false),
+    command("grid.rate-5", "Rate 5", "5", false),
+    command("grid.up", "Move selection up", "Up", false),
+    command("grid.down", "Move selection down", "Down", false),
+    command("grid.left", "Move selection left", "Left", false),
+    command("grid.right", "Move selection right", "Right", false),
+    command(
+        "grid.page-up",
+        "Move selection one page up",
+        "PageUp",
+        false,
+    ),
+    command(
+        "grid.page-down",
+        "Move selection one page down",
+        "PageDown",
+        false,
+    ),
+    command("grid.home", "Select the first photo", "Home", false),
+    command("grid.end", "Select the last photo", "End", false),
+    command("file.new-workspace", "New workspace", "Ctrl+N", true),
+    command("file.open-workspace", "Open workspace", "Ctrl+O", true),
+    command("file.settings", "Settings", "Ctrl+,", true),
+    command("file.import", "Import", "Ctrl+I", true),
+    command("file.quit", "Quit", "Ctrl+Q", true),
+    command("edit.undo", "Undo", "Ctrl+Z", true),
+    command("edit.redo", "Redo", "Ctrl+Y", true),
+    command("edit.cut", "Cut", "Ctrl+X", true),
+    command("edit.copy", "Copy", "Ctrl+C", true),
+    command("edit.paste", "Paste", "Ctrl+V", true),
+    command("edit.select-all", "Select all", "Ctrl+A", true),
+    command("edit.delete", "Delete", "Del", true),
+    command("help.about", "About", "F1", true),
+];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn qml_file(name: &str) -> String {
+        std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("qml")
+                .join(name),
+        )
+        .unwrap()
+    }
+
+    /// What the `shortcut:` of a menu command's `Action` says: a Qt standard key where the platform
+    /// has one (so the Mac gets its own), else the sequence itself.
+    fn qml_shortcut(id: &str) -> &'static str {
+        match id {
+            "file.new-workspace" => "StandardKey.New",
+            "file.open-workspace" => "StandardKey.Open",
+            "file.quit" => "StandardKey.Quit",
+            "edit.undo" => "StandardKey.Undo",
+            "edit.redo" => "StandardKey.Redo",
+            "edit.cut" => "StandardKey.Cut",
+            "edit.copy" => "StandardKey.Copy",
+            "edit.paste" => "StandardKey.Paste",
+            "edit.select-all" => "StandardKey.SelectAll",
+            "edit.delete" => "StandardKey.Delete",
+            "help.about" => "StandardKey.HelpContents",
+            "file.settings" => "\"Ctrl+,\"",
+            "file.import" => "\"Ctrl+I\"",
+            other => panic!("{other} has no shortcut spelled in the test yet"),
+        }
+    }
+
+    /// The `Action`s of `AppActions.qml`, as (command id, text of its block).
+    fn actions() -> Vec<(String, String)> {
+        let text = qml_file("AppActions.qml");
+        let mut found = Vec::new();
+        let mut rest = text.as_str();
+        while let Some(at) = rest.find("commandId: \"") {
+            rest = &rest[at + "commandId: \"".len()..];
+            let id = &rest[..rest.find('"').unwrap()];
+            let block_end = rest.find("\n    }\n").unwrap_or(rest.len());
+            found.push((id.to_string(), rest[..block_end].to_string()));
+        }
+        found
+    }
+
+    /// Every menu command has an `Action` with the shortcut the table says, and every `Action` is a
+    /// command of the table: the two cannot drift apart. A textual check, not a semantic one: it
+    /// would not catch an action wired to the wrong handler.
+    #[test]
+    fn every_menu_command_is_an_action_with_its_shortcut() {
+        let actions = actions();
+        for command in COMMANDS.iter().filter(|c| c.menu) {
+            let (_, block) = actions
+                .iter()
+                .find(|(id, _)| id == command.id)
+                .unwrap_or_else(|| panic!("{}: no Action in AppActions.qml", command.id));
+            let expected = format!("shortcut: {}", qml_shortcut(command.id));
+            assert!(
+                block.contains(&expected),
+                "{}: AppActions.qml does not say {expected:?}",
+                command.id
+            );
+        }
+        for (id, _) in &actions {
+            assert!(
+                COMMANDS.iter().any(|c| c.id == id && c.menu),
+                "AppActions.qml has {id:?}, which is not a menu command of the table"
+            );
+        }
+    }
+
+    /// The menu lists each action of the table's menu commands once, in `AppMenu.qml`.
+    #[test]
+    fn the_menu_lists_exactly_the_menu_commands() {
+        let menu = qml_file("AppMenu.qml");
+        let actions = qml_file("AppActions.qml");
+        let mut listed = Vec::new();
+        for line in menu.lines() {
+            let Some(at) = line.find("root.actions.") else {
+                continue;
+            };
+            let name = line[at + "root.actions.".len()..]
+                .split(|c: char| !c.is_alphanumeric())
+                .next()
+                .unwrap();
+            // The Action property named `name`, and its command id.
+            let start = actions
+                .find(&format!("readonly property Action {name}:"))
+                .unwrap_or_else(|| panic!("AppMenu.qml lists {name}, which AppActions.qml lacks"));
+            let block = &actions[start..];
+            let at = block.find("commandId: \"").unwrap() + "commandId: \"".len();
+            let id = &block[at..at + block[at..].find('"').unwrap()];
+            listed.push(id.to_string());
+        }
+        for command in COMMANDS {
+            let count = listed.iter().filter(|id| *id == command.id).count();
+            assert_eq!(
+                count,
+                usize::from(command.menu),
+                "{}: menu = {} in the table, listed {count} time(s) in AppMenu.qml",
+                command.id,
+                command.menu
+            );
+        }
+        for id in &listed {
+            assert!(
+                COMMANDS.iter().any(|c| c.id == id),
+                "{id:?} is not a command"
+            );
+        }
+    }
+
+    #[test]
+    fn every_command_has_a_keyboard_shortcut() {
+        for command in COMMANDS {
+            assert!(
+                !command.shortcut.is_empty(),
+                "{} has no keyboard shortcut (spec §3: keyboard first)",
+                command.name
+            );
+        }
+    }
+
+    #[test]
+    fn no_two_commands_share_a_shortcut_or_an_id() {
+        for (i, a) in COMMANDS.iter().enumerate() {
+            for b in &COMMANDS[i + 1..] {
+                assert_ne!(
+                    a.shortcut, b.shortcut,
+                    "{} and {} both claim {:?}",
+                    a.name, b.name, a.shortcut
+                );
+                assert_ne!(a.id, b.id);
+            }
+        }
+    }
+}

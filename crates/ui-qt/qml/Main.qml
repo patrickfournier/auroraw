@@ -7,6 +7,9 @@ import org.auroraw.ui
 
 ApplicationWindow {
     id: window
+    // Tests: a machine (a folder under AURORAW_TEST_HOME) to run on, chosen before the launcher starts.
+    property string machine: ""
+
     visible: true
     width: 1400
     height: 900
@@ -36,31 +39,67 @@ ApplicationWindow {
     }
     title: launcher.screen === "workspace" ? launcher.workspaceName + " — Auroraw" : "Auroraw"
 
-    // What the tests reach into (tests/tst_*.qml).
+    // What the tests reach into (tests/qml/tst_*.qml).
     property alias welcome: welcomeView
     property alias library: libraryView
     property alias newDialog: newDialog
+    property alias settingsDialog: settingsDialog
+    property alias aboutDialog: aboutDialog
     property alias openDialog: openDialog
     property alias waiting: waiting
     property alias launcher: launcher
+    property alias known: known
     property alias photos: photoGrid
+    property alias actions: actions
+    property alias menu: appMenu
+    property alias hamburger: hamburger
+    property alias tabs: tabs
+    property alias noticeBar: noticeBar
 
     Launcher { id: launcher }
+    KnownWorkspaces { id: known }
     PhotoGrid { id: photoGrid }
+    AppActions { id: actions; host: window }
+
+    // The task on screen: what a workspace opens on is the catalogue when it is new or empty, and
+    // the grid otherwise (D-090).
+    property string currentTask: "cull"
+    // Something that could not be done, said at the top until dismissed.
+    property string notice: ""
 
     // A dialog is open: every command that opens a window waits (the mouse is blocked by the
-    // dialog's own modality; shortcuts are not, so the actions below check this).
-    // (`guardShortcuts` exists so that the self-test can ask what Qt does by itself.)
-    property bool guardShortcuts: true
-    property int newCount: 0
+    // dialog's own modality; keyboard shortcuts may not be, depending on the Qt version and the
+    // kind of shortcut, so the actions check this).
     // A native folder dialog is another window: Qt cannot block this one for it, so while one is open
-    // a modal popup covers everything (menu bar included) and the commands wait.
+    // a modal popup covers everything (the menu included) and the commands wait.
     // (`nativeDialogForced` stands for one in the tests: none can open off screen.)
     property bool nativeDialogForced: false
     readonly property bool nativeDialogOpen: nativeDialogForced || openDialog.visible || sourceDialog.visible || newDialog.browsing
-    readonly property bool dialogOpen: guardShortcuts && (newDialog.visible || nativeDialogOpen)
+    readonly property bool dialogOpen: newDialog.visible || settingsDialog.visible
+                                       || aboutDialog.visible || nativeDialogOpen
     readonly property bool inWorkspace: launcher.screen === "workspace"
+
+    // The Edit commands act on the text field that has the keyboard. The menu takes the keyboard
+    // while it is open, so the field that had it is remembered.
     readonly property Item focusItem: window.activeFocusItem
+    property Item fieldBeforeMenu: null
+    readonly property Item editTarget: appMenu.opened ? fieldBeforeMenu
+                                                       : (isField(focusItem) ? focusItem : null)
+    function isField(item) {
+        return item !== null && item !== undefined && item.selectedText !== undefined
+    }
+
+    // Commands (what `AppActions` calls).
+    function newWorkspace() { newDialog.openWith() }
+    function openWorkspace() { openDialog.open() }
+    function showSettings() { settingsDialog.open() }
+    function showAbout() { aboutDialog.open() }
+    // Opens the workspace in `folder`, or says why not.
+    function openFolder(folder) {
+        const reason = launcher.openPath(folder)
+        if (reason !== "")
+            notice = qsTr("Cannot open the workspace: %1").arg(reason)
+    }
 
     Component.onCompleted: {
         Theme.fontFamily = launcher.env("AURORAW_FONT")
@@ -69,13 +108,20 @@ ApplicationWindow {
             window.font.family = Theme.fontFamily
         if (Theme.fontSize > 0)
             window.font.pointSize = Theme.fontSize
+        if (machine !== "")
+            launcher.useMachine(machine)
         launcher.start()
+        known.refresh()
     }
     Connections {
         target: launcher
         function onScreenChanged() {
-            if (launcher.screen === "workspace")
+            if (launcher.screen === "workspace") {
                 photoGrid.load()
+                window.currentTask = photoGrid.count === 0 ? "catalogue" : "cull"
+            } else {
+                known.refresh()
+            }
         }
     }
     // What the engine reports arrives on the Bus (a singleton, created here at the latest).
@@ -84,129 +130,107 @@ ApplicationWindow {
         function onIndexFinished() { photoGrid.load() }
     }
 
-    menuBar: MenuBar {
-        Menu {
-            title: qsTr("File")
-            Action {
-                text: qsTr("New workspace…")
-                shortcut: StandardKey.New
-                enabled: !window.dialogOpen
-                onTriggered: {
-                    window.newCount++
-                    newDialog.openWith()
+    // Alt and a section's mnemonic open it.
+    Repeater {
+        model: 3
+        Item {
+            required property int index
+            Shortcut {
+                sequence: appMenu.sectionKey(index)
+                enabled: !window.nativeDialogOpen && sequence !== ""
+                onActivated: appMenu.openSection(index)
+            }
+        }
+    }
+
+    header: ToolBar {
+        RowLayout {
+            anchors.fill: parent
+            spacing: 0
+            ToolButton {
+                id: hamburger
+                text: "☰"
+                font.pixelSize: 18
+                Accessible.name: qsTr("Menu")
+                onClicked: appMenu.opened ? appMenu.close() : appMenu.popup(hamburger, 0, hamburger.height)
+                AppMenu {
+                    id: appMenu
+                    parent: hamburger
+                    actions: actions
+                    onAboutToShow: window.fieldBeforeMenu = window.isField(window.focusItem) ? window.focusItem : null
                 }
             }
-            Action {
-                text: qsTr("Open workspace…")
-                shortcut: StandardKey.Open
-                enabled: !window.dialogOpen
-                onTriggered: openDialog.open()
+            TabBar {
+                id: tabs
+                visible: window.inWorkspace
+                background: null
+                currentIndex: window.currentTask === "catalogue" ? 0 : 1
+                TabButton {
+                    text: qsTr("Catalogue")
+                    enabled: !window.dialogOpen
+                    width: implicitWidth
+                    onClicked: window.currentTask = "catalogue"
+                }
+                TabButton {
+                    text: qsTr("Cull")
+                    enabled: !window.dialogOpen
+                    width: implicitWidth
+                    onClicked: window.currentTask = "cull"
+                }
+                TabButton { text: qsTr("Develop"); enabled: false; width: implicitWidth }
+                TabButton { text: qsTr("Publish"); enabled: false; width: implicitWidth }
             }
-            Action {
-                text: qsTr("Add a source…")
-                enabled: window.inWorkspace && !window.dialogOpen
-                onTriggered: sourceDialog.open()
-            }
-            MenuSeparator {}
-            Action {
-                text: qsTr("Import…")
-                shortcut: "Ctrl+I"
-                enabled: window.inWorkspace && !window.dialogOpen
-            }
-            MenuSeparator {}
-            Action {
-                text: qsTr("Settings…")
-                shortcut: "Ctrl+,"
-                enabled: !window.dialogOpen
-            }
-            MenuSeparator {}
-            Action {
-                text: qsTr("Quit")
-                shortcut: StandardKey.Quit
-                onTriggered: Qt.quit()
-            }
-        }
-        Menu {
-            title: qsTr("Edit")
-            // The text field that has the keyboard does the work: Qt Quick's own text editing.
-            Action {
-                text: qsTr("Undo")
-                shortcut: StandardKey.Undo
-                enabled: window.focusItem && window.focusItem.canUndo === true
-                onTriggered: window.focusItem.undo()
-            }
-            Action {
-                text: qsTr("Redo")
-                shortcut: StandardKey.Redo
-                enabled: window.focusItem && window.focusItem.canRedo === true
-                onTriggered: window.focusItem.redo()
-            }
-            MenuSeparator {}
-            Action {
-                text: qsTr("Cut")
-                shortcut: StandardKey.Cut
-                enabled: window.focusItem && window.focusItem.selectedText !== undefined
-                onTriggered: window.focusItem.cut()
-            }
-            Action {
-                text: qsTr("Copy")
-                shortcut: StandardKey.Copy
-                enabled: window.focusItem && window.focusItem.selectedText !== undefined
-                onTriggered: window.focusItem.copy()
-            }
-            Action {
-                text: qsTr("Paste")
-                shortcut: StandardKey.Paste
-                enabled: window.focusItem && window.focusItem.canPaste === true
-                onTriggered: window.focusItem.paste()
-            }
-            Action {
-                text: qsTr("Delete")
-                shortcut: StandardKey.Delete
-                enabled: window.focusItem && window.focusItem.selectedText !== undefined
-                onTriggered: window.focusItem.remove(window.focusItem.selectionStart,
-                                                      window.focusItem.selectionEnd)
-            }
-            MenuSeparator {}
-            Action {
-                text: qsTr("Select all")
-                shortcut: StandardKey.SelectAll
-                enabled: window.focusItem && window.focusItem.selectedText !== undefined
-                onTriggered: window.focusItem.selectAll()
-            }
-        }
-        Menu {
-            title: qsTr("Help")
-            Action {
-                text: qsTr("About Auroraw")
-                shortcut: "F1"
-                enabled: !window.dialogOpen
-            }
+            Item { Layout.fillWidth: true }
         }
     }
 
-    Welcome {
-        id: welcomeView
+    ColumnLayout {
         anchors.fill: parent
-        visible: launcher.screen === "welcome"
-        launcher: launcher
-        onNewRequested: newDialog.openWith()
-        onOpenRequested: openDialog.open()
-    }
+        spacing: 0
 
-    Library {
-        id: libraryView
-        anchors.fill: parent
-        launcher: launcher
-        visible: window.inWorkspace
-        photoGrid: photoGrid
+        NoticeBar {
+            id: noticeBar
+            Layout.fillWidth: true
+            text: window.notice
+            onDismissed: window.notice = ""
+        }
+
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            Welcome {
+                id: welcomeView
+                anchors.fill: parent
+                visible: launcher.screen === "welcome"
+                launcher: launcher
+                known: known
+                onNewRequested: window.newWorkspace()
+                onOpenRequested: window.openWorkspace()
+                onKnownRequested: row => window.openFolder(known.pathAt(row))
+            }
+            Catalogue {
+                anchors.fill: parent
+                visible: window.inWorkspace && window.currentTask === "catalogue"
+            }
+            Library {
+                id: libraryView
+                anchors.fill: parent
+                visible: window.inWorkspace && window.currentTask === "cull"
+                launcher: launcher
+                photoGrid: photoGrid
+            }
+        }
     }
 
     NewWorkspaceDialog {
         id: newDialog
         launcher: launcher
         hostWindow: window
+        onCreated: window.currentTask = "catalogue"
     }
+    SettingsDialog { id: settingsDialog; launcher: launcher }
+    AboutDialog { id: aboutDialog; launcher: launcher }
 
     Popup {
         id: waiting
@@ -241,6 +265,6 @@ ApplicationWindow {
         id: openDialog
         parentWindow: window
         title: qsTr("Open a workspace")
-        onAccepted: launcher.openPath(selectedFolder.toString().replace(/^file:\/\//, ""))
+        onAccepted: window.openFolder(selectedFolder.toString().replace(/^file:\/\//, ""))
     }
 }

@@ -4,13 +4,17 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import org.auroraw.ui
 
+// What opens when no workspace is: the ones this machine knows, and the two ways to get another.
 Item {
     id: root
     required property var launcher
+    required property var known
     signal newRequested
     signal openRequested
+    signal knownRequested(int row)
     property alias newButton: newButton
     property alias openButton: openButton
+    property alias list: list
 
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
@@ -44,23 +48,67 @@ Item {
             }
             Button {
                 id: openButton
-                text: qsTr("Open a workspace…")
+                text: qsTr("Open workspace…")
                 onClicked: root.openRequested()
             }
         }
         Label {
-            visible: root.launcher.knownNames.length === 0
-            text: qsTr("No workspace yet.")
+            text: root.known.count > 0 ? qsTr("Recent workspaces") : qsTr("No workspace yet.")
             font.bold: true
         }
-        Repeater {
-            model: root.launcher.knownNames
+        ListView {
+            id: list
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(root.known.count * 60, 380)
+            clip: true
+            model: root.known
             delegate: ItemDelegate {
-                required property string modelData
+                id: row
                 required property int index
-                Layout.fillWidth: true
-                text: modelData + "\n" + root.launcher.knownPaths[index]
-                onClicked: root.launcher.openKnown(index)
+                required property string name
+                required property string path
+                required property string opened
+                required property bool found
+                width: ListView.view.width
+                height: 56
+                Accessible.name: name + ", " + path
+                onClicked: root.knownRequested(index)
+
+                contentItem: RowLayout {
+                    spacing: 8
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+                        Label {
+                            text: row.name
+                            font.bold: true
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+                        Label {
+                            text: row.path
+                            color: Theme.quiet
+                            elide: Text.ElideMiddle
+                            Layout.fillWidth: true
+                        }
+                    }
+                    Label {
+                        visible: !row.found
+                        text: qsTr("Not found")
+                        color: Theme.danger
+                    }
+                    Button {
+                        visible: !row.found
+                        text: qsTr("Remove from the list")
+                        Accessible.name: qsTr("Remove from the list: %1").arg(row.name)
+                        onClicked: root.known.forget(row.index)
+                    }
+                    Label {
+                        visible: row.found
+                        text: row.opened
+                        color: Theme.quiet
+                    }
+                }
             }
         }
     }
