@@ -1,0 +1,5 @@
+# A test that hangs must fail the job, not hold a runner for hours (a lost wake-up did, on macOS).
+# The slowest legitimate tests (the RAW samples, the WebAssembly decoder) take about three minutes
+# on a Windows runner; 120 s slow periods, terminated after five of them, leave a wide margin.
+[profile.default]
+slow-timeout = { period = "120s", terminate-after = 5 }
