@@ -35,6 +35,16 @@ pub mod qobject {
         #[qinvokable]
         fn rename(self: &Files, from: &QString, to: &QString) -> bool;
 
+        /// Copies the files of the folder `from` into the folder `to` (made if need be).
+        #[qinvokable]
+        #[cxx_name = "copyDir"]
+        fn copy_dir(self: &Files, from: &QString, to: &QString);
+
+        /// Copies one file.
+        #[qinvokable]
+        #[cxx_name = "copyFile"]
+        fn copy_file(self: &Files, from: &QString, to: &QString);
+
         /// The canonical form of a path, as the application understands it.
         #[qinvokable]
         fn canonical(self: &Files, path: &QString) -> QString;
@@ -90,6 +100,26 @@ impl qobject::Files {
 
     pub fn rename(&self, from: &QString, to: &QString) -> bool {
         std::fs::rename(path(from), path(to)).is_ok()
+    }
+
+    pub fn copy_dir(&self, from: &QString, to: &QString) {
+        let _ = std::fs::create_dir_all(path(to));
+        for entry in std::fs::read_dir(path(from))
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
+            if entry.path().is_file() {
+                let _ = std::fs::copy(entry.path(), path(to).join(entry.file_name()));
+            }
+        }
+    }
+
+    pub fn copy_file(&self, from: &QString, to: &QString) {
+        if let Some(parent) = path(to).parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::copy(path(from), path(to));
     }
 
     pub fn previews_count(&self, cache: &QString) -> i32 {

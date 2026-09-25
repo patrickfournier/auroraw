@@ -64,6 +64,25 @@ TestCase {
             return
         files.mkdir(dir)
         grabImage(app.contentItem).save(dir + "/" + name + ".png")
+        // Dialogs and menus live in the overlay, above the content.
+        if (app.overlay)
+            grabImage(app.overlay).save(dir + "/" + name + "-overlay.png")
+    }
+
+    // Adds `folder` as a source through the catalogue task's dialog, as a person does.
+    function addSource(folder, name) {
+        app.currentTask = "catalogue"
+        click(app.catalogue.addButton)
+        wait(150)
+        verify(app.flow.addDialog.visible, "the Add a source dialog opened")
+        app.flow.addDialog.folderField.text = folder
+        if (name)
+            app.flow.addDialog.nameField.text = name
+        click(app.flow.addDialog.addButton)
+    }
+
+    function waitForTheScan() {
+        tryVerify(() => !app.flow.busy, 30000, "the scan or removal ended")
     }
 
     // Clicks the centre of an item as a person would.

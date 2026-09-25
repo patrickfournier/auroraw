@@ -35,6 +35,50 @@
     </message>
 </context>
 <context>
+    <name>AddSourceDialog</name>
+    <message>
+        <location filename="../qml/AddSourceDialog.qml" line="24"/>
+        <location filename="../qml/AddSourceDialog.qml" line="106"/>
+        <source>Add a source</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AddSourceDialog.qml" line="42"/>
+        <source>Kind: Folder (local, or a network share that is mounted)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AddSourceDialog.qml" line="45"/>
+        <source>Folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AddSourceDialog.qml" line="52"/>
+        <source>Browse…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AddSourceDialog.qml" line="55"/>
+        <source>Name (optional)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AddSourceDialog.qml" line="83"/>
+        <source>Add</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AddSourceDialog.qml" line="91"/>
+        <source>Merge and add</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AddSourceDialog.qml" line="97"/>
+        <source>Cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>AppActions</name>
     <message>
         <location filename="../qml/AppActions.qml" line="15"/>
@@ -123,13 +167,109 @@
 <context>
     <name>Catalogue</name>
     <message>
-        <location filename="../qml/Catalogue.qml" line="16"/>
+        <location filename="../qml/Catalogue.qml" line="27"/>
         <source>Sources</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Catalogue.qml" line="24"/>
-        <source>A source is a folder whose photos are in the catalogue.</source>
+        <location filename="../qml/Catalogue.qml" line="34"/>
+        <source>Add a source…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Catalogue.qml" line="44"/>
+        <source>A source is a folder whose photos are in the catalogue. Adding one copies nothing: the photos stay where they are.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Catalogue.qml" line="51"/>
+        <source>No source yet. Add the folder your photos are in.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Catalogue.qml" line="101"/>
+        <source>Offline</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Catalogue.qml" line="112"/>
+        <source>%n photo(s)</source>
+        <translation>
+            <numerusform>%n photo</numerusform>
+            <numerusform>%n photos</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/Catalogue.qml" line="115"/>
+        <source>Rescan</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Catalogue.qml" line="116"/>
+        <source>Rescan: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Catalogue.qml" line="122"/>
+        <source>Remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/Catalogue.qml" line="123"/>
+        <source>Remove: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>CatalogueFlow</name>
+    <message>
+        <location filename="../qml/CatalogueFlow.qml" line="35"/>
+        <location filename="../qml/CatalogueFlow.qml" line="116"/>
+        <source>Reading photos: %1 of %2…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/CatalogueFlow.qml" line="52"/>
+        <source>The scan could not start: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/CatalogueFlow.qml" line="62"/>
+        <location filename="../qml/CatalogueFlow.qml" line="79"/>
+        <source>Cannot add the source: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/CatalogueFlow.qml" line="71"/>
+        <source>This folder contains the sources %1. Merge them into the new one? Their photos are kept, with their ratings and versions.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/CatalogueFlow.qml" line="121"/>
+        <source>Done: %1 added, %2 restored, %3 already known, %4 not readable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/CatalogueFlow.qml" line="128"/>
+        <source>The scan stopped: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/CatalogueFlow.qml" line="134"/>
+        <source>Source &quot;%1&quot; removed; %n photo(s) left the catalogue.</source>
+        <translation>
+            <numerusform>Source "%1" removed; %n photo left the catalogue.</numerusform>
+            <numerusform>Source "%1" removed; %n photos left the catalogue.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/CatalogueFlow.qml" line="141"/>
+        <source>Scan cancelled. Rescanning the source picks up where it stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/CatalogueFlow.qml" line="162"/>
+        <source>The removal could not start: %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -144,52 +284,37 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="34"/>
-        <source>Cannot add the source: %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/Library.qml" line="39"/>
-        <source>Reading photos…</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/Library.qml" line="91"/>
-        <source>Done: %1 added.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/Library.qml" line="112"/>
+        <location filename="../qml/Library.qml" line="81"/>
         <source>All</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="113"/>
+        <location filename="../qml/Library.qml" line="82"/>
         <source>1+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="114"/>
+        <location filename="../qml/Library.qml" line="83"/>
         <source>2+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="115"/>
+        <location filename="../qml/Library.qml" line="84"/>
         <source>3+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="116"/>
+        <location filename="../qml/Library.qml" line="85"/>
         <source>4+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="117"/>
+        <location filename="../qml/Library.qml" line="86"/>
         <source>5</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="222"/>
+        <location filename="../qml/Library.qml" line="189"/>
         <source>Photo, %n star(s)</source>
         <translation>
             <numerusform>Photo, %n star</numerusform>
@@ -197,12 +322,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="222"/>
+        <location filename="../qml/Library.qml" line="189"/>
         <source>Photo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="235"/>
+        <location filename="../qml/Library.qml" line="208"/>
         <source>No preview</source>
         <translation type="unfinished"></translation>
     </message>
@@ -210,47 +335,42 @@
 <context>
     <name>Main</name>
     <message>
-        <location filename="../qml/Main.qml" line="101"/>
+        <location filename="../qml/Main.qml" line="111"/>
         <source>Cannot open the workspace: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="157"/>
+        <location filename="../qml/Main.qml" line="174"/>
         <source>Menu</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="172"/>
+        <location filename="../qml/Main.qml" line="189"/>
         <source>Catalogue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="178"/>
+        <location filename="../qml/Main.qml" line="195"/>
         <source>Cull</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="183"/>
+        <location filename="../qml/Main.qml" line="200"/>
         <source>Develop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="184"/>
+        <location filename="../qml/Main.qml" line="201"/>
         <source>Publish</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="252"/>
+        <location filename="../qml/Main.qml" line="271"/>
         <source>Choose a folder in the folder dialog…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="262"/>
-        <source>Add a source</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/Main.qml" line="270"/>
+        <location filename="../qml/Main.qml" line="282"/>
         <source>Open a workspace</source>
         <translation type="unfinished"></translation>
     </message>
@@ -323,6 +443,68 @@
     <message>
         <location filename="../qml/NoticeBar.qml" line="32"/>
         <source>Dismiss</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>RemoveSourceDialog</name>
+    <message>
+        <location filename="../qml/RemoveSourceDialog.qml" line="16"/>
+        <source>Remove the source &quot;%1&quot;?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/RemoveSourceDialog.qml" line="23"/>
+        <source>%n photo(s) leave(s) the catalogue.</source>
+        <translation>
+            <numerusform>%n photo leaves the catalogue.</numerusform>
+            <numerusform>%n photos leave the catalogue.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/RemoveSourceDialog.qml" line="30"/>
+        <source>%n of them has a rating, keywords, a title or a version.</source>
+        <translation>
+            <numerusform>%n of them has a rating, keywords, a title or a version.</numerusform>
+            <numerusform>%n of them have a rating, keywords, a title or a version.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/RemoveSourceDialog.qml" line="36"/>
+        <source>Their data is kept in the workspace&apos;s removed folder and comes back if you add this folder again. The photo files themselves are never touched.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RemoveSourceDialog.qml" line="43"/>
+        <source>Remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RemoveSourceDialog.qml" line="49"/>
+        <source>Cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>RestoreDialog</name>
+    <message>
+        <location filename="../qml/RestoreDialog.qml" line="21"/>
+        <source>Photos removed earlier</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RestoreDialog.qml" line="28"/>
+        <source>%1 of the %2 photos in this folder were in the catalogue before, with their ratings, keywords and versions.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RestoreDialog.qml" line="35"/>
+        <source>Add them as new photos</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RestoreDialog.qml" line="41"/>
+        <source>Restore them</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

@@ -99,3 +99,13 @@ fn a_scan_reaches_the_grid_and_makes_thumbnails_ahead() {
     support::write_photos(&extra, "EXTRA", 5);
     run_suite("scan", home.path(), Some(&extra));
 }
+
+/// The catalogue task on machines that start empty: folders of generated photos to copy from.
+#[test]
+fn the_catalogue_task_adds_scans_removes_and_restores_sources() {
+    let home = temp_dir();
+    support::write_photos(&home.path().join("Template2"), "IMG", 2);
+    support::write_photos(&home.path().join("Template3"), "IMG", 3);
+    support::write_photos(&home.path().join("One"), "NEW", 1);
+    run_suite("catalogue", home.path(), None);
+}

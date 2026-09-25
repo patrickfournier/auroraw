@@ -71,12 +71,6 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "chooseLanguage"]
         fn choose_language(self: Pin<&mut Launcher>, code: &QString);
-
-        /// Adds `folder` as a source of the open workspace and starts its scan; the job's identifier,
-        /// or `error:` and why not. The scan reports through the `Bus`.
-        #[qinvokable]
-        #[cxx_name = "addSource"]
-        fn add_source(self: Pin<&mut Launcher>, folder: &QString) -> QString;
     }
 }
 
@@ -84,7 +78,7 @@ use core::pin::Pin;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 
-use auroraw_engine::{AddSourceRequest, Engine, LocalDirs, OpenedWorkspace, paths};
+use auroraw_engine::{Engine, LocalDirs, OpenedWorkspace, paths};
 use cxx_qt::CxxQtType;
 use cxx_qt_lib::{QString, QStringList};
 
@@ -313,23 +307,5 @@ impl qobject::Launcher {
         }
         self.as_mut().set_language(text(&code));
         self.as_mut().set_effective_language(text(effective));
-    }
-
-    pub fn add_source(self: Pin<&mut Self>, folder: &QString) -> QString {
-        let Some(session) = session::current() else {
-            return text("error:no workspace is open");
-        };
-        let root = match paths::resolve(&folder.to_string()) {
-            Ok(root) => root,
-            Err(e) => return text(&format!("error:{e}")),
-        };
-        match session.engine.add_source(AddSourceRequest {
-            root,
-            name: None,
-            merge: false,
-        }) {
-            Ok(started) => text(&started.job.to_string()),
-            Err(e) => text(&format!("error:{e}")),
-        }
     }
 }

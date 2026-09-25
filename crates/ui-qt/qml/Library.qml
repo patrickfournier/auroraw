@@ -10,7 +10,6 @@ import org.auroraw.ui
 FocusScope {
     id: root
     required property var photoGrid
-    required property var launcher
 
     // The rating's star (a literal U+2605: a regression test reads it back, since a compiler that
     // took the source for a legacy code page once turned it into mojibake on Windows).
@@ -22,24 +21,6 @@ FocusScope {
     // What the strip under the grid says about the selected photo.
     property string summary: ""
     readonly property string status: qsTr("%n photo(s)", "", photoGrid.count)
-
-    // The scan of a source added to the workspace: progress and the closing sentence. (The catalogue
-    // panel of milestone Q4 takes this over.)
-    property string scanJob: ""
-    property real scanProgress: 0
-    property string scanStatus: ""
-
-    function addSource(folder) {
-        const job = launcher.addSource(folder)
-        if (job.indexOf("error:") === 0) {
-            scanStatus = qsTr("Cannot add the source: %1").arg(job.substring(6))
-            return false
-        }
-        scanJob = job
-        scanProgress = 0
-        scanStatus = qsTr("Reading photos…")
-        return true
-    }
 
     // Selects a photo (-1 for none) and brings it into view.
     function select(index) {
@@ -78,20 +59,6 @@ FocusScope {
         photoGrid.refreshPhoto(photoId)
         if (grid.currentIndex >= 0 && photoGrid.idAt(grid.currentIndex) === photoId)
             updateSummary()
-    }
-
-    Connections {
-        target: Bus
-        function onJobProgress(job, done, total) {
-            if (job === root.scanJob && total > 0)
-                root.scanProgress = done / total
-        }
-        function onIndexFinished(job, added, restored, known, failed) {
-            if (job === root.scanJob) {
-                root.scanProgress = 1
-                root.scanStatus = qsTr("Done: %1 added.").arg(added)
-            }
-        }
     }
 
     ColumnLayout {
@@ -272,25 +239,6 @@ FocusScope {
                         }
                     }
                 }
-            }
-        }
-
-        // The scan of a source added from here (until the catalogue panel takes it over).
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 28
-            color: root.palette.dark
-            visible: root.scanStatus !== ""
-            Row {
-                anchors.verticalCenter: parent.verticalCenter
-                x: 8
-                spacing: 10
-                ProgressBar {
-                    width: 160
-                    value: root.scanProgress
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Label { text: root.scanStatus }
             }
         }
 

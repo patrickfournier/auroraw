@@ -27,6 +27,27 @@ pub mod qobject {
         #[cxx_name = "jobProgress"]
         fn job_progress(self: Pin<&mut Bus>, job: &QString, done: i32, total: i32);
 
+        /// A scan found what a source holds; when some of it was removed earlier, it waits for an
+        /// answer.
+        #[qsignal]
+        #[cxx_name = "indexPlanned"]
+        fn index_planned(self: Pin<&mut Bus>, job: &QString, new_files: i32, restorable: i32);
+
+        /// A scan could not run at all.
+        #[qsignal]
+        #[cxx_name = "indexAborted"]
+        fn index_aborted(self: Pin<&mut Bus>, job: &QString, reason: &QString);
+
+        /// A source was taken out of the catalogue.
+        #[qsignal]
+        #[cxx_name = "sourceRemoved"]
+        fn source_removed(self: Pin<&mut Bus>, job: &QString, removed: i32, kept: i32);
+
+        /// A job was cancelled before its end.
+        #[qsignal]
+        #[cxx_name = "jobCancelled"]
+        fn job_cancelled(self: Pin<&mut Bus>, job: &QString);
+
         /// A scan of a source finished.
         #[qsignal]
         #[cxx_name = "indexFinished"]
@@ -134,6 +155,42 @@ fn dispatch(event: Event, session: &Session) {
                     failed as i32,
                 )
             });
+        }
+        Event::IndexPlanned {
+            job,
+            new_files,
+            restorable,
+            ..
+        } => {
+            let job = job.to_string();
+            on_gui(move |bus| {
+                bus.index_planned(
+                    &QString::from(job.as_str()),
+                    new_files as i32,
+                    restorable as i32,
+                )
+            });
+        }
+        Event::IndexAborted { job, reason } => {
+            let job = job.to_string();
+            on_gui(move |bus| {
+                bus.index_aborted(
+                    &QString::from(job.as_str()),
+                    &QString::from(reason.as_str()),
+                )
+            });
+        }
+        Event::SourceRemoved {
+            job, removed, kept, ..
+        } => {
+            let job = job.to_string();
+            on_gui(move |bus| {
+                bus.source_removed(&QString::from(job.as_str()), removed as i32, kept as i32)
+            });
+        }
+        Event::JobCancelled(job) => {
+            let job = job.to_string();
+            on_gui(move |bus| bus.job_cancelled(&QString::from(job.as_str())));
         }
         _ => {}
     }

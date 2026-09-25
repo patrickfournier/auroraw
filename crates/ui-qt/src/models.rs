@@ -168,6 +168,91 @@ pub mod qobject {
 
     // Reads the registry once the object exists.
     impl cxx_qt::Initialize for KnownWorkspaces {}
+
+    extern "RustQt" {
+        #[qobject]
+        #[base = QAbstractListModel]
+        #[qml_element]
+        #[qproperty(i32, count)]
+        #[qproperty(QString, job)]
+        type SourceList = super::SourceListRust;
+
+        /// Reads the open workspace's sources again.
+        #[qinvokable]
+        fn refresh(self: Pin<&mut SourceList>);
+
+        /// The folder `text` names, as the application understands it (canonical); `error:` and
+        /// why not.
+        #[qinvokable]
+        fn resolve(self: &SourceList, text: &QString) -> QString;
+
+        /// What adding `folder` would do: `free`, `inside:<the source>`, or `contains:<the sources,
+        /// quoted and separated by commas>`; `error:` and why not.
+        #[qinvokable]
+        fn plan(self: &SourceList, folder: &QString) -> QString;
+
+        /// Adds `folder` as a source and starts its scan (`job` is its job); empty, or why not.
+        /// `merge` takes the sources inside it into the new one.
+        #[qinvokable]
+        fn add(
+            self: Pin<&mut SourceList>,
+            folder: &QString,
+            name: &QString,
+            merge: bool,
+        ) -> QString;
+
+        /// How many photos the source in `row` has, and how many of them have work in them (read
+        /// from the catalogue now, not from the list).
+        #[qinvokable]
+        #[cxx_name = "photosAt"]
+        fn photos_at(self: &SourceList, row: i32) -> i32;
+        #[qinvokable]
+        #[cxx_name = "workedOnAt"]
+        fn worked_on_at(self: &SourceList, row: i32) -> i32;
+
+        /// Takes the source in `row` out of the catalogue, in the background; empty, or why not.
+        #[qinvokable]
+        fn remove(self: Pin<&mut SourceList>, row: i32) -> QString;
+
+        /// Scans the source in `row` again; empty, or why not.
+        #[qinvokable]
+        fn rescan(self: Pin<&mut SourceList>, row: i32) -> QString;
+
+        /// Answers the scan's question about photos removed earlier.
+        #[qinvokable]
+        #[cxx_name = "continueScan"]
+        fn continue_scan(self: &SourceList, restore: bool);
+
+        /// Stops the scan that waits at its question.
+        #[qinvokable]
+        #[cxx_name = "cancelScan"]
+        fn cancel_scan(self: &SourceList);
+    }
+
+    unsafe extern "RustQt" {
+        #[inherit]
+        #[cxx_name = "beginResetModel"]
+        unsafe fn begin_reset_model(self: Pin<&mut SourceList>);
+        #[inherit]
+        #[cxx_name = "endResetModel"]
+        unsafe fn end_reset_model(self: Pin<&mut SourceList>);
+    }
+
+    extern "RustQt" {
+        #[qinvokable]
+        #[cxx_override]
+        fn data(self: &SourceList, index: &QModelIndex, role: i32) -> QVariant;
+
+        #[qinvokable]
+        #[cxx_override]
+        #[cxx_name = "roleNames"]
+        fn role_names(self: &SourceList) -> QHash_i32_QByteArray;
+
+        #[qinvokable]
+        #[cxx_override]
+        #[cxx_name = "rowCount"]
+        fn row_count(self: &SourceList, _parent: &QModelIndex) -> i32;
+    }
 }
 
 use core::pin::Pin;
@@ -184,6 +269,7 @@ use cxx_qt_lib::{
 };
 
 use crate::session;
+use crate::source_list::SourceListRust;
 
 /// Qt::UserRole and the next one.
 const ROLE_PHOTO_ID: i32 = 0x0100;

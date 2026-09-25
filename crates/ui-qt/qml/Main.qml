@@ -42,6 +42,9 @@ ApplicationWindow {
     // What the tests reach into (tests/qml/tst_*.qml).
     property alias welcome: welcomeView
     property alias library: libraryView
+    property alias catalogue: catalogueView
+    property alias flow: catalogueFlow
+    property alias sources: sourceList
     property alias newDialog: newDialog
     property alias settingsDialog: settingsDialog
     property alias aboutDialog: aboutDialog
@@ -59,6 +62,13 @@ ApplicationWindow {
     Launcher { id: launcher }
     KnownWorkspaces { id: known }
     PhotoGrid { id: photoGrid }
+    SourceList { id: sourceList }
+    CatalogueFlow {
+        id: catalogueFlow
+        host: window
+        sources: sourceList
+        hostWindow: window
+    }
     AppActions { id: actions; host: window }
 
     // The task on screen: what a workspace opens on is the catalogue when it is new or empty, and
@@ -74,9 +84,9 @@ ApplicationWindow {
     // a modal popup covers everything (the menu included) and the commands wait.
     // (`nativeDialogForced` stands for one in the tests: none can open off screen.)
     property bool nativeDialogForced: false
-    readonly property bool nativeDialogOpen: nativeDialogForced || openDialog.visible || sourceDialog.visible || newDialog.browsing
+    readonly property bool nativeDialogOpen: nativeDialogForced || openDialog.visible || catalogueFlow.browsing || newDialog.browsing
     readonly property bool dialogOpen: newDialog.visible || settingsDialog.visible
-                                       || aboutDialog.visible || nativeDialogOpen
+                                       || aboutDialog.visible || catalogueFlow.dialogOpen || nativeDialogOpen
     readonly property bool inWorkspace: launcher.screen === "workspace"
 
     // The Edit commands act on the text field that has the keyboard. The menu takes the keyboard
@@ -117,6 +127,9 @@ ApplicationWindow {
         target: launcher
         function onScreenChanged() {
             if (launcher.screen === "workspace") {
+                catalogueFlow.status = ""
+                sourceList.job = ""
+                sourceList.refresh()
                 libraryView.filterBy(0)
                 window.currentTask = photoGrid.count === 0 ? "catalogue" : "cull"
             } else {
@@ -128,8 +141,12 @@ ApplicationWindow {
     Connections {
         target: Bus
         function onIndexFinished() { libraryView.reload() }
+        function onSourceRemoved() { libraryView.reload() }
+        function onJobCancelled() { libraryView.reload() }
         function onPhotoChanged(photoId) { libraryView.photoChanged(photoId) }
     }
+    // A question that waited for a dialog is put once no dialog is open.
+    onDialogOpenChanged: if (!dialogOpen) catalogueFlow.askWaitingQuestion()
     // Photos may have arrived while another task was showing.
     onCurrentTaskChanged: if (currentTask === "cull" && inWorkspace) libraryView.reload()
 
@@ -213,14 +230,16 @@ ApplicationWindow {
                 onKnownRequested: row => window.openFolder(known.pathAt(row))
             }
             Catalogue {
+                id: catalogueView
                 anchors.fill: parent
+                flow: catalogueFlow
+                sources: sourceList
                 visible: window.inWorkspace && window.currentTask === "catalogue"
             }
             Library {
                 id: libraryView
                 anchors.fill: parent
                 visible: window.inWorkspace && window.currentTask === "cull"
-                launcher: launcher
                 photoGrid: photoGrid
             }
         }
@@ -254,13 +273,6 @@ ApplicationWindow {
             verticalAlignment: Text.AlignVCenter
             font.pixelSize: 16
         }
-    }
-
-    FolderDialog {
-        id: sourceDialog
-        parentWindow: window
-        title: qsTr("Add a source")
-        onAccepted: libraryView.addSource(selectedFolder.toString().replace(/^file:\/\//, ""))
     }
 
     // The system's own folder dialog (a Qt Quick one where the platform has none), modal to the window.

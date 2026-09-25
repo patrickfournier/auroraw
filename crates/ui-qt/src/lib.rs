@@ -24,6 +24,8 @@ mod models;
 mod session;
 #[allow(unsafe_code)]
 mod shortcuts;
+#[allow(unsafe_code)]
+mod source_list;
 
 use std::path::PathBuf;
 use std::sync::Mutex;

@@ -23,9 +23,9 @@ AppTestCase {
         app.currentTask = "catalogue"
         const before = files.previewsCount(home + "/cache")
         verify(before >= 0, "the workspace has a previews database")
-        verify(app.library.addSource(app.launcher.env("AURORAW_TEST_EXTRA")))
-        tryVerify(() => app.library.scanStatus.indexOf("Done") === 0, 20000)
-        compare(app.library.scanProgress, 1.0)
+        addSource(app.launcher.env("AURORAW_TEST_EXTRA"))
+        waitForTheScan()
+        verify(app.flow.status.indexOf("Done: 5 added") === 0, app.flow.status)
         tryVerify(() => files.previewsCount(home + "/cache") === before + 5, 20000,
                   "the new photos' thumbnails were made as they were scanned")
         compare(app.currentTask, "catalogue")
