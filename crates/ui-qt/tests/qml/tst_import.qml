@@ -30,8 +30,7 @@ AppTestCase {
 
     function openImport() {
         app.actions.importPhotos.trigger()
-        wait(150)
-        verify(d.visible, "the Import dialog opened")
+        tryVerify(() => d.visible, 3000, "the Import dialog opened")
     }
 
     function fill(m) {
@@ -285,9 +284,9 @@ AppTestCase {
         snapshot("card-banner")
 
         // Import… opens the dialog on that card.
+        wait(200) // the banner has taken its place in the layout
         click(app.cardBanner.importButton)
-        wait(150)
-        verify(d.visible)
+        tryVerify(() => d.visible, 3000)
         compare(d.sourceField.text, m.card)
         verify(!app.cardBanner.visible)
         d.close()
@@ -323,13 +322,14 @@ AppTestCase {
         wait(150)
         plug([camera("EOS_DIGITAL", m.card)])
         tryVerify(() => app.cardBanner.visible, 8000)
+        wait(200)
         verify(!app.cardBanner.importButton.enabled, "not over Settings")
         app.settingsDialog.close()
         wait(150)
         verify(app.cardBanner.importButton.enabled)
+        wait(200)
         click(app.cardBanner.importButton)
-        wait(150)
-        verify(d.visible)
+        tryVerify(() => d.visible, 3000)
         compare(d.sourceField.text, m.card)
     }
 
