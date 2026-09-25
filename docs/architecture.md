@@ -43,14 +43,14 @@ Budgets and what the spikes measured against them:
 | --- | --- | --- |
 | Language | **Rust** | D-068 |
 | Image engine | **wgpu** with **WGSL** shaders on Vulkan, Metal and DirectX 12 | spike 1: the same shaders give the same image within one 8-bit level on all three |
-| Interface | **Slint** (femtovg renderer) | D-072, spike 2. Qt Quick is the documented fallback |
+| Interface | **Qt Quick** (QML) through **cxx-qt**, the **Fusion** style with a neutral grey theme | D-094, spike 5 (supersedes D-072, Slint, spike 2) |
 | Catalogue | **SQLite** through rusqlite, with FTS5 | D-073, spike 3 |
 | Thumbnails | A separate SQLite database of blobs, 32 KB pages | D-075, provisional pending Windows |
 | Sidecars | **XMP** for the photo, XMP plus JSON for the version | D-023, D-074 |
 | Plugins | **WebAssembly** run by **wasmtime** | D-076, spike 4 |
 | RAW decoding | **rawler** (Rust, LGPL-2.1), through the import-plugin interface; LibRaw possible as a plugin | spikes 1 and 4 |
-| Translations | gettext files bundled by Slint, without the default translation context | spike 2 |
-| Accessibility | AccessKit, through Slint | spike 2 |
+| Translations | Qt Linguist `.ts` files, compiled by `lrelease` and embedded | D-094 |
+| Accessibility | Qt's own (AT-SPI on Linux, UI Automation on Windows, NSAccessibility on macOS) | D-094 [open: to check on this interface] |
 
 Chosen by this document, still to confirm [proposed]: `notify` for file watching, `keyring` for
 the operating system's keychain, `image`, `fast_image_resize`, `jpeg-encoder` and `kamadak-exif`
@@ -114,7 +114,7 @@ flowchart TD
 | `plugin-api` | The types shared by the host and the plugins: declaration, permissions, interface. Small, versioned, stable from M5. **Licensed MIT OR Apache-2.0 (D-080), so it depends on no other crate of the application.** | M1 |
 | `plugin-host` | wasmtime, permission grants, limits, compiled cache, GPU shader checks. | M1 |
 | `engine` | The application core: owns the catalogues, workspaces, job system and event bus; the only thing the interface talks to. Testable without a window. | M1 |
-| `ui` | The Slint views, the virtualised models, the translations. | M1 |
+| `ui` | The Qt Quick views (QML), the Rust objects behind them (models, event bus), the translations. | M1 |
 | `cli` | A headless command: rebuild, verify, export, import, benchmark. For scripting and for tests. | M1 |
 | `app` | The binary that assembles the above. | M1 |
 
@@ -517,13 +517,17 @@ The shell is organised by **task** (Import, Cull, Develop, Publish) around a lib
   and 100,000 items (spike 2), and the grid never showed an empty cell while scrolling (spike 3).
 - **The image view** is fed a new RGBA buffer per frame; nothing heavy runs on the interface
   thread.
-- **Pitfalls**: an atlas of thumbnails cut with `source-clip` made Slint use 1.7 GB and stall for
-  75 ms; **one small image per thumbnail** fixed it. Slint's `run()` returns only when its window
-  is hidden. The default translation context prevents translations from applying unless
-  turned off.
-- **Accessibility**: Slint exposes a tree through AccessKit; it was read through AT-SPI in
-  spike 2. A manual check with each platform's screen reader is to be done [open].
-- **Translations** are gettext files, switched at run time, open to contributions.
+- **Pitfalls** (spike 2, on Slint, kept as a warning for any toolkit): an atlas of thumbnails cut
+  into one image made Slint use 1.7 GB and stall for 75 ms; **one small image per thumbnail**
+  fixed it. On Qt Quick a thumbnail is served by an image provider (`image://thumbs/<id>`), one
+  image each, made on Qt's loading threads.
+- **The engine reaches the interface through one event bus** (a singleton QObject): a thread
+  carries the engine's events onto the interface thread, where they become signals (D-094).
+- **A native folder dialog is another window**: Qt cannot block ours for it, so a modal popup
+  covers the window while one is open. Shortcuts are not blocked by a modal dialog either: every
+  command that opens a window checks that no dialog is open.
+- **Accessibility**: Qt's own; a manual check with each platform's screen reader is to be done [open].
+- **Translations** are Qt Linguist `.ts` files, switched at run time, open to contributions.
 - **Keyboard first** (spec §3): every action has a command, and the same command set feeds the
   keyboard, the menus and, possibly, a command palette.
 

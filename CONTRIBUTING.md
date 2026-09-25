@@ -11,6 +11,21 @@ wrong or missing**, and **sample files** (see below).
 
 ## Building and testing
 
+The interface is Qt Quick (D-094), so building the workspace needs **Qt 6.4 or later** (6.8 is the one
+tested in CI), **cmake 3.24 or later**, a C++ compiler, and `qmake` findable (on the path, or in the
+`QMAKE` variable). Qt's tools `lrelease` and `lupdate` must be in the same install (the translations
+are compiled at build time).
+
+- **Ubuntu 24.04**: `sudo apt install qt6-base-dev qt6-declarative-dev qt6-l10n-tools qt6-tools-dev-tools
+  qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-dialogs
+  qml6-module-qtquick-layouts qml6-module-qtquick-templates qml6-module-qtquick-window
+  qml6-module-qtqml qml6-module-qtqml-models qml6-module-qttest cmake lld`, then
+  `export QMAKE=/usr/bin/qmake6`. (`lld` is optional: without it cxx-qt links with `gold` and cargo
+  prints a warning.)
+- **Windows and macOS**: Qt from the online installer, or `pip install aqtinstall` then
+  `aqt install-qt <host> desktop 6.8.3 <arch>` (the CI uses `jurplel/install-qt-action`), with its
+  `bin` folder on the path.
+
 ```bash
 cargo build --workspace
 cargo test --workspace        # or: cargo nextest run --workspace
@@ -72,7 +87,8 @@ and named for screen readers. The reasons are in [docs/testing-strategy.md](docs
 
 ## Translations
 
-Translations are gettext `.po` files, **sent as pull requests**. Say in an issue which language
+Translations are Qt Linguist `.ts` files (`crates/ui-qt/i18n/auroraw_<code>.ts`, editable with Qt
+Linguist or any text editor), **sent as pull requests**. Say in an issue which language
 you take, so that nobody works on the same one twice. A language ships when it is at least 90 %
 translated for the main views, passes the automatic checks, and has a named person who reviews
 its changes. Source strings are in English. See [docs/governance.md](docs/governance.md) §5.

@@ -52,12 +52,16 @@ fn main() -> ExitCode {
                 eprintln!("cannot find this machine's data folders");
                 return ExitCode::FAILURE;
             };
-            let launch = auroraw_ui::Launch {
+            #[cfg(not(feature = "qt"))]
+            use auroraw_ui as ui;
+            #[cfg(feature = "qt")]
+            use auroraw_ui_qt as ui;
+            let launch = ui::Launch {
                 dirs,
                 pictures,
                 open: other.map(PathBuf::from),
             };
-            match auroraw_ui::run(launch) {
+            match ui::run(launch) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
                     eprintln!("cannot start the interface: {e}");

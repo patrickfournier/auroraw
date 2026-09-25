@@ -154,10 +154,11 @@ are maintainers, by two people, and are confidential.
 
 ## 5. Translations [proposed]
 
-- **Source strings are English**, in gettext form (architecture §10). The French translation
-  is maintained by the owner, and is the first checked in review.
-- **How people translate**: **`.po` files sent as pull requests** (D-082). No translation
-  platform for now; one can be added later if translators ask for it.
+- **Source strings are English**, marked in the interface's code for Qt Linguist (architecture §10,
+  D-094). The French translation is maintained by the owner, and is the first checked in review.
+- **How people translate**: **Qt Linguist `.ts` files sent as pull requests** (D-082, D-094; a
+  `.po` file converts with Qt's `lconvert`). No translation platform for now; one can be added
+  later if translators ask for it (Weblate reads `.ts`).
 - **A language ships** when it is at least **90 %** translated for the strings of the main
   views, passes the pseudo-locale and message-id checks (testing strategy §6), and has a named
   person who agrees to review its changes.

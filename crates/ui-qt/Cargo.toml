@@ -1,0 +1,41 @@
+[package]
+name = "auroraw-ui-qt"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "The Qt Quick user interface (D-094)"
+
+[lints]
+workspace = true
+
+[features]
+default = ["quicktest"]
+# QtQuickTest's runner (the QML test suites): links two more Qt libraries, so the application itself is
+# built without it (`default-features = false`).
+quicktest = []
+
+[dependencies]
+auroraw-catalogue = { path = "../catalogue" }
+auroraw-engine = { path = "../engine" }
+auroraw-types = { path = "../types" }
+cxx = "1"
+cxx-qt = "0.10"
+cxx-qt-lib = { version = "0.10", features = ["full"] }
+serde.workspace = true
+serde_json.workspace = true
+sys-locale = "0.3"
+
+[build-dependencies]
+cxx-qt-build = "0.10"
+
+[dev-dependencies]
+auroraw-testkit = { path = "../testkit" }
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+
+[[bin]]
+name = "qml-test-runner"
+path = "src/bin/qml-test-runner.rs"
+required-features = ["quicktest"]

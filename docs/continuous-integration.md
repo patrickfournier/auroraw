@@ -45,7 +45,7 @@ Runs on every push to `dev` and to a pull request. Jobs run in parallel; the slo
 | **Plugins** | Build the plugins for `wasm32-wasip1` (the spike's step) and run the conformance tests against them | Linux, Windows, macOS |
 | **GPU reference** | The smoke test and the stage-against-reference tests on the **software adapter** of each runner: lavapipe, WARP, the runner's Metal adapter. **Blocking.** | All three |
 | **Dependencies** | `cargo deny check` (licences compatible with GPL-3.0, bans, sources, and the RustSec advisories, which is what `cargo audit` reads) | Linux |
-| **Translations** | Message ids present and unused, pseudo-locale run of every screen, the catalogue compiles | Linux |
+| **Translations** | Every `qsTr` string of the QML is in each `.ts` file and nothing else is, every translation is finished and keeps its placeholders (a Rust test); the files compile with `lrelease`; pseudo-locale run of every screen [open] | All three |
 | **Accessibility** | The AT-SPI check that every control has a role and a name | Linux, under a virtual display |
 | **Docs** | The documents build; the spike and decision indexes are consistent | Linux |
 
