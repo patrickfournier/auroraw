@@ -38,6 +38,7 @@ pub mod qobject {
         #[qproperty(i32, selected_count, cxx_name = "selectedCount")]
         #[qproperty(i32, flag_filter, cxx_name = "flagFilter")]
         #[qproperty(QString, keyword_filter, cxx_name = "keywordFilter")]
+        #[qproperty(QString, label_filter, cxx_name = "labelFilter")]
         type PhotoGrid = super::PhotoGridRust;
 
         /// Loads the open workspace's photos, newest first, those rated `minRating` or more (the
@@ -61,6 +62,12 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "filterKeyword"]
         fn filter_keyword(self: Pin<&mut PhotoGrid>, keyword: &QString);
+
+        /// Lists only the photos with this colour label (`red`, `yellow`, `green`, `blue`, `purple`; empty for
+        /// any). The other filters stay; nothing is selected any more.
+        #[qinvokable]
+        #[cxx_name = "filterLabel"]
+        fn filter_label(self: Pin<&mut PhotoGrid>, name: &QString);
 
         /// Flags the selection as one action: `pick`, `reject` (the flag is cleared instead when every
         /// selected photo has it already) or `clear`. How many photos were changed.
@@ -613,6 +620,7 @@ pub struct PhotoGridRust {
     min_rating: i32,
     flag_filter: i32,
     keyword_filter: QString,
+    label_filter: QString,
     items: Vec<Item>,
     /// Where each listed photo is.
     rows: HashMap<PhotoId, usize>,
@@ -714,6 +722,12 @@ impl qobject::PhotoGrid {
                 _ => FlagFilter::NotRejected,
             },
             keyword: auroraw_types::KeywordId::from_str(&self.keyword_filter.to_string()).ok(),
+            label: self
+                .label_filter
+                .to_string()
+                .parse::<auroraw_engine::ColourLabel>()
+                .ok()
+                .map(|colour| colour.name().to_string()),
         }
     }
 
@@ -725,6 +739,12 @@ impl qobject::PhotoGrid {
 
     pub fn filter_keyword(mut self: Pin<&mut Self>, keyword: &QString) {
         self.as_mut().set_keyword_filter(keyword.clone());
+        self.as_mut().rust_mut().selection.none();
+        self.load();
+    }
+
+    pub fn filter_label(mut self: Pin<&mut Self>, name: &QString) {
+        self.as_mut().set_label_filter(name.clone());
         self.as_mut().rust_mut().selection.none();
         self.load();
     }
@@ -1069,6 +1089,7 @@ impl qobject::PhotoGrid {
         let mut roles = QVector::<i32>::default();
         roles.append(ROLE_RATING);
         roles.append(ROLE_FLAG);
+        roles.append(ROLE_LABEL);
         self.as_mut().data_changed(&first, &end, &roles);
     }
 

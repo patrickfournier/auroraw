@@ -6,7 +6,8 @@ import org.auroraw.ui
 
 // The image view and cull mode (spec §5.3, D-100): one photo at a time over the grid, from the photo service's
 // picture (`image://preview/<id>`, the grid's thumbnail scaled up until it arrives), fit to the window or at
-// 100 %, with a filmstrip and a line about the photo. Everything is a key, all of them the grid's (a rating,
+// 100 %, with a filmstrip, a line about the photo and, at the top right, its state (stars, flag, colour) that a
+// click goes through. Everything is a key, all of them the grid's (a rating,
 // a flag or a colour label is the library's own action, one step of the history, undone with Ctrl+Z):
 // Left and Right (Backspace and Space) walk, 0 to 5 rate, P X U flag, 6 to 9 label, Z fits or shows 100 %,
 // I, T and A show the information and the filmstrip and turn auto-advance on, F is full screen, Escape or Enter
@@ -37,6 +38,9 @@ FocusScope {
     property alias picture: big
     property alias strip: strip
     property alias infoBar: infoBar
+    property alias ratingButton: ratingButton
+    property alias flagButton: flagButton
+    property alias colourButton: colourButton
 
     readonly property real fitScale: big.implicitWidth > 0 && big.implicitHeight > 0
                                      ? Math.min(flick.width / big.implicitWidth, flick.height / big.implicitHeight) : 1
@@ -245,31 +249,55 @@ FocusScope {
             id: tools
             anchors.centerIn: parent
             spacing: 2
-            Repeater {
-                model: ["red", "yellow", "green", "blue", "purple"]
-                ToolButton {
-                    id: swatch
-                    required property string modelData
-                    focusPolicy: Qt.NoFocus
-                    Accessible.name: swatch.modelData
-                    ToolTip.visible: hovered
-                    ToolTip.text: swatch.modelData === "red" ? qsTr("Red label (6)")
-                                  : swatch.modelData === "yellow" ? qsTr("Yellow label (7)")
-                                  : swatch.modelData === "green" ? qsTr("Green label (8)")
-                                  : swatch.modelData === "blue" ? qsTr("Blue label (9)") : qsTr("Purple label")
-                    contentItem: Rectangle {
-                        implicitWidth: 14
-                        implicitHeight: 14
-                        radius: 7
-                        color: Theme.labelColour(swatch.modelData)
-                        border.width: view.colour === swatch.modelData ? 2 : 0
-                        border.color: "white"
-                    }
-                    onClicked: {
-                        view.library.label(swatch.modelData)
-                        view.acted()
-                    }
+            // The photo's state, in its colours, each a button that goes round its states: the stars from 0 to
+            // 5, the flag (none, picked, rejected) and the colour label (none, then the five colours).
+            ToolButton {
+                id: ratingButton
+                focusPolicy: Qt.NoFocus
+                text: "★".repeat(view.rating) + "☆".repeat(5 - view.rating)
+                font.pixelSize: 15
+                palette.buttonText: view.rating > 0 ? Theme.rating : Theme.quiet
+                Accessible.name: qsTr("Rating")
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Rating: click to change it (0 to 5)")
+                onClicked: view.library.rate((view.rating + 1) % 6)
+            }
+            ToolButton {
+                id: flagButton
+                focusPolicy: Qt.NoFocus
+                text: view.flag === 1 ? "✔" : view.flag === 2 ? "✖" : "–"
+                font.pixelSize: 15
+                palette.buttonText: view.flag === 1 ? Theme.picked : view.flag === 2 ? Theme.danger : Theme.quiet
+                Accessible.name: qsTr("Flag")
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Flag: click for picked, rejected, none (P, X, U)")
+                onClicked: view.library.flag(view.flag === 0 ? "pick" : view.flag === 1 ? "reject" : "clear")
+            }
+            ToolButton {
+                id: colourButton
+                focusPolicy: Qt.NoFocus
+                Accessible.name: qsTr("Colour label")
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Colour label: click to go through the colours (6 to 9)")
+                contentItem: Rectangle {
+                    implicitWidth: 14
+                    implicitHeight: 14
+                    radius: 7
+                    color: view.colour === "" ? "transparent" : Theme.labelColour(view.colour)
+                    border.width: 2
+                    border.color: view.colour === "" ? Theme.quiet : "white"
                 }
+                onClicked: {
+                    const order = ["", "red", "yellow", "green", "blue", "purple"]
+                    const next = order[(order.indexOf(view.colour) + 1) % order.length]
+                    view.library.label(next === "" ? "none" : next)
+                }
+            }
+            Rectangle {
+                implicitWidth: 1
+                implicitHeight: 18
+                color: Theme.quiet
+                opacity: 0.5
             }
             ToolButton {
                 text: view.fit ? qsTr("100 %") : qsTr("Fit")
@@ -355,23 +383,6 @@ FocusScope {
                 text: view.summary
                 color: "#e0e0e0"
                 elide: Text.ElideRight
-            }
-            Rectangle {
-                visible: view.colour !== ""
-                width: 14
-                height: 14
-                radius: 7
-                color: Theme.labelColour(view.colour)
-            }
-            Label {
-                visible: view.rating > 0
-                text: view.rating + view.library.star
-                color: Theme.rating
-            }
-            Label {
-                visible: view.flag !== 0
-                text: view.flag === 1 ? "✔" : "✖"
-                color: view.flag === 1 ? Theme.picked : Theme.danger
             }
         }
     }

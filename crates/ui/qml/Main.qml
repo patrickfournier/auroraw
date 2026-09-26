@@ -204,15 +204,24 @@ ApplicationWindow {
     // Photos may have arrived while another task was showing.
     onCurrentTaskChanged: if (currentTask === "cull" && inWorkspace) libraryView.reload()
 
+    property int visibilityBeforeFullScreen: Window.Windowed
+
     // F in the image view: the window goes full screen, and comes back (also when the view is closed).
     Connections {
         target: libraryView
         function onFullScreenToggled() {
-            window.visibility = window.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen
+            if (window.visibility === Window.FullScreen) {
+                window.visibility = window.visibilityBeforeFullScreen
+            } else {
+                // The window comes back the way it was: maximised, or its own size.
+                window.visibilityBeforeFullScreen = window.visibility === Window.Maximized ? Window.Maximized
+                                                                                            : Window.Windowed
+                window.visibility = Window.FullScreen
+            }
         }
         function onViewingChanged() {
             if (!libraryView.viewing && window.visibility === Window.FullScreen)
-                window.visibility = Window.Windowed
+                window.visibility = window.visibilityBeforeFullScreen
         }
     }
 

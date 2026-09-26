@@ -49,9 +49,9 @@ AppTestCase {
         return item
     }
 
-    function click(index) {
+    function click(index, modifiers) {
         const item = cell(index)
-        mouseClick(item, item.width / 2, item.height / 2)
+        mouseClick(item, item.width / 2, item.height / 2, Qt.LeftButton, modifiers === undefined ? Qt.NoModifier : modifiers)
         wait(40)
     }
 
@@ -221,6 +221,99 @@ AppTestCase {
                     return false
             return true
         }, 15000, "every photo has its stars and flag")
+    }
+
+    function test_a_colour_key_in_the_grid_shows_on_the_cell_at_once() {
+        click(3)
+        keyClick(Qt.Key_6)
+        tryCompare(cell(3), "colourLabel", "red")
+        keyClick(Qt.Key_6)
+        tryCompare(cell(3), "colourLabel", "", 5000, "the same colour takes it off")
+        keyClick(Qt.Key_9)
+        tryCompare(cell(3), "colourLabel", "blue")
+    }
+
+    function test_the_context_menu_gives_purple_and_the_flags_to_what_is_under_the_pointer() {
+        click(1)
+        const item = cell(5)
+        mouseClick(item, item.width / 2, item.height / 2, Qt.RightButton)
+        const menu = app.library.cellMenu
+        tryVerify(() => menu.visible)
+        compare(app.photos.selectedCount, 1)
+        compare(grid.currentIndex, 5, "a photo outside the selection becomes the selection")
+        let purple = null, reject = null
+        for (let i = 0; i < menu.count; i++) {
+            const row = menu.itemAt(i)
+            if (row && row.text === "Purple") purple = row
+            if (row && row.text === "Reject") reject = row
+        }
+        verify(purple && reject, "the menu has Purple and Reject")
+        snapshot("grid-menu-en")
+        purple.triggered()
+        reject.triggered()
+        menu.close()
+        tryCompare(cell(5), "colourLabel", "purple")
+        tryCompare(cell(5), "flag", 2)
+    }
+
+    function test_the_grid_can_be_filtered_by_colour() {
+        click(0)
+        click(2, Qt.ShiftModifier)
+        keyClick(Qt.Key_8)
+        click(6)
+        keyClick(Qt.Key_6)
+        wait(500)
+        const dots = app.library.labelFilterButtons
+        compare(dots.count, 5)
+        mouseClick(dots.itemAt(2)) // green
+        tryCompare(app.photos, "count", 3)
+        compare(app.photos.labelFilter, "green")
+        mouseClick(dots.itemAt(2))
+        tryCompare(app.photos, "count", 40, 5000, "the same dot again lists them all")
+        mouseClick(dots.itemAt(0)) // red
+        tryCompare(app.photos, "count", 1)
+        mouseClick(dots.itemAt(4)) // purple: none has it
+        tryCompare(app.photos, "count", 0)
+        mouseClick(dots.itemAt(4))
+        tryCompare(app.photos, "count", 40)
+    }
+
+    function test_the_state_buttons_of_the_view_go_round_their_states() {
+        openOn(2)
+        for (let n = 1; n <= 6; n++) {
+            mouseClick(view.ratingButton)
+            tryCompare(app.photos, "count", 40)
+            tryVerify(() => app.photos.ratingAt(2) === n % 6, 5000, "rating " + n)
+        }
+        mouseClick(view.flagButton)
+        tryVerify(() => app.photos.flagAt(2) === 1)
+        mouseClick(view.flagButton)
+        tryVerify(() => app.photos.flagAt(2) === 2)
+        mouseClick(view.flagButton)
+        tryVerify(() => app.photos.flagAt(2) === 0)
+        for (const colour of ["red", "yellow", "green", "blue", "purple", ""]) {
+            mouseClick(view.colourButton)
+            tryVerify(() => app.photos.labelAt(2) === colour, 5000, "colour " + colour)
+        }
+        // The buttons show the state in its colours.
+        mouseClick(view.flagButton)
+        tryCompare(view, "flag", 1)
+        compare(view.flagButton.palette.buttonText.toString(), Qt.color(Theme.picked).toString())
+        snapshot("viewer-state-en")
+    }
+
+    function test_leaving_full_screen_gives_back_a_maximised_window() {
+        openOn(0)
+        app.visibility = Window.Maximized
+        tryCompare(app, "visibility", Window.Maximized)
+        keyClick(Qt.Key_F)
+        tryCompare(app, "visibility", Window.FullScreen)
+        keyClick(Qt.Key_F)
+        tryCompare(app, "visibility", Window.Maximized)
+        keyClick(Qt.Key_F)
+        tryCompare(app, "visibility", Window.FullScreen)
+        keyClick(Qt.Key_Escape)
+        tryCompare(app, "visibility", Window.Maximized, 5000, "closing the view leaves full screen the same way")
     }
 
     function test_the_view_speaks_french() {

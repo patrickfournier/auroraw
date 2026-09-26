@@ -126,6 +126,8 @@ pub struct Filter {
     pub flags: FlagFilter,
     /// Photos carrying this keyword or any keyword under it in the vocabulary tree.
     pub keyword: Option<KeywordId>,
+    /// Photos with this colour label (its text, any case: `Red`, `Yellow`...).
+    pub label: Option<String>,
 }
 
 /// One keyword of the vocabulary, with how many photos carry it directly.
@@ -197,6 +199,10 @@ impl Catalogue {
             FlagFilter::All => {}
             FlagFilter::Picked => conditions.push("p.effective_flag = 1".into()),
             FlagFilter::Rejected => conditions.push("p.effective_flag = 2".into()),
+        }
+        if let Some(label) = &filter.label {
+            conditions.push("p.label = ? COLLATE NOCASE".into());
+            values.push(Value::Text(label.clone()));
         }
         if let Some(keyword) = &filter.keyword {
             conditions.push(

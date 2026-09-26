@@ -31,6 +31,8 @@ FocusScope {
     readonly property int selectedCount: photoGrid.selectedCount
     property alias keywords: keywordList
     property alias viewer: viewer
+    property alias cellMenu: cellMenu
+    property alias labelFilterButtons: labelFilterButtons
     // The image view (one photo at a time) is open over the grid.
     property bool viewing: false
     // Asked to make the window full screen or back (the window's business).
@@ -65,6 +67,26 @@ FocusScope {
                     keywordFilterName = name // it may have been renamed
             }
         }
+    }
+
+    // A colour label's name, in the person's language.
+    function colourTitle(name) {
+        switch (name) {
+        case "red": return qsTr("Red")
+        case "yellow": return qsTr("Yellow")
+        case "green": return qsTr("Green")
+        case "blue": return qsTr("Blue")
+        case "purple": return qsTr("Purple")
+        }
+        return qsTr("No colour")
+    }
+
+    // Lists only the photos with this colour label; the same colour again lists them all.
+    function filterLabel(name) {
+        photoGrid.filterLabel(photoGrid.labelFilter === name ? "" : name)
+        grid.currentIndex = -1
+        grid.contentY = 0
+        updateSummary()
     }
 
     function flagName(index) {
@@ -293,6 +315,32 @@ FocusScope {
                             grid.forceActiveFocus()
                         }
                     }
+                    // Only the photos with a colour label: one dot for each, the same one again lists them all.
+                    Repeater {
+                        id: labelFilterButtons
+                        model: ["red", "yellow", "green", "blue", "purple"]
+                        ToolButton {
+                            id: dot
+                            required property string modelData
+                            padding: 4
+                            focusPolicy: Qt.NoFocus
+                            Accessible.name: root.colourTitle(dot.modelData)
+                            ToolTip.visible: hovered
+                            ToolTip.text: qsTr("Only the photos labelled %1").arg(root.colourTitle(dot.modelData))
+                            contentItem: Rectangle {
+                                implicitWidth: 14
+                                implicitHeight: 14
+                                radius: 7
+                                color: Theme.labelColour(dot.modelData)
+                                border.width: root.photoGrid.labelFilter === dot.modelData ? 2 : 0
+                                border.color: "white"
+                            }
+                            onClicked: {
+                                root.filterLabel(dot.modelData)
+                                grid.forceActiveFocus()
+                            }
+                        }
+                    }
                     AppButton {
                         visible: root.photoGrid.keywordFilter !== ""
                         text: qsTr("Keyword: %1").arg(root.keywordFilterName) + " ×"
@@ -423,7 +471,7 @@ FocusScope {
                     width: grid.width
                     height: Math.max(grid.contentHeight, grid.height)
                     preventStealing: true
-                    acceptedButtons: Qt.LeftButton
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
 
                     property real startX: 0
                     property real startY: 0
@@ -455,6 +503,18 @@ FocusScope {
 
                     onPressed: mouse => {
                         grid.forceActiveFocus()
+                        if (mouse.button === Qt.RightButton) {
+                            // A menu for what is under the pointer: a photo outside the selection becomes the selection.
+                            const under = photoAt(mouse.x, mouse.y)
+                            if (under >= 0) {
+                                if (!root.photoGrid.isSelected(under))
+                                    root.goTo(under, 0)
+                                cellMenu.popup()
+                            }
+                            banding = false
+                            onEmpty = false
+                            return
+                        }
                         startX = lastX = mouse.x
                         startY = lastY = mouse.y
                         modifiers = mouse.modifiers
@@ -470,7 +530,7 @@ FocusScope {
                     }
 
                     onPositionChanged: mouse => {
-                        if (!pressed)
+                        if (!(pressedButtons & Qt.LeftButton))
                             return
                         lastX = Math.max(0, Math.min(mouse.x, width))
                         lastY = Math.max(0, Math.min(mouse.y, height))
@@ -648,6 +708,48 @@ FocusScope {
             library: root
             launcher: root.launcher
         }
+    }
+
+    // The mouse's way to what the keys do to the selection, and to purple (which has no key).
+    component MarkItem: MenuItem {
+        id: mark
+        property string colour: ""
+        property string keyHint: ""
+        contentItem: RowLayout {
+            spacing: 10
+            Rectangle {
+                visible: mark.colour !== ""
+                implicitWidth: 12
+                implicitHeight: 12
+                radius: 6
+                color: Theme.labelColour(mark.colour)
+            }
+            Label {
+                Layout.fillWidth: true
+                text: mark.text
+                color: mark.enabled ? mark.palette.windowText : mark.palette.placeholderText
+            }
+            Label {
+                text: mark.keyHint
+                color: Theme.quiet
+            }
+        }
+    }
+
+    AppSubMenu {
+        id: cellMenu
+        MarkItem { text: qsTr("Open in the image view"); keyHint: "↵"; onTriggered: root.openView(-1) }
+        MenuSeparator {}
+        MarkItem { text: root.colourTitle("red"); colour: "red"; keyHint: "6"; onTriggered: root.label("red") }
+        MarkItem { text: root.colourTitle("yellow"); colour: "yellow"; keyHint: "7"; onTriggered: root.label("yellow") }
+        MarkItem { text: root.colourTitle("green"); colour: "green"; keyHint: "8"; onTriggered: root.label("green") }
+        MarkItem { text: root.colourTitle("blue"); colour: "blue"; keyHint: "9"; onTriggered: root.label("blue") }
+        MarkItem { text: root.colourTitle("purple"); colour: "purple"; onTriggered: root.label("purple") }
+        MarkItem { text: root.colourTitle("none"); onTriggered: root.label("none") }
+        MenuSeparator {}
+        MarkItem { text: qsTr("Pick"); keyHint: "P"; onTriggered: root.flag("pick") }
+        MarkItem { text: qsTr("Reject"); keyHint: "X"; onTriggered: root.flag("reject") }
+        MarkItem { text: qsTr("Clear the flag"); keyHint: "U"; onTriggered: root.flag("clear") }
     }
 
     // One photo at a time, over the grid, the keyword panel and the filter bar (spec §5.3).

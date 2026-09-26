@@ -345,6 +345,7 @@ fn list_filtered_agrees_with_a_plain_filter_for_every_combination() {
                     min_rating,
                     flags,
                     keyword,
+                    label: None,
                 };
                 let got: Vec<_> = every_row(&cat, &filter, 97)
                     .into_iter()
@@ -422,4 +423,55 @@ fn keywords_come_with_their_counts_and_a_selection_says_which_it_carries() {
         assert_eq!(usage.get(&keyword.id).copied().unwrap_or(0), expected);
     }
     assert!(cat.keyword_usage(&[]).unwrap().is_empty());
+}
+
+#[test]
+fn the_label_filter_lists_the_photos_with_that_colour_whatever_the_case() {
+    let (data, mut cat, _dir) = built(300, 3);
+    let colour = |i: usize| match i % 5 {
+        0 => Some("Red"),
+        1 => Some("blue"),
+        _ => None,
+    };
+    for (i, (photo, stat)) in data.photos.iter().enumerate().take(100) {
+        let mut edited = photo.clone();
+        edited.meta.label = colour(i).map(str::to_string);
+        cat.apply_photo_metadata(&edited, *stat, None).unwrap();
+    }
+    let all = |label: Option<&str>| {
+        every_row(
+            &cat,
+            &Filter {
+                flags: FlagFilter::All,
+                label: label.map(str::to_string),
+                ..Filter::default()
+            },
+            50,
+        )
+    };
+    assert_eq!(all(None).len(), data.photos.len());
+    let red = all(Some("red"));
+    assert_eq!(
+        red.len(),
+        20,
+        "one in five of the first hundred, whatever the case asked"
+    );
+    assert!(red.iter().all(|r| r.label.as_deref() == Some("Red")));
+    assert_eq!(all(Some("Blue")).len(), 20);
+    assert_eq!(all(Some("Purple")).len(), 0);
+    // It composes with the others: red and rated 3 or more.
+    let both = every_row(
+        &cat,
+        &Filter {
+            min_rating: 3,
+            flags: FlagFilter::All,
+            label: Some("Red".into()),
+            ..Filter::default()
+        },
+        50,
+    );
+    assert_eq!(
+        both.len(),
+        red.iter().filter(|r| r.effective_rating >= 3).count()
+    );
 }
