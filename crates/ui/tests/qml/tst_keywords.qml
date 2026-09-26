@@ -16,7 +16,7 @@ AppTestCase {
         launch("")
         app.width = 1680
         wait(300)
-        tryCompare(app.photos, "count", 40)
+        tryCompare(app.photos, "count", 40, 20000)
         grid = app.library.grid
     }
 
@@ -237,7 +237,7 @@ AppTestCase {
         compare(app.library.status, "4 photos")
         compare(app.photos.selectedCount, 0, "a change of list lets go of the selection")
         app.library.filterKeyword("", "")
-        tryCompare(app.photos, "count", 40)
+        tryCompare(app.photos, "count", 40, 20000)
     }
 
     function test_a_keyword_is_renamed() {

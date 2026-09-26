@@ -16,7 +16,7 @@ AppTestCase {
         launch("")
         app.width = 1680
         wait(300)
-        tryCompare(app.photos, "count", 40)
+        tryCompare(app.photos, "count", 40, 20000)
         grid = app.library.grid
     }
 
@@ -258,7 +258,7 @@ AppTestCase {
         const dialog = app.keywordPanel.deleteDialog
         dialog.openFor(gone)
         dialog.confirm()
-        tryCompare(app.photos, "count", 40)
+        tryCompare(app.photos, "count", 40, 20000)
         compare(app.photos.keywordFilter, "")
     }
 

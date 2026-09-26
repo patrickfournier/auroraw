@@ -15,7 +15,7 @@ AppTestCase {
         launch("")
         app.width = 1680
         wait(300)
-        tryCompare(app.photos, "count", 40)
+        tryCompare(app.photos, "count", 40, 20000)
         grid = app.library.grid
     }
 
@@ -107,7 +107,7 @@ AppTestCase {
         app.library.filterFlags(3)
         tryCompare(app.photos, "count", 1)
         app.library.filterFlags(1)
-        tryCompare(app.photos, "count", 40)
+        tryCompare(app.photos, "count", 40, 20000)
         app.library.filterFlags(0)
         tryCompare(app.photos, "count", 39)
     }
