@@ -63,6 +63,12 @@ pub mod qobject {
         #[cxx_name = "refreshPhoto"]
         fn refresh_photo(self: Pin<&mut PhotoGrid>, id: &QString);
 
+        /// Reads a photo's rating again after an undo or a redo, at once: what the person asked for a
+        /// moment ago no longer stands in for what the catalogue says.
+        #[qinvokable]
+        #[cxx_name = "syncPhoto"]
+        fn sync_photo(self: Pin<&mut PhotoGrid>, id: &QString);
+
         /// What the status strip says of the photo in `row`: its file, its camera, its stars.
         #[qinvokable]
         #[cxx_name = "summaryAt"]
@@ -383,6 +389,13 @@ impl qobject::PhotoGrid {
             .ok()
             .and_then(|id| self.rows.get(&id).copied())
             .map_or(-1, |row| row as i32)
+    }
+
+    pub fn sync_photo(mut self: Pin<&mut Self>, id: &QString) {
+        if let Ok(photo) = PhotoId::from_str(&id.to_string()) {
+            self.as_mut().rust_mut().pending.remove(&photo);
+        }
+        self.refresh_photo(id);
     }
 
     pub fn refresh_photo(mut self: Pin<&mut Self>, id: &QString) {

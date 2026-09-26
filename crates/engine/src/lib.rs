@@ -18,6 +18,7 @@ mod command;
 mod coordinator;
 mod error;
 mod event;
+mod history;
 mod import_flow;
 mod import_job;
 mod index_job;
@@ -35,6 +36,7 @@ pub use command::Command;
 pub use coordinator::Outcome;
 pub use error::{EngineError, Result};
 pub use event::Event;
+pub use history::{Change, HistoryState, KeywordSet, Label, LabelKind};
 pub use import_flow::{
     DestinationKind, ImportRequest, ImportSourceInfo, ImportStarted, VolumeInfo,
 };
@@ -175,6 +177,16 @@ impl Engine {
                 reply: None,
             })
             .map_err(|_| EngineError::Stopped)
+    }
+
+    /// Undoes the last action of the person's (D-096), waiting for it.
+    pub fn undo(&self) -> Result<Outcome> {
+        self.submit_and_wait(Command::Undo)
+    }
+
+    /// Redoes the action that was undone last, waiting for it.
+    pub fn redo(&self) -> Result<Outcome> {
+        self.submit_and_wait(Command::Redo)
     }
 
     /// Sends a command and blocks until the coordinator has applied it (or failed to), returning

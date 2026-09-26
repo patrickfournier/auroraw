@@ -164,6 +164,14 @@ runs in a separate helper process, so that its crash or corruption stays out of 
   import, then background analysis. A request that is no longer on screen is dropped: the
   thumbnail loader serves the **most recent request first** and caps its queue (spike 3: no empty
   cell on screen while scrolling at 21 rows per second).
+- **Undo and redo** live in the engine (D-096, `crates/engine/src/history.rs`): the single writer sees
+  the state before it changes it, so each edit of a photo (rating, flag, keywords) is journaled as a
+  **before and after pair** (`Change`), and an action is one **entry** however many photos it touches
+  (`Command::Batch`: all or nothing, one step). `Command::Undo` and `Command::Redo` apply the pairs in the
+  other direction; a new edit discards what was undone; a same-value edit is not a step; a step about a
+  photo that has gone is dropped. The history is in memory, for the open workspace, and bounded (500
+  steps); `Event::HistoryChanged` says what Undo and Redo would do and `Event::HistoryApplied` which photos
+  were touched. Something new that a person can undo adds a `Change` variant, nothing else.
 - Every long job has a **deadline** and reports progress; a watchdog ends anything that does
   not.
 

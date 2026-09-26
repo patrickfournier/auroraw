@@ -23,6 +23,9 @@ pub enum EngineError {
         /// Its identifier, as text.
         id: String,
     },
+    /// A command that cannot be done the way it was asked (an edit that is not one, in a batch).
+    #[error("{0}")]
+    InvalidCommand(String),
     /// The coordinator thread has already stopped (a command was sent after `shutdown`, or it
     /// panicked: the latter is always a bug, since every command is caught, never propagated).
     #[error("the engine is no longer running")]

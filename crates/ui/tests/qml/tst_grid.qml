@@ -138,6 +138,91 @@ AppTestCase {
         compare(grid.itemAtIndex(0).rating, 0)
     }
 
+    // The Edit menu's Undo and Redo, for what was done to the photos (D-096).
+    function undo() { keyClick(Qt.Key_Z, Qt.ControlModifier) }
+    function redo() { keyClick(Qt.Key_Y, Qt.ControlModifier) }
+
+    function test_undo_and_redo_take_a_rating_back_and_forward() {
+        verify(!app.actions.undo.enabled, "nothing to undo yet")
+        compare(app.actions.undo.text, "Undo")
+        clickCell(2)
+        rateSelected(4)
+        tryVerify(() => app.actions.undo.enabled, 5000, "the engine reported the step")
+        compare(app.actions.undo.text, "Undo rating")
+        verify(!app.actions.redo.enabled)
+
+        undo()
+        tryCompare(grid.itemAtIndex(2), "rating", 0)
+        tryVerify(() => app.actions.redo.enabled)
+        compare(app.actions.redo.text, "Redo rating")
+        verify(!app.actions.undo.enabled, "back where it began")
+        redo()
+        tryCompare(grid.itemAtIndex(2), "rating", 4)
+        tryVerify(() => app.library.summary.indexOf("★★★★") >= 0)
+        app.menu.openSection(1)
+        wait(250)
+        snapshot("edit-menu-undo")
+        app.menu.close()
+        wait(150)
+    }
+
+    function test_a_rating_pressed_twice_is_one_step_and_two_ratings_are_two() {
+        clickCell(0)
+        rateSelected(3)
+        rateSelected(3)
+        tryVerify(() => app.actions.undo.enabled)
+        undo()
+        tryCompare(grid.itemAtIndex(0), "rating", 0)
+        tryVerify(() => !app.actions.undo.enabled, 5000, "the second press was not a step")
+
+        rateSelected(1)
+        rateSelected(2)
+        tryCompare(grid.itemAtIndex(0), "rating", 2)
+        undo()
+        tryCompare(grid.itemAtIndex(0), "rating", 1)
+        undo()
+        tryCompare(grid.itemAtIndex(0), "rating", 0)
+    }
+
+    function test_undo_shows_the_photo_it_undid() {
+        clickCell(5)
+        rateSelected(3)
+        tryVerify(() => app.actions.undo.enabled)
+        clickCell(1)
+        compare(grid.currentIndex, 1)
+        undo()
+        tryCompare(grid, "currentIndex", 5)
+        compare(grid.itemAtIndex(5).rating, 0)
+        verify(app.library.summary !== "", "the strip shows it")
+    }
+
+    function test_undo_waits_for_a_dialog_and_a_text_field_keeps_its_own() {
+        clickCell(0)
+        rateSelected(2)
+        tryVerify(() => app.actions.undo.enabled)
+        app.showSettings()
+        wait(200)
+        verify(!app.actions.undo.enabled, "the photos are behind a dialog")
+        undo()
+        wait(200)
+        compare(grid.itemAtIndex(0).rating, 2, "and Ctrl+Z did not reach them")
+        app.settingsDialog.close()
+        wait(300)
+        verify(app.actions.undo.enabled)
+    }
+
+    function test_undo_and_redo_are_named_in_the_language() {
+        app.launcher.chooseLanguage("fr")
+        wait(200)
+        clickCell(0)
+        rateSelected(2)
+        tryVerify(() => app.actions.undo.enabled)
+        compare(app.actions.undo.text, "Annuler la note")
+        undo()
+        tryVerify(() => app.actions.redo.enabled)
+        compare(app.actions.redo.text, "Rétablir la note")
+    }
+
     function test_the_filter_bar_lists_photos_by_rating_and_says_how_many() {
         compare(app.library.status, "80 photos")
         clickCell(0)

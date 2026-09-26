@@ -103,6 +103,11 @@ by the recipe (location, serial number).
 pairs, cull, rate, keyword, make two versions, export, edit a sidecar from outside and confirm the
 change is signalled and applied on confirmation, rebuild, and compare. A scenario is a small
 script over the `cli`, so it doubles as an example for users.
+**The command history** (D-096) is checked as a property: any sequence of edits, batches, undos and
+redos ends in the state a model gives that keeps the whole world before every action; a batch is one
+step and all or nothing; a never-rated photo goes back to unset; a step about a photo that has gone is
+dropped without harming the rest (`crates/engine/tests/history.rs`). The interface tests check the
+Edit menu's names, Ctrl+Z and Ctrl+Y on the grid, and that the photo undone is shown.
 
 ## 4. The image engine [decided by the spikes; detail proposed]
 

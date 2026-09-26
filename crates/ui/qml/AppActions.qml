@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import QtQuick.Controls
+import org.auroraw.ui
 
 // Every command the menus and the keyboard reach (spec §3, `commands.rs`): one Action each, with its
 // shortcut and when it is available. The menu lists them and the shortcuts fire them, so the two
@@ -45,22 +46,45 @@ QtObject {
         onTriggered: Qt.quit()
     }
 
-    // The Edit commands act on the text field that had the keyboard (the menu itself takes it while
-    // open, so the host remembers the field). Nothing else of the interface is editable: Delete only
-    // deletes a text selection, never a photo (D-018).
+    // Undo and Redo: a text field that has the keyboard has its own (what was typed in it is the most recent
+    // thing the person did); otherwise they undo and redo what was done to the photos (D-096), which the
+    // engine keeps and `History` reports. The menu says what: "Undo rating".
+    readonly property bool fieldCanUndo: !!root.host.editTarget && root.host.editTarget.canUndo === true
+    readonly property bool fieldCanRedo: !!root.host.editTarget && root.host.editTarget.canRedo === true
+
+    function undoText(kind, count) {
+        switch (kind) {
+        case "rating": return qsTr("Undo %n rating(s)", "", count)
+        case "flag": return qsTr("Undo %n flag(s)", "", count)
+        case "keywords": return qsTr("Undo keywords of %n photo(s)", "", count)
+        case "batch": return qsTr("Undo the change to %n photo(s)", "", count)
+        }
+        return qsTr("Undo")
+    }
+
+    function redoText(kind, count) {
+        switch (kind) {
+        case "rating": return qsTr("Redo %n rating(s)", "", count)
+        case "flag": return qsTr("Redo %n flag(s)", "", count)
+        case "keywords": return qsTr("Redo keywords of %n photo(s)", "", count)
+        case "batch": return qsTr("Redo the change to %n photo(s)", "", count)
+        }
+        return qsTr("Redo")
+    }
+
     readonly property Action undo: Action {
         property string commandId: "edit.undo"
-        text: qsTr("Undo")
+        text: root.fieldCanUndo ? qsTr("Undo") : root.undoText(History.undoKind, History.undoCount)
         shortcut: StandardKey.Undo
-        enabled: root.host.editTarget && root.host.editTarget.canUndo === true
-        onTriggered: root.host.editTarget.undo()
+        enabled: root.fieldCanUndo || (!root.host.dialogOpen && History.undoKind !== "")
+        onTriggered: root.fieldCanUndo ? root.host.editTarget.undo() : History.undo()
     }
     readonly property Action redo: Action {
         property string commandId: "edit.redo"
-        text: qsTr("Redo")
+        text: root.fieldCanRedo ? qsTr("Redo") : root.redoText(History.redoKind, History.redoCount)
         shortcut: StandardKey.Redo
-        enabled: root.host.editTarget && root.host.editTarget.canRedo === true
-        onTriggered: root.host.editTarget.redo()
+        enabled: root.fieldCanRedo || (!root.host.dialogOpen && History.redoKind !== "")
+        onTriggered: root.fieldCanRedo ? root.host.editTarget.redo() : History.redo()
     }
     readonly property Action cut: Action {
         property string commandId: "edit.cut"

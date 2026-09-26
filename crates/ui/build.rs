@@ -40,6 +40,7 @@ fn main() {
             "src/bus.rs",
             "src/files.rs",
             "src/folders.rs",
+            "src/history.rs",
             "src/import_form.rs",
             "src/models.rs",
             "src/shortcuts.rs",

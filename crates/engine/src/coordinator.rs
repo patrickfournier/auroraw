@@ -22,6 +22,7 @@ use auroraw_workspace::{FileStat, Workspace};
 use crate::command::Command;
 use crate::error::{EngineError, Result};
 use crate::event::Event;
+use crate::history::{Change, Direction, Entry, History, HistoryState, KeywordSet};
 use crate::import_job::{self, ImportJob};
 use crate::index_job::{self, IndexJob};
 use crate::job::{CancelToken, JobId};
@@ -78,6 +79,10 @@ pub enum Outcome {
         /// The job removing the source.
         job: JobId,
     },
+    /// `Undo` or `Redo` did it, and this is what the next Undo and Redo would do.
+    History(HistoryState),
+    /// `Undo` or `Redo` had nothing to undo or redo.
+    Nothing,
 }
 
 pub(crate) type Reply = mpsc::Sender<Result<Outcome>>;
@@ -134,6 +139,13 @@ pub(crate) enum Inbound {
     },
 }
 
+fn keyword_set(meta: &auroraw_format::sidecar::Metadata) -> KeywordSet {
+    KeywordSet {
+        ids: meta.keyword_ids.clone(),
+        paths: meta.keyword_paths.clone(),
+    }
+}
+
 fn sidecar_stat(stat: &FileStat) -> SidecarStat {
     stat_from(stat.size, stat.modified)
 }
@@ -154,6 +166,8 @@ pub(crate) struct Coordinator {
     /// Where the answer to an index job's pause goes.
     index_decisions: HashMap<JobId, mpsc::Sender<bool>>,
     next_job: u64,
+    /// What the person did to their photos, for Undo and Redo (D-096).
+    history: History,
 }
 
 impl Coordinator {
@@ -171,6 +185,7 @@ impl Coordinator {
             jobs: HashMap::new(),
             index_decisions: HashMap::new(),
             next_job: 0,
+            history: History::default(),
         }
     }
 
@@ -189,6 +204,10 @@ impl Coordinator {
                 }
                 Inbound::Removed { photo_id } => {
                     let _ = self.catalogue.remove_photo(&photo_id);
+                    // What was done to a photo that has left cannot be undone.
+                    if self.history.forget_photo(photo_id) {
+                        self.report_history();
+                    }
                 }
                 Inbound::Relocated {
                     photo_id,
@@ -253,18 +272,17 @@ impl Coordinator {
         match command {
             Command::Rebuild => self.rebuild(),
             Command::Reconcile => self.reconcile(),
-            Command::SetRating { photo_id, rating } => {
-                self.edit_photo(photo_id, |m| m.rating = Some(rating))
+            Command::SetRating { .. }
+            | Command::SetFlag { .. }
+            | Command::AddKeyword { .. }
+            | Command::RemoveKeyword { .. } => {
+                let change = self.apply_edit(&command)?;
+                self.record(change.into_iter().collect());
+                Ok(Outcome::Applied)
             }
-            Command::SetFlag { photo_id, flag } => self.edit_photo(photo_id, |m| m.flag = flag),
-            Command::AddKeyword {
-                photo_id,
-                keyword_id,
-            } => self.edit_keywords(photo_id, keyword_id, true),
-            Command::RemoveKeyword {
-                photo_id,
-                keyword_id,
-            } => self.edit_keywords(photo_id, keyword_id, false),
+            Command::Batch { commands } => self.batch(commands),
+            Command::Undo => self.travel(Direction::Undo),
+            Command::Redo => self.travel(Direction::Redo),
             Command::CreateKeyword { name, parent } => self.create_keyword(name, parent),
             Command::RenameKeyword {
                 keyword_id,
@@ -326,47 +344,189 @@ impl Coordinator {
         Ok(loaded.and_then(|l| l.current()))
     }
 
+    /// Applies one of the edit commands (the ones that go in the history) and says what changed: `None`
+    /// when the photo already was as asked, which is not worth a step.
+    fn apply_edit(&mut self, command: &Command) -> Result<Option<Change>> {
+        match command {
+            Command::SetRating { photo_id, rating } => {
+                let rating = Some(*rating);
+                self.edit_photo(*photo_id, |m| {
+                    let before = std::mem::replace(&mut m.rating, rating);
+                    (before != rating).then_some(Change::Rating {
+                        photo: *photo_id,
+                        before,
+                        after: rating,
+                    })
+                })
+            }
+            Command::SetFlag { photo_id, flag } => self.edit_photo(*photo_id, |m| {
+                let before = std::mem::replace(&mut m.flag, *flag);
+                (before != *flag).then_some(Change::Flag {
+                    photo: *photo_id,
+                    before,
+                    after: *flag,
+                })
+            }),
+            Command::AddKeyword {
+                photo_id,
+                keyword_id,
+            } => {
+                let path = if self
+                    .read_photo(photo_id)?
+                    .0
+                    .meta
+                    .keyword_ids
+                    .contains(keyword_id)
+                {
+                    String::new()
+                } else {
+                    self.keyword_path(keyword_id)?
+                };
+                self.edit_photo(*photo_id, |m| {
+                    if m.keyword_ids.contains(keyword_id) {
+                        return None;
+                    }
+                    let before = keyword_set(m);
+                    m.push_keyword(*keyword_id, path);
+                    Some(Change::Keywords {
+                        photo: *photo_id,
+                        before,
+                        after: keyword_set(m),
+                    })
+                })
+            }
+            Command::RemoveKeyword {
+                photo_id,
+                keyword_id,
+            } => self.edit_photo(*photo_id, |m| {
+                let i = m.keyword_ids.iter().position(|k| k == keyword_id)?;
+                let before = keyword_set(m);
+                m.keyword_ids.remove(i);
+                if i < m.keyword_paths.len() {
+                    m.keyword_paths.remove(i);
+                }
+                Some(Change::Keywords {
+                    photo: *photo_id,
+                    before,
+                    after: keyword_set(m),
+                })
+            }),
+            other => Err(EngineError::InvalidCommand(format!(
+                "{other:?} is not an edit of a photo: it cannot be part of a batch"
+            ))),
+        }
+    }
+
+    /// Reads a photo's sidecar, lets `edit` change its metadata (it says what changed), and writes it
+    /// back and into the catalogue: only when something changed.
     fn edit_photo(
         &mut self,
         photo_id: PhotoId,
-        edit: impl FnOnce(&mut auroraw_format::sidecar::Metadata),
-    ) -> Result<Outcome> {
+        edit: impl FnOnce(&mut auroraw_format::sidecar::Metadata) -> Option<Change>,
+    ) -> Result<Option<Change>> {
         let (mut photo, _) = self.read_photo(&photo_id)?;
-        edit(&mut photo.meta);
+        let change = edit(&mut photo.meta);
+        // (A same-value edit still writes: it is how a sidecar that was changed outside is written back.)
+        self.persist_photo(photo)?;
+        Ok(change)
+    }
+
+    /// Writes a photo's sidecar and brings the catalogue's row in line with what was written.
+    fn persist_photo(&mut self, photo: PhotoSidecar) -> Result<()> {
+        let photo_id = photo.photo_id;
         self.workspace.write_photo(&photo)?;
         let (photo, stat) = self.read_photo(&photo_id)?; // the just-written size and time
         let main_version = self.main_version_of(&photo)?;
         self.catalogue
             .apply_photo_metadata(&photo, stat, main_version.as_ref())?;
         let _ = self.events.send(Event::PhotoChanged(photo_id));
+        Ok(())
+    }
+
+    /// Puts one more action in the history.
+    fn record(&mut self, changes: Vec<Change>) {
+        if changes.is_empty() {
+            return;
+        }
+        self.history.record(Entry::new(changes));
+        self.report_history();
+    }
+
+    fn report_history(&self) {
+        let _ = self
+            .events
+            .send(Event::HistoryChanged(self.history.state()));
+    }
+
+    /// Applies several edits as one action: one step in the history, all or nothing.
+    fn batch(&mut self, commands: Vec<Command>) -> Result<Outcome> {
+        let mut changes: Vec<Change> = Vec::new();
+        for command in &commands {
+            match self.apply_edit(command) {
+                Ok(change) => changes.extend(change),
+                Err(e) => {
+                    // The edits that were made are taken back, so that a batch is not half done.
+                    for change in changes.iter().rev() {
+                        let _ = self.write_change(change, Direction::Undo);
+                    }
+                    return Err(e);
+                }
+            }
+        }
+        self.record(changes);
         Ok(Outcome::Applied)
     }
 
-    fn edit_keywords(
-        &mut self,
-        photo_id: PhotoId,
-        keyword_id: KeywordId,
-        add: bool,
-    ) -> Result<Outcome> {
-        let (mut photo, _) = self.read_photo(&photo_id)?;
-        if add {
-            if !photo.meta.keyword_ids.contains(&keyword_id) {
-                let path = self.keyword_path(&keyword_id)?;
-                photo.meta.push_keyword(keyword_id, path);
-            }
-        } else if let Some(i) = photo.meta.keyword_ids.iter().position(|k| *k == keyword_id) {
-            photo.meta.keyword_ids.remove(i);
-            if i < photo.meta.keyword_paths.len() {
-                photo.meta.keyword_paths.remove(i);
+    /// Undoes the last action, or redoes the last one undone.
+    fn travel(&mut self, direction: Direction) -> Result<Outcome> {
+        let taken = match direction {
+            Direction::Undo => self.history.take_undo(),
+            Direction::Redo => self.history.take_redo(),
+        };
+        let Some(entry) = taken else {
+            return Ok(Outcome::Nothing);
+        };
+        // Every photo has to be there, or the step is dropped (and the rest of the history stays).
+        if let Some(missing) = entry
+            .changes
+            .iter()
+            .map(Change::photo)
+            .find(|photo| self.read_photo(photo).is_err())
+        {
+            self.report_history();
+            return Err(EngineError::NotFound {
+                kind: "photo",
+                id: missing.to_string(),
+            });
+        }
+        let ordered: Vec<&Change> = match direction {
+            Direction::Undo => entry.changes.iter().rev().collect(),
+            Direction::Redo => entry.changes.iter().collect(),
+        };
+        for change in ordered {
+            if let Err(e) = self.write_change(change, direction) {
+                self.report_history();
+                return Err(e);
             }
         }
-        self.workspace.write_photo(&photo)?;
-        let (photo, stat) = self.read_photo(&photo_id)?;
-        let main_version = self.main_version_of(&photo)?;
-        self.catalogue
-            .apply_photo_metadata(&photo, stat, main_version.as_ref())?;
-        let _ = self.events.send(Event::PhotoChanged(photo_id));
-        Ok(Outcome::Applied)
+        let photos = entry.photos();
+        match direction {
+            Direction::Undo => self.history.put_redo(entry),
+            Direction::Redo => self.history.put_undo(entry),
+        }
+        let _ = self.events.send(Event::HistoryApplied {
+            redo: direction == Direction::Redo,
+            photos,
+        });
+        self.report_history();
+        Ok(Outcome::History(self.history.state()))
+    }
+
+    /// Puts a photo in the state one change leads to.
+    fn write_change(&mut self, change: &Change, direction: Direction) -> Result<()> {
+        let (mut photo, _) = self.read_photo(&change.photo())?;
+        change.apply(&mut photo.meta, direction);
+        self.persist_photo(photo)
     }
 
     fn keyword_path(&self, id: &KeywordId) -> Result<String> {

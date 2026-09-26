@@ -230,8 +230,12 @@ AppTestCase {
         app.currentTask = "cull"
         tryCompare(app.photos, "count", 2)
         compare(app.sources.count, 1)
+        mouseClick(app.library.grid.itemAtIndex(0))
+        keyClick(Qt.Key_3)
+        tryCompare(History, "undoKind", "rating")
 
         createWorkspace("Second")
+        compare(History.undoKind, "", "another workspace has a history of its own")
         compare(app.launcher.workspaceName, "Second")
         compare(app.sources.count, 0, "the sources are the new workspace's")
         compare(app.photos.count, 0, "so are the photos")

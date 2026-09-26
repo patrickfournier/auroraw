@@ -3,6 +3,7 @@ use auroraw_import::ItemOutcome;
 use auroraw_types::{KeywordId, PhotoId, SourceId};
 
 use crate::command::Command;
+use crate::history::HistoryState;
 use crate::job::JobId;
 
 /// Something the engine reports, in the order it happened (architecture §4.3). Delivered on
@@ -38,6 +39,17 @@ pub enum Event {
     },
     /// A photo's catalogue row (and, for a rating or flag change, its sidecar) changed.
     PhotoChanged(PhotoId),
+    /// What Undo and Redo would do changed (an action was done, undone or redone, or steps were
+    /// forgotten).
+    HistoryChanged(HistoryState),
+    /// An action was undone or redone: the photos it touched (`PhotoChanged` follows for each), so
+    /// that the interface can show them.
+    HistoryApplied {
+        /// Redone rather than undone.
+        redo: bool,
+        /// The photos, in the order the action changed them.
+        photos: Vec<PhotoId>,
+    },
     /// A keyword was added to the vocabulary.
     KeywordCreated(KeywordId),
     /// A keyword was renamed; the catalogue already reflects it. `affected` sidecars still carry

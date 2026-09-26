@@ -157,6 +157,7 @@ dependencies = [
  "auroraw-testkit",
  "auroraw-types",
  "auroraw-workspace",
+ "fastrand",
  "image 0.25.10",
  "serde_json",
  "thiserror 2.0.20",

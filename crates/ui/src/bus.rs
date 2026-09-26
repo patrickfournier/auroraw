@@ -21,6 +21,23 @@ pub mod qobject {
         #[cxx_name = "photoChanged"]
         fn photo_changed(self: Pin<&mut Bus>, photo_id: &QString);
 
+        /// What Undo and Redo would do changed: the kind of the step (`rating`, `flag`, `keywords`,
+        /// `batch`; empty when there is none) and how many photos it touched, for each.
+        #[qsignal]
+        #[cxx_name = "historyChanged"]
+        fn history_changed(
+            self: Pin<&mut Bus>,
+            undo_kind: &QString,
+            undo_count: i32,
+            redo_kind: &QString,
+            redo_count: i32,
+        );
+
+        /// An action was undone or redone: the photos it touched, their identifiers joined by commas.
+        #[qsignal]
+        #[cxx_name = "historyApplied"]
+        fn history_applied(self: Pin<&mut Bus>, photo_ids: &QString);
+
         /// A background job made progress.
         #[qsignal]
         #[cxx_name = "jobProgress"]
@@ -145,6 +162,28 @@ fn dispatch(event: Event, session: &Session) {
             session.thumbs.warm(id);
             let id = id.to_string();
             on_gui(move |bus| bus.photo_changed(&QString::from(id.as_str())));
+        }
+        Event::HistoryChanged(state) => {
+            let (undo, redo) = (state.undo, state.redo);
+            let kind = |label: Option<auroraw_engine::Label>| {
+                label.map_or(String::new(), |l| l.kind.name().to_string())
+            };
+            let count = |label: Option<auroraw_engine::Label>| label.map_or(0, |l| l.count as i32);
+            let (undo_kind, redo_kind) = (kind(undo), kind(redo));
+            let (undo_count, redo_count) = (count(undo), count(redo));
+            on_gui(move |bus| {
+                bus.history_changed(
+                    &QString::from(undo_kind.as_str()),
+                    undo_count,
+                    &QString::from(redo_kind.as_str()),
+                    redo_count,
+                )
+            });
+        }
+        Event::HistoryApplied { photos, .. } => {
+            let ids: Vec<String> = photos.iter().map(ToString::to_string).collect();
+            let ids = ids.join(",");
+            on_gui(move |bus| bus.history_applied(&QString::from(ids.as_str())));
         }
         Event::JobProgress { job, done, total } => {
             let job = job.to_string();

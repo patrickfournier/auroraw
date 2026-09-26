@@ -90,67 +90,133 @@
 <context>
     <name>AppActions</name>
     <message>
-        <location filename="../qml/AppActions.qml" line="15"/>
+        <location filename="../qml/AppActions.qml" line="16"/>
         <source>New workspace…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="22"/>
+        <location filename="../qml/AppActions.qml" line="23"/>
         <source>Open workspace…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="29"/>
+        <location filename="../qml/AppActions.qml" line="30"/>
         <source>Import…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="36"/>
+        <location filename="../qml/AppActions.qml" line="37"/>
         <source>Settings…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="43"/>
+        <location filename="../qml/AppActions.qml" line="44"/>
         <source>Quit</source>
         <translation type="unfinished"></translation>
     </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="57"/>
+        <source>Undo %n rating(s)</source>
+        <translation>
+            <numerusform>Undo rating</numerusform>
+            <numerusform>Undo %n ratings</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="58"/>
+        <source>Undo %n flag(s)</source>
+        <translation>
+            <numerusform>Undo flag</numerusform>
+            <numerusform>Undo %n flags</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="59"/>
+        <source>Undo keywords of %n photo(s)</source>
+        <translation>
+            <numerusform>Undo keywords</numerusform>
+            <numerusform>Undo keywords of %n photos</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="60"/>
+        <source>Undo the change to %n photo(s)</source>
+        <translation>
+            <numerusform>Undo the change</numerusform>
+            <numerusform>Undo the change to %n photos</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="53"/>
+        <location filename="../qml/AppActions.qml" line="62"/>
+        <location filename="../qml/AppActions.qml" line="77"/>
         <source>Undo</source>
         <translation type="unfinished"></translation>
     </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="67"/>
+        <source>Redo %n rating(s)</source>
+        <translation>
+            <numerusform>Redo rating</numerusform>
+            <numerusform>Redo %n ratings</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="68"/>
+        <source>Redo %n flag(s)</source>
+        <translation>
+            <numerusform>Redo flag</numerusform>
+            <numerusform>Redo %n flags</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="69"/>
+        <source>Redo keywords of %n photo(s)</source>
+        <translation>
+            <numerusform>Redo keywords</numerusform>
+            <numerusform>Redo keywords of %n photos</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="70"/>
+        <source>Redo the change to %n photo(s)</source>
+        <translation>
+            <numerusform>Redo the change</numerusform>
+            <numerusform>Redo the change to %n photos</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="60"/>
+        <location filename="../qml/AppActions.qml" line="72"/>
+        <location filename="../qml/AppActions.qml" line="84"/>
         <source>Redo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="67"/>
+        <location filename="../qml/AppActions.qml" line="91"/>
         <source>Cut</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="74"/>
+        <location filename="../qml/AppActions.qml" line="98"/>
         <source>Copy</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="81"/>
+        <location filename="../qml/AppActions.qml" line="105"/>
         <source>Paste</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="88"/>
+        <location filename="../qml/AppActions.qml" line="112"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="105"/>
+        <location filename="../qml/AppActions.qml" line="129"/>
         <source>Select all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="113"/>
+        <location filename="../qml/AppActions.qml" line="137"/>
         <source>About Auroraw</source>
         <translation type="unfinished"></translation>
     </message>
@@ -512,37 +578,37 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="85"/>
+        <location filename="../qml/Library.qml" line="100"/>
         <source>All</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="85"/>
+        <location filename="../qml/Library.qml" line="100"/>
         <source>1+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="85"/>
+        <location filename="../qml/Library.qml" line="100"/>
         <source>2+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="86"/>
+        <location filename="../qml/Library.qml" line="101"/>
         <source>3+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="86"/>
+        <location filename="../qml/Library.qml" line="101"/>
         <source>4+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="86"/>
+        <location filename="../qml/Library.qml" line="101"/>
         <source>5</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="185"/>
+        <location filename="../qml/Library.qml" line="200"/>
         <source>Photo, %n star(s)</source>
         <translation>
             <numerusform>Photo, %n star</numerusform>
@@ -550,12 +616,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="185"/>
+        <location filename="../qml/Library.qml" line="200"/>
         <source>Photo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="204"/>
+        <location filename="../qml/Library.qml" line="219"/>
         <source>No preview</source>
         <translation type="unfinished"></translation>
     </message>
@@ -568,37 +634,37 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="202"/>
+        <location filename="../qml/Main.qml" line="216"/>
         <source>Menu</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="217"/>
+        <location filename="../qml/Main.qml" line="231"/>
         <source>Catalogue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="223"/>
+        <location filename="../qml/Main.qml" line="237"/>
         <source>Cull</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="228"/>
+        <location filename="../qml/Main.qml" line="242"/>
         <source>Develop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="229"/>
+        <location filename="../qml/Main.qml" line="243"/>
         <source>Publish</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="315"/>
+        <location filename="../qml/Main.qml" line="329"/>
         <source>Choose a folder in the folder dialog…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="326"/>
+        <location filename="../qml/Main.qml" line="340"/>
         <source>Open a workspace</source>
         <translation type="unfinished"></translation>
     </message>

@@ -34,6 +34,18 @@ pub enum Command {
         /// The new flag, or `None` to clear it.
         flag: Option<Flag>,
     },
+    /// Applies several edits (`SetRating`, `SetFlag`, `AddKeyword`, `RemoveKeyword`) as **one action**:
+    /// one step of the history, and all or nothing (a failing edit takes back the ones before it). How a
+    /// batch of ratings, a series resolved, or a paste of metadata onto many photos is undone in one go.
+    Batch {
+        /// The edits, in order.
+        commands: Vec<Command>,
+    },
+    /// Undoes the last action of the person's (D-096). Reports [`crate::Outcome::History`], or
+    /// [`crate::Outcome::Nothing`] when there is nothing to undo.
+    Undo,
+    /// Redoes the action that was undone last; a new action discards what was undone.
+    Redo,
     /// Adds a keyword to a photo.
     AddKeyword {
         /// The photo.

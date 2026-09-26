@@ -20,6 +20,8 @@ mod folders;
 mod glue;
 mod gridmath;
 #[allow(unsafe_code)]
+mod history;
+#[allow(unsafe_code)]
 mod import_form;
 mod import_settings;
 #[allow(unsafe_code)]

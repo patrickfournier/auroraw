@@ -150,6 +150,11 @@ ApplicationWindow {
         // Another workspace replaces the open one (New or Open while one is open): everything that
         // shows the workspace starts over.
         function onWorkspaceSerialChanged() {
+            // Another workspace has a history of its own (a new engine, empty).
+            History.undoKind = ""
+            History.undoCount = 0
+            History.redoKind = ""
+            History.redoCount = 0
             catalogueFlow.status = ""
             sourceList.job = ""
             sourceList.refresh()
@@ -170,6 +175,15 @@ ApplicationWindow {
         function onIndexFinished() { libraryView.reload() }
         function onSourceRemoved() { libraryView.reload() }
         function onImportFinished() { libraryView.reload() }
+        // What Undo and Redo would do, as the engine says it.
+        function onHistoryChanged(undoKind, undoCount, redoKind, redoCount) {
+            History.undoKind = undoKind
+            History.undoCount = undoCount
+            History.redoKind = redoKind
+            History.redoCount = redoCount
+        }
+        // An action was undone or redone: the grid shows the photos it touched.
+        function onHistoryApplied(photoIds) { libraryView.historyApplied(photoIds.split(",")) }
         function onJobCancelled() { libraryView.reload() }
         function onPhotoChanged(photoId) { libraryView.photoChanged(photoId) }
     }

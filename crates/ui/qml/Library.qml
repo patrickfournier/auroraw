@@ -54,6 +54,21 @@ FocusScope {
         updateSummary()
     }
 
+    // An action was undone or redone (Edit menu, Ctrl+Z): the photos it touched are shown as they are now,
+    // and the first is selected and brought into view, as a person expects to see what was undone.
+    function historyApplied(photoIds) {
+        for (const id of photoIds)
+            photoGrid.syncPhoto(id)
+        // A filter may now list a photo it did not, or not list one it did.
+        if (photoGrid.minRating > 0)
+            reload()
+        const row = photoGrid.rowOf(photoIds[0])
+        if (row >= 0)
+            select(row)
+        else
+            updateSummary()
+    }
+
     // The engine says a photo changed: its cell and, when selected, the strip follow.
     function photoChanged(photoId) {
         photoGrid.refreshPhoto(photoId)
