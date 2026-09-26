@@ -500,3 +500,117 @@ fn any_sequence_of_edits_undos_and_redos_agrees_with_a_model() {
         }
     }
 }
+
+#[test]
+fn a_colour_label_is_undone_and_redone_and_a_selection_is_one_step() {
+    use auroraw_engine::ColourLabel;
+    let f = fixture(3, 0);
+    let label_of = |photo: PhotoId| f.meta(photo).label;
+    let row_label = |photo: PhotoId| {
+        f.engine
+            .read_catalogue()
+            .unwrap()
+            .photo(&photo)
+            .unwrap()
+            .unwrap()
+            .label
+    };
+    let set = |photo: PhotoId, label: Option<ColourLabel>| {
+        f.engine
+            .submit_and_wait(Command::SetLabel {
+                photo_id: photo,
+                label,
+            })
+            .unwrap();
+    };
+
+    set(f.photos[0], Some(ColourLabel::Red));
+    assert_eq!(label_of(f.photos[0]).as_deref(), Some("Red"));
+    assert_eq!(
+        row_label(f.photos[0]).as_deref(),
+        Some("Red"),
+        "the catalogue follows"
+    );
+    f.engine.undo().unwrap();
+    assert_eq!(label_of(f.photos[0]), None);
+    assert_eq!(row_label(f.photos[0]), None);
+    f.engine.redo().unwrap();
+    assert_eq!(label_of(f.photos[0]).as_deref(), Some("Red"));
+
+    // The same colour again is not a step; taking it off is.
+    f.events.drain();
+    set(f.photos[0], Some(ColourLabel::Red));
+    assert!(
+        f.events
+            .drain()
+            .into_iter()
+            .all(|e| !matches!(e, Event::HistoryChanged(_))),
+        "a same-value edit is not a step"
+    );
+    set(f.photos[0], None);
+    assert_eq!(label_of(f.photos[0]), None);
+    f.engine.undo().unwrap();
+    assert_eq!(label_of(f.photos[0]).as_deref(), Some("Red"));
+
+    // A selection: one step, all three go back together (one of them had another colour).
+    set(f.photos[1], Some(ColourLabel::Blue));
+    f.events.drain();
+    f.engine
+        .submit_and_wait(Command::Batch {
+            commands: f
+                .photos
+                .iter()
+                .map(|p| Command::SetLabel {
+                    photo_id: *p,
+                    label: Some(ColourLabel::Green),
+                })
+                .collect(),
+        })
+        .unwrap();
+    let steps: Vec<_> = f
+        .events
+        .drain()
+        .into_iter()
+        .filter_map(|e| match e {
+            Event::HistoryChanged(s) => Some(s),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(steps.len(), 1);
+    let label = steps[0].undo.unwrap();
+    assert_eq!((label.kind, label.count), (LabelKind::ColourLabel, 3));
+    f.engine.undo().unwrap();
+    assert_eq!(label_of(f.photos[0]).as_deref(), Some("Red"));
+    assert_eq!(label_of(f.photos[1]).as_deref(), Some("Blue"));
+    assert_eq!(label_of(f.photos[2]), None);
+
+    // A rebuild from the sidecars gives the catalogue the same labels.
+    f.engine.submit_and_wait(Command::Rebuild).unwrap();
+    assert_eq!(row_label(f.photos[1]).as_deref(), Some("Blue"));
+}
+
+#[test]
+fn a_label_another_program_wrote_goes_back_exactly() {
+    use auroraw_engine::ColourLabel;
+    let f = fixture(1, 0);
+    // A label of our own making is a colour; one from elsewhere is kept as it was written.
+    let mut sidecar = f
+        .engine
+        .workspace()
+        .read_photo(&f.photos[0])
+        .unwrap()
+        .unwrap()
+        .current()
+        .unwrap();
+    sidecar.meta.label = Some("Approved".into());
+    f.engine.workspace().write_photo(&sidecar).unwrap();
+    f.engine
+        .submit_and_wait(Command::SetLabel {
+            photo_id: f.photos[0],
+            label: Some(ColourLabel::Purple),
+        })
+        .unwrap();
+    assert_eq!(f.meta(f.photos[0]).label.as_deref(), Some("Purple"));
+    f.engine.undo().unwrap();
+    assert_eq!(f.meta(f.photos[0]).label.as_deref(), Some("Approved"));
+}

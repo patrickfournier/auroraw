@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use auroraw_engine::{Engine, ThumbnailService};
+use auroraw_engine::{Engine, PreviewService, ThumbnailService};
 use auroraw_types::PhotoId;
 
 /// An open workspace. It is dropped as soon as another opens, which releases the workspace's folder.
@@ -16,7 +16,9 @@ pub struct Session {
     pub engine: Engine,
     /// This machine's folder for what the workspace remembers (the import form, resumable imports).
     pub data_dir: std::path::PathBuf,
-    pub thumbs: Collector,
+    pub thumbs: Collector<ThumbnailService>,
+    /// The pictures of the image view (WP9): big, few, kept by the service itself.
+    pub previews: Collector<PreviewService>,
 }
 
 static CURRENT: Mutex<Option<Arc<Session>>> = Mutex::new(None);
@@ -50,10 +52,56 @@ struct Done {
     waiting: HashMap<PhotoId, Vec<u64>>,
 }
 
-/// Turns the thumbnail service's poll-based delivery into an answer for each request: a thread polls
-/// the service and hands every waiting request its thumbnail (or its failure) through `deliver`.
-pub struct Collector {
-    service: Arc<ThumbnailService>,
+/// What a [`Collector`] needs of the service it polls: an image service that answers asynchronously.
+pub trait ImageSource: Send + Sync + 'static {
+    /// Asks for the photo's image.
+    fn ask(&self, id: PhotoId);
+    /// The images that arrived since the last call, as JPEG bytes.
+    fn arrived(&self) -> Vec<(PhotoId, Vec<u8>)>;
+    /// The photos that cannot be made since the last call.
+    fn given_up(&self) -> Vec<PhotoId>;
+    /// Whether the collector keeps what arrived (and what failed) to answer a later request itself: thumbnails
+    /// are small and asked for again and again as a grid scrolls, the pictures of the view are neither, and
+    /// the service keeps its own few.
+    const KEEPS: bool;
+}
+
+impl ImageSource for ThumbnailService {
+    fn ask(&self, id: PhotoId) {
+        self.request(id)
+    }
+    fn arrived(&self) -> Vec<(PhotoId, Vec<u8>)> {
+        self.poll()
+            .into_iter()
+            .map(|(id, t)| (id, t.jpeg))
+            .collect()
+    }
+    fn given_up(&self) -> Vec<PhotoId> {
+        self.poll_failed()
+    }
+    const KEEPS: bool = true;
+}
+
+impl ImageSource for PreviewService {
+    fn ask(&self, id: PhotoId) {
+        self.request(id)
+    }
+    fn arrived(&self) -> Vec<(PhotoId, Vec<u8>)> {
+        self.poll()
+            .into_iter()
+            .map(|(id, t)| (id, t.jpeg.clone()))
+            .collect()
+    }
+    fn given_up(&self) -> Vec<PhotoId> {
+        self.poll_failed()
+    }
+    const KEEPS: bool = false;
+}
+
+/// Turns a service's poll-based delivery into an answer for each request: a thread polls the service and
+/// hands every waiting request its image (or its failure) through `deliver`.
+pub struct Collector<S: ImageSource> {
+    service: Arc<S>,
     done: Arc<Mutex<Done>>,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
@@ -63,8 +111,8 @@ pub struct Collector {
 /// Answers one request: its token, and the JPEG of the thumbnail or `None` when there is none.
 pub type Deliver = Arc<dyn Fn(u64, Option<&[u8]>) + Send + Sync>;
 
-impl Collector {
-    pub fn new(service: ThumbnailService, deliver: Deliver) -> Self {
+impl<S: ImageSource> Collector<S> {
+    pub fn new(service: S, deliver: Deliver) -> Self {
         let service = Arc::new(service);
         let done: Arc<Mutex<Done>> = Arc::default();
         let stop = Arc::new(AtomicBool::new(false));
@@ -73,8 +121,8 @@ impl Collector {
                 (service.clone(), done.clone(), stop.clone(), deliver.clone());
             std::thread::spawn(move || {
                 while !stop.load(Ordering::Relaxed) {
-                    let arrived = service.poll();
-                    let failed = service.poll_failed();
+                    let arrived = service.arrived();
+                    let failed = service.given_up();
                     if !arrived.is_empty() || !failed.is_empty() {
                         let mut answers: Vec<(u64, Option<Vec<u8>>)> = Vec::new();
                         {
@@ -82,17 +130,21 @@ impl Collector {
                             if state.ready.len() > 4096 {
                                 state.ready.clear();
                             }
-                            for (id, thumbnail) in arrived {
+                            for (id, jpeg) in arrived {
                                 for token in state.waiting.remove(&id).unwrap_or_default() {
-                                    answers.push((token, Some(thumbnail.jpeg.clone())));
+                                    answers.push((token, Some(jpeg.clone())));
                                 }
-                                state.ready.insert(id, thumbnail.jpeg);
+                                if S::KEEPS {
+                                    state.ready.insert(id, jpeg);
+                                }
                             }
                             for id in failed {
                                 for token in state.waiting.remove(&id).unwrap_or_default() {
                                     answers.push((token, None));
                                 }
-                                state.failed.insert(id);
+                                if S::KEEPS {
+                                    state.failed.insert(id);
+                                }
                             }
                         }
                         for (token, jpeg) in answers {
@@ -112,14 +164,6 @@ impl Collector {
         }
     }
 
-    /// Makes a photo's thumbnail ahead of anybody asking for it (a photo that just entered the
-    /// catalogue), behind whatever the grid asks for. A photo that changed may have a thumbnail
-    /// now, so an earlier failure is forgotten.
-    pub fn warm(&self, id: PhotoId) {
-        self.done.lock().unwrap().failed.remove(&id);
-        self.service.warm(id);
-    }
-
     /// Asks for a photo's thumbnail on behalf of the request `token`, answered through the collector's
     /// `deliver` (from this call, when the thumbnail is already known, or later from the collector's thread).
     pub fn request(&self, id: PhotoId, token: u64) {
@@ -136,16 +180,33 @@ impl Collector {
         };
         match known {
             Some(jpeg) => (self.deliver)(token, jpeg.as_deref()),
-            None => self.service.request(id),
+            None => self.service.ask(id),
         }
     }
 }
 
-impl Drop for Collector {
+impl<S: ImageSource> Drop for Collector<S> {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
+    }
+}
+
+impl Collector<ThumbnailService> {
+    /// Makes a photo's thumbnail ahead of anybody asking for it (a photo that just entered the
+    /// catalogue), behind whatever the grid asks for. A photo that changed may have a thumbnail
+    /// now, so an earlier failure is forgotten.
+    pub fn warm(&self, id: PhotoId) {
+        self.done.lock().unwrap().failed.remove(&id);
+        self.service.warm(id);
+    }
+}
+
+impl Collector<PreviewService> {
+    /// Says which photos the image view will want next (see `PreviewService::prefetch`).
+    pub fn prefetch(&self, ids: &[PhotoId]) {
+        self.service.prefetch(ids);
     }
 }

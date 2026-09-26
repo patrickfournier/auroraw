@@ -28,10 +28,11 @@ mod refresh;
 mod remove_job;
 mod sources_api;
 mod thumbnails;
+mod viewer;
 mod workspaces;
 
 pub use auroraw_catalogue::SourceCounts;
-pub use auroraw_format::sidecar::Flag;
+pub use auroraw_format::sidecar::{ColourLabel, Flag};
 pub use auroraw_import::{ItemOutcome, MetadataTemplate, PairRule, Profile};
 pub use auroraw_types::KeywordId;
 pub use command::Command;
@@ -48,6 +49,7 @@ pub use import_job::Registration;
 pub use job::JobId;
 pub use sources_api::{AddPlan, AddSourceRequest, AddedSource, SourceInfo, SourceKind};
 pub use thumbnails::ThumbnailService;
+pub use viewer::{DEFAULT_CAPACITY as PREVIEW_CACHE, PreviewService};
 pub use workspaces::{KnownWorkspace, LocalDirs, OpenedWorkspace};
 
 use std::path::{Path, PathBuf};
@@ -235,6 +237,17 @@ impl Engine {
             self.catalogue_path.clone(),
             previews_path.to_path_buf(),
             workers,
+        )
+    }
+
+    /// Starts a [`PreviewService`] for the image view: pictures of the photos at a size worth looking at,
+    /// kept in memory (`PREVIEW_CACHE` of them), made on `workers` background threads.
+    pub fn start_previews(&self, workers: usize) -> Result<PreviewService> {
+        PreviewService::start(
+            self.workspace.clone(),
+            self.catalogue_path.clone(),
+            workers,
+            PREVIEW_CACHE,
         )
     }
 }

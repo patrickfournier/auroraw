@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! The Rust half of the C++ glue (`glue.cpp`), everything the interface needs that cxx-qt-lib does not
-//! wrap: the `image://thumbs/<photo id>` provider, loading a translation, and the QtQuickTest runner.
+//! wrap: the `image://thumbs/<photo id>` and `image://preview/<photo id>` providers, loading a translation, and the QtQuickTest runner.
 //! The only module with `unsafe` besides the cxx-qt bridges (D-094).
 
 use std::ffi::c_void;
@@ -111,13 +111,18 @@ pub fn thumbnail_deliverer() -> session::Deliver {
     })
 }
 
-/// A request of the image provider (`image://thumbs/<photo id>`, the id being `id`, UTF-8, `len`
-/// bytes) for a thumbnail; the answer goes to `auroraw_thumbnail_ready` under `token`.
+/// A request of an image provider (`image://thumbs/<photo id>` for `kind` 0, `image://preview/<photo id>`
+/// for 1, the id being `id`, UTF-8, `len` bytes); the answer goes to `auroraw_thumbnail_ready` under `token`.
 ///
 /// # Safety
 /// `id` points at `len` readable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn auroraw_thumbnail_request(id: *const u8, len: usize, token: u64) {
+pub unsafe extern "C" fn auroraw_thumbnail_request(
+    kind: i32,
+    id: *const u8,
+    len: usize,
+    token: u64,
+) {
     // SAFETY: the caller guarantees `id` and `len`.
     let name = unsafe { std::slice::from_raw_parts(id, len) };
     let asked = std::str::from_utf8(name)
@@ -125,6 +130,7 @@ pub unsafe extern "C" fn auroraw_thumbnail_request(id: *const u8, len: usize, to
         .and_then(|text| PhotoId::from_str(text).ok())
         .zip(session::current());
     match asked {
+        Some((id, session)) if kind == 1 => session.previews.request(id, token),
         Some((id, session)) => session.thumbs.request(id, token),
         // SAFETY: no bytes (null, 0) is allowed.
         None => unsafe { auroraw_thumbnail_ready(token, std::ptr::null(), 0) },

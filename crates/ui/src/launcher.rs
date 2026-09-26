@@ -80,6 +80,16 @@ pub mod qobject {
         #[cxx_name = "keywordPanelWidth"]
         fn keyword_panel_width(self: &Launcher) -> i32;
 
+        /// An option of the image view (`autoAdvance`, `filmstrip`, `info`).
+        #[qinvokable]
+        #[cxx_name = "viewOption"]
+        fn view_option(self: &Launcher, name: &QString) -> bool;
+
+        /// Remembers an option of the image view.
+        #[qinvokable]
+        #[cxx_name = "setViewOption"]
+        fn set_view_option(self: &Launcher, name: &QString, on: bool);
+
         /// Remembers the width of the keyword panel.
         #[qinvokable]
         #[cxx_name = "setKeywordPanelWidth"]
@@ -169,10 +179,14 @@ impl qobject::Launcher {
         let service = engine
             .start_thumbnails(&previews_path, 4)
             .expect("the previews database opens");
+        let previews = engine
+            .start_previews(2)
+            .expect("the preview service starts");
         let session = Arc::new(Session {
             engine,
             data_dir: self.dirs().workspace_data(workspace_id),
             thumbs: Collector::new(service, glue::thumbnail_deliverer()),
+            previews: Collector::new(previews, glue::thumbnail_deliverer()),
         });
         bus::start_pump(events, &session);
         self.as_mut().rust_mut().session = Some(Arc::downgrade(&session));
@@ -332,6 +346,34 @@ impl qobject::Launcher {
             Some(_) => AppSettings::load(&self.settings_path()).keyword_panel_width,
             None => crate::app_settings::KEYWORD_PANEL_WIDTH,
         }
+    }
+
+    pub fn view_option(&self, name: &QString) -> bool {
+        let settings = match &self.dirs {
+            Some(_) => AppSettings::load(&self.settings_path()),
+            None => AppSettings::default(),
+        };
+        match name.to_string().as_str() {
+            "autoAdvance" => settings.auto_advance,
+            "filmstrip" => settings.show_filmstrip,
+            "info" => settings.show_info,
+            _ => false,
+        }
+    }
+
+    pub fn set_view_option(&self, name: &QString, on: bool) {
+        if self.dirs.is_none() {
+            return;
+        }
+        let path = self.settings_path();
+        let mut settings = AppSettings::load(&path);
+        match name.to_string().as_str() {
+            "autoAdvance" => settings.auto_advance = on,
+            "filmstrip" => settings.show_filmstrip = on,
+            "info" => settings.show_info = on,
+            _ => return,
+        }
+        settings.save(&path);
     }
 
     pub fn set_keyword_panel_width(&self, width: i32) {

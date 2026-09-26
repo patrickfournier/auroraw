@@ -84,6 +84,16 @@ pub enum Change {
         /// The flag after.
         after: Option<Flag>,
     },
+    /// The photo's own colour label (the sidecar's text, so that a label another program wrote and that is
+    /// not one of ours goes back exactly).
+    Label {
+        /// The photo.
+        photo: PhotoId,
+        /// The label before.
+        before: Option<String>,
+        /// The label after.
+        after: Option<String>,
+    },
     /// The photo's keywords.
     Keywords {
         /// The photo.
@@ -109,6 +119,7 @@ impl Change {
         match self {
             Change::Rating { photo, .. }
             | Change::Flag { photo, .. }
+            | Change::Label { photo, .. }
             | Change::Keywords { photo, .. } => Some(*photo),
             Change::Vocabulary { .. } => None,
         }
@@ -118,6 +129,7 @@ impl Change {
         match self {
             Change::Rating { .. } => LabelKind::Rating,
             Change::Flag { .. } => LabelKind::Flag,
+            Change::Label { .. } => LabelKind::ColourLabel,
             Change::Keywords { .. } => LabelKind::Keywords,
             Change::Vocabulary { action, .. } => match action {
                 VocabularyAction::Create => LabelKind::KeywordCreate,
@@ -136,6 +148,9 @@ impl Change {
                 meta.rating = if undo { *before } else { *after }
             }
             Change::Flag { before, after, .. } => meta.flag = if undo { *before } else { *after },
+            Change::Label { before, after, .. } => {
+                meta.label = if undo { before.clone() } else { after.clone() }
+            }
             Change::Keywords { before, after, .. } => {
                 let set = if undo { before } else { after };
                 meta.keyword_ids = set.ids.clone();
@@ -153,6 +168,8 @@ pub enum LabelKind {
     Rating,
     /// Flags.
     Flag,
+    /// Colour labels.
+    ColourLabel,
     /// Keywords.
     Keywords,
     /// Several kinds of change at once.
@@ -173,6 +190,7 @@ impl LabelKind {
         match self {
             LabelKind::Rating => "rating",
             LabelKind::Flag => "flag",
+            LabelKind::ColourLabel => "label",
             LabelKind::Keywords => "keywords",
             LabelKind::Batch => "batch",
             LabelKind::KeywordCreate => "keyword-create",

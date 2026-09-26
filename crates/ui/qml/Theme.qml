@@ -23,6 +23,18 @@ QtObject {
     readonly property color danger: "#e08070"
     readonly property color quiet: "#aaaaaa"
 
+    // A colour label (spec §5.3), by the name the grid gives it.
+    function labelColour(name) {
+        switch (name) {
+        case "red": return "#e05252"
+        case "yellow": return "#e0c452"
+        case "green": return "#5cb85c"
+        case "blue": return "#5292e0"
+        case "purple": return "#a066d8"
+        }
+        return "transparent"
+    }
+
     // The typeface: IBM Plex Sans, carried by the application (`assets/fonts`), at 11 points.
     // `AURORAW_FONT` (a family) and `AURORAW_FONT_SIZE` (points) try others without a rebuild.
     readonly property string defaultFamily: "IBM Plex Sans"

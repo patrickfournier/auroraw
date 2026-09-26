@@ -19,7 +19,8 @@
 #include <unordered_map>
 
 extern "C" {
-void auroraw_thumbnail_request(const unsigned char *id, size_t len, unsigned long long token);
+void auroraw_thumbnail_request(int kind, const unsigned char *id, size_t len,
+                               unsigned long long token);
 }
 
 namespace {
@@ -36,13 +37,13 @@ std::atomic<unsigned long long> g_next{1};
 
 class ThumbResponse : public QQuickImageResponse {
 public:
-    explicit ThumbResponse(const QString &id) : m_token(g_next++) {
+    ThumbResponse(int kind, const QString &id) : m_token(g_next++) {
         {
             std::lock_guard<std::mutex> lock(g_mutex);
             g_responses[m_token] = this;
         }
         const QByteArray name = id.toUtf8();
-        auroraw_thumbnail_request(reinterpret_cast<const unsigned char *>(name.constData()),
+        auroraw_thumbnail_request(kind, reinterpret_cast<const unsigned char *>(name.constData()),
                                   static_cast<size_t>(name.size()), m_token);
     }
 
@@ -76,11 +77,17 @@ private:
 
 // A request for a thumbnail does not wait: the answer arrives from the collector's thread, so the
 // thumbnails of a screenful are made side by side and none of Qt's image threads is held up.
+// The same provider serves the thumbnails (`image://thumbs`, kind 0) and the pictures of the image view
+// (`image://preview`, kind 1): only the Rust side that answers differs.
 class ThumbProvider : public QQuickAsyncImageProvider {
 public:
+    explicit ThumbProvider(int kind) : m_kind(kind) {}
     QQuickImageResponse *requestImageResponse(const QString &id, const QSize &) override {
-        return new ThumbResponse(id);
+        return new ThumbResponse(m_kind, id);
     }
+
+private:
+    int m_kind;
 };
 } // namespace
 
@@ -127,7 +134,10 @@ extern "C" void auroraw_quit_after(int ms) {
 extern "C" void auroraw_install_thumbnails(QObject *object) {
     if (QQmlEngine *engine = qmlEngine(object)) {
         if (!engine->imageProvider(QStringLiteral("thumbs"))) {
-            engine->addImageProvider(QStringLiteral("thumbs"), new ThumbProvider);
+            engine->addImageProvider(QStringLiteral("thumbs"), new ThumbProvider(0));
+        }
+        if (!engine->imageProvider(QStringLiteral("preview"))) {
+            engine->addImageProvider(QStringLiteral("preview"), new ThumbProvider(1));
         }
     }
 }

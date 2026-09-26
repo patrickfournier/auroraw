@@ -36,6 +36,54 @@ impl std::str::FromStr for Flag {
     }
 }
 
+/// A colour label (spec §5.3): the five names other software writes in `xmp:Label`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColourLabel {
+    /// Red.
+    Red,
+    /// Yellow.
+    Yellow,
+    /// Green.
+    Green,
+    /// Blue.
+    Blue,
+    /// Purple.
+    Purple,
+}
+
+impl ColourLabel {
+    /// Every colour, in the order they are offered.
+    pub const ALL: [ColourLabel; 5] = [
+        ColourLabel::Red,
+        ColourLabel::Yellow,
+        ColourLabel::Green,
+        ColourLabel::Blue,
+        ColourLabel::Purple,
+    ];
+
+    /// The text the sidecar holds (`Red`, `Yellow`, `Green`, `Blue`, `Purple`).
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Red => "Red",
+            Self::Yellow => "Yellow",
+            Self::Green => "Green",
+            Self::Blue => "Blue",
+            Self::Purple => "Purple",
+        }
+    }
+}
+
+impl std::str::FromStr for ColourLabel {
+    type Err = ();
+    /// Any case; a label that is not one of the five (a foreign file's own) is not a colour.
+    fn from_str(s: &str) -> Result<Self, ()> {
+        Self::ALL
+            .into_iter()
+            .find(|c| c.name().eq_ignore_ascii_case(s.trim()))
+            .ok_or(())
+    }
+}
+
 /// A keyword of a photo as the sidecar records it: its identifier and the snapshot of its path
 /// (note 003 §6). The names are a copy for other software; the identifier is the identity.
 #[derive(Debug, Clone, PartialEq, Eq)]

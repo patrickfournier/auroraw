@@ -56,6 +56,7 @@ QtObject {
         switch (kind) {
         case "rating": return qsTr("Undo %n rating(s)", "", count)
         case "flag": return qsTr("Undo %n flag(s)", "", count)
+        case "label": return qsTr("Undo %n label(s)", "", count)
         case "keywords": return qsTr("Undo keywords of %n photo(s)", "", count)
         case "keyword-create": return qsTr("Undo creating the keyword")
         case "keyword-rename": return qsTr("Undo renaming the keyword")
@@ -70,6 +71,7 @@ QtObject {
         switch (kind) {
         case "rating": return qsTr("Redo %n rating(s)", "", count)
         case "flag": return qsTr("Redo %n flag(s)", "", count)
+        case "label": return qsTr("Redo %n label(s)", "", count)
         case "keywords": return qsTr("Redo keywords of %n photo(s)", "", count)
         case "keyword-create": return qsTr("Redo creating the keyword")
         case "keyword-rename": return qsTr("Redo renaming the keyword")

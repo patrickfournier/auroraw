@@ -35,7 +35,7 @@ pub use error::{ImagingError, Result};
 pub use format::is_photo_file;
 pub use metadata::{Metadata, read_metadata};
 pub use phash::perceptual_hash;
-pub use preview::embedded_preview;
+pub use preview::{VIEW_MAX_EDGE, embedded_preview, view_image};
 pub use previews::PreviewsDb;
 pub use thumbnail::{Thumbnail, make_thumbnail};
 

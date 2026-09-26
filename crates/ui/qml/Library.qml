@@ -30,6 +30,11 @@ FocusScope {
     readonly property string status: qsTr("%n photo(s)", "", photoGrid.count)
     readonly property int selectedCount: photoGrid.selectedCount
     property alias keywords: keywordList
+    property alias viewer: viewer
+    // The image view (one photo at a time) is open over the grid.
+    property bool viewing: false
+    // Asked to make the window full screen or back (the window's business).
+    signal fullScreenToggled()
     property alias keywordPanel: keywordPanel
     // A dialog of the panel is open (the window's commands wait, as for every dialog).
     readonly property bool dialogOpen: keywordPanel.renameDialog.visible || keywordPanel.moveDialog.visible
@@ -125,6 +130,34 @@ FocusScope {
             photoGrid.selectOnly(grid.currentIndex)
         photoGrid.flagSelection(kind)
         updateSummary()
+    }
+
+    // Gives a colour label to what is selected (or the cursor's photo when nothing is): `red`, `yellow`, `green`,
+    // `blue`, `purple`, or `none`; the same colour again takes it off.
+    function label(name) {
+        if (photoGrid.selectedCount === 0 && grid.currentIndex >= 0)
+            photoGrid.selectOnly(grid.currentIndex)
+        photoGrid.labelSelection(name)
+        updateSummary()
+    }
+
+    // Opens the image view on `index` (the cursor's photo when it is -1).
+    function openView(index) {
+        const row = index >= 0 ? index : Math.max(grid.currentIndex, 0)
+        if (photoGrid.count === 0 || row >= photoGrid.count)
+            return
+        goTo(row, 0)
+        viewing = true
+        viewer.opened()
+    }
+
+    // Back to the grid, with the cursor on the photo that was shown.
+    function closeView() {
+        if (!viewing)
+            return
+        viewing = false
+        showCursor(grid.currentIndex)
+        grid.forceActiveFocus()
     }
 
     // Puts the keyboard in the keyword field (Ctrl+K).
@@ -341,6 +374,14 @@ FocusScope {
                         if (ctrlOrShift)
                             return
                         root.flag(event.key === Qt.Key_P ? "pick" : event.key === Qt.Key_X ? "reject" : "clear")
+                    } else if (event.key >= Qt.Key_6 && event.key <= Qt.Key_9) {
+                        if (ctrlOrShift)
+                            return
+                        root.label(["red", "yellow", "green", "blue"][event.key - Qt.Key_6])
+                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        if (ctrlOrShift)
+                            return
+                        root.openView(-1)
                     } else if (event.key === Qt.Key_Left) {
                         move(-1, 0, event.modifiers)
                     } else if (event.key === Qt.Key_Right) {
@@ -441,6 +482,12 @@ FocusScope {
                             band()
                     }
 
+                    onDoubleClicked: mouse => {
+                        const index = photoAt(mouse.x, mouse.y)
+                        if (index >= 0)
+                            root.openView(index)
+                    }
+
                     onReleased: {
                         if (banding)
                             root.photoGrid.rubberEnd()
@@ -476,6 +523,7 @@ FocusScope {
                     required property int rating
                     required property bool selected
                     required property int flag
+                    required property string colourLabel
                     // No thumbnail can be made for this photo (it says so instead of staying empty).
                     readonly property bool unavailable: thumbnail.status === Image.Error
                     readonly property bool shown: thumbnail.status === Image.Ready
@@ -547,6 +595,15 @@ FocusScope {
                                 color: cell.flag === 1 ? Theme.picked : Theme.danger
                             }
                         }
+                        // The colour label, a bar along the bottom of the picture.
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: 5
+                            visible: cell.colourLabel !== ""
+                            color: Theme.labelColour(cell.colourLabel)
+                        }
                         // The selection's frame, over the picture.
                         Rectangle {
                             anchors.fill: parent
@@ -591,5 +648,14 @@ FocusScope {
             library: root
             launcher: root.launcher
         }
+    }
+
+    // One photo at a time, over the grid, the keyword panel and the filter bar (spec §5.3).
+    Viewer {
+        id: viewer
+        anchors.fill: parent
+        visible: root.viewing
+        library: root
+        launcher: root.launcher
     }
 }

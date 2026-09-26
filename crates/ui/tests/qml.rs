@@ -195,3 +195,11 @@ fn reorganising_the_keyword_tree() {
     support::machine_with_photos(home.path(), 40);
     run_suite("keyword_tree", home.path(), None);
 }
+
+/// The image view: opening, walking, rating with keys, 100 %, full screen, auto-advance.
+#[test]
+fn the_image_view_and_cull_mode() {
+    let home = temp_dir();
+    support::machine_with_photos(home.path(), 40);
+    run_suite("viewer", home.path(), None);
+}

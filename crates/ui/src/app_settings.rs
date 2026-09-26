@@ -19,6 +19,12 @@ pub struct AppSettings {
     pub language: String,
     /// The width the keyword panel was dragged to, in pixels.
     pub keyword_panel_width: i32,
+    /// The image view moves on to the next photo after a rating, flag or label key.
+    pub auto_advance: bool,
+    /// The image view shows its filmstrip.
+    pub show_filmstrip: bool,
+    /// The image view shows the line about the photo.
+    pub show_info: bool,
 }
 
 /// The keyword panel's width when nothing was chosen, and the limits of what can be.
@@ -31,6 +37,9 @@ impl Default for AppSettings {
         Self {
             language: "system".into(),
             keyword_panel_width: KEYWORD_PANEL_WIDTH,
+            auto_advance: false,
+            show_filmstrip: true,
+            show_info: true,
         }
     }
 }
@@ -97,6 +106,9 @@ mod tests {
         let chosen = AppSettings {
             language: "fr".into(),
             keyword_panel_width: 350,
+            auto_advance: true,
+            show_filmstrip: false,
+            show_info: false,
         };
         chosen.save(&path);
         assert_eq!(AppSettings::load(&path), chosen);

@@ -274,6 +274,12 @@ reduced size where the decoder allows), otherwise from the RAW through the image
 regenerated when the original changes. Files remain the fallback if Windows shows the database
 performs badly.
 
+The **image view** (D-100) has a second service beside the thumbnail one: `PreviewService` makes the picture
+of the photo on screen (the embedded preview or the file itself, upright, at most 4096 px on its long edge,
+JPEG at quality 90) and, ahead of the key presses, of the photos around it. The pictures live in memory
+(eight, least recently used out), not in a database; the interface asks for them through `image://preview/<id>`,
+served by the same provider code as the thumbnails.
+
 ### 5.8 Several catalogues, backup, moving photos [decided, D-017, D-025, D-064, D-067]
 
 Each catalogue is a local database plus one workspace; a small registry in the user's data

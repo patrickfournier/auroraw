@@ -1,0 +1,235 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import QtQuick
+import QtQuick.Window
+import QtTest
+import org.auroraw.ui
+
+// The image view and cull mode (D-100): Enter or a double click opens the cursor's photo, the keys walk and rate,
+// flag and label it (the grid's own actions, undone with Ctrl+Z, and the view follows an undo), Z shows 100 %, the
+// filmstrip and the information can be hidden, auto-advance moves on after a key and is remembered, F is full
+// screen, Escape goes back with the cursor where the view was. The 40-photo machine, window 1680 wide.
+AppTestCase {
+    name: "Viewer"
+
+    property var grid: null
+    property var view: null
+
+    function init() {
+        launchWithPhotos(40)
+        grid = app.library.grid
+        view = app.library.viewer
+    }
+
+    // What a test rated, flagged or labelled is cleared, the options put back and the language too.
+    function cleanup() {
+        if (app) {
+            app.launcher.chooseLanguage("en")
+            app.launcher.setViewOption("autoAdvance", false)
+            app.launcher.setViewOption("filmstrip", true)
+            app.launcher.setViewOption("info", true)
+            if (app.library.viewing)
+                app.library.closeView()
+            // (Rejected photos are not listed unless asked for: they are cleared too.)
+            app.library.filterFlags(1)
+            wait(200)
+            app.library.selectAll()
+            app.photos.rateSelection(0)
+            app.photos.flagSelection("clear")
+            app.photos.labelSelection("none")
+            wait(300)
+        }
+        quit()
+    }
+
+    function cell(index) {
+        grid.positionViewAtIndex(index, GridView.Contain)
+        wait(30)
+        const item = grid.itemAtIndex(index)
+        verify(item, "the cell " + index + " exists")
+        return item
+    }
+
+    function click(index) {
+        const item = cell(index)
+        mouseClick(item, item.width / 2, item.height / 2)
+        wait(40)
+    }
+
+    // Opens the view on photo `index` with Enter, once its picture is there.
+    function openOn(index) {
+        click(index)
+        keyClick(Qt.Key_Return)
+        tryVerify(() => app.library.viewing)
+        compare(view.row, index)
+        tryVerify(() => view.picture.status === Image.Ready, 20000, "the picture arrived")
+    }
+
+    function test_enter_opens_the_cursors_photo_and_escape_goes_back_to_it() {
+        openOn(3)
+        compare(view.photoId, app.photos.idAt(3))
+        verify(view.visible && view.activeFocus, "the view has the keyboard")
+        for (let i = 0; i < 5; i++)
+            keyClick(Qt.Key_Right)
+        compare(view.row, 8)
+        keyClick(Qt.Key_Left)
+        compare(view.row, 7)
+        keyClick(Qt.Key_End)
+        compare(view.row, 39)
+        keyClick(Qt.Key_Right)
+        compare(view.row, 39, "there is no photo after the last")
+        keyClick(Qt.Key_Home)
+        compare(view.row, 0)
+        keyClick(Qt.Key_Space)
+        keyClick(Qt.Key_Backspace)
+        compare(view.row, 0)
+        keyClick(Qt.Key_Right)
+        keyClick(Qt.Key_Right)
+        keyClick(Qt.Key_Escape)
+        verify(!app.library.viewing)
+        compare(grid.currentIndex, 2, "the grid's cursor is on the photo that was shown")
+        verify(grid.activeFocus)
+    }
+
+    function test_a_double_click_opens_the_photo_under_it() {
+        const item = cell(5)
+        mouseDoubleClickSequence(item, item.width / 2, item.height / 2)
+        tryVerify(() => app.library.viewing)
+        compare(view.row, 5)
+        snapshot("viewer-en")
+    }
+
+    function test_rating_flagging_and_labelling_are_the_grids_and_ctrl_z_undoes_them() {
+        openOn(4)
+        keyClick(Qt.Key_4)
+        compare(app.photos.ratingAt(4), 4)
+        keyClick(Qt.Key_P)
+        compare(app.photos.flagAt(4), 1)
+        keyClick(Qt.Key_7)
+        compare(app.photos.labelAt(4), "yellow")
+        keyClick(Qt.Key_7)
+        compare(app.photos.labelAt(4), "", "the same colour again takes it off")
+        keyClick(Qt.Key_9)
+        compare(app.photos.labelAt(4), "blue")
+        tryCompare(view, "rating", 4)
+        tryCompare(view, "colour", "blue")
+        tryCompare(view, "flag", 1)
+        verify(view.summary.indexOf("IMG_") === 0, view.summary)
+        tryVerify(() => app.actions.undo.text === "Undo label", 5000, app.actions.undo.text)
+        wait(300)
+        keyClick(Qt.Key_Z, Qt.ControlModifier)
+        tryCompare(app.photos, "count", 40)
+        tryVerify(() => app.photos.labelAt(4) === "", 5000)
+        // The view follows an undo: on a photo further on, undo the rating of photo 4, and the view goes back to it.
+        keyClick(Qt.Key_Right)
+        keyClick(Qt.Key_Right)
+        compare(view.row, 6)
+        wait(300)
+        keyClick(Qt.Key_Z, Qt.ControlModifier) // the label taken off
+        wait(300)
+        keyClick(Qt.Key_Z, Qt.ControlModifier)
+        tryCompare(view, "row", 4)
+    }
+
+    function test_z_shows_the_picture_at_100_percent_and_again_fits_it() {
+        openOn(1)
+        verify(view.fit)
+        const natural = view.picture.implicitWidth
+        verify(natural > 0)
+        keyClick(Qt.Key_Z)
+        verify(!view.fit)
+        tryCompare(view.picture, "width", natural)
+        keyClick(Qt.Key_Z)
+        verify(view.fit)
+        compare(view.picture.width, view.picture.implicitWidth * view.fitScale)
+        // The wheel zooms about the pointer; the plus and minus keys too.
+        keyClick(Qt.Key_Plus)
+        verify(!view.fit && view.zoom > view.fitScale)
+        keyClick(Qt.Key_Z)
+        snapshot("viewer-100-en")
+        keyClick(Qt.Key_Z)
+    }
+
+    function test_the_filmstrip_and_the_information_can_be_hidden_and_are_remembered() {
+        openOn(2)
+        verify(view.strip.visible && view.infoBar.visible)
+        keyClick(Qt.Key_T)
+        verify(!view.strip.visible)
+        keyClick(Qt.Key_I)
+        verify(!view.infoBar.visible)
+        verify(!app.launcher.viewOption("filmstrip") && !app.launcher.viewOption("info"), "remembered")
+        keyClick(Qt.Key_T)
+        keyClick(Qt.Key_I)
+        verify(view.strip.visible && view.infoBar.visible)
+        // A click on the filmstrip goes to that photo.
+        tryVerify(() => view.strip.itemAtIndex(4) !== null)
+        const frame = view.strip.itemAtIndex(4)
+        mouseClick(frame, frame.width / 2, frame.height / 2)
+        compare(view.row, 4)
+    }
+
+    function test_auto_advance_moves_on_after_a_key_and_is_remembered() {
+        openOn(10)
+        keyClick(Qt.Key_3)
+        compare(view.row, 10, "off: it stays")
+        keyClick(Qt.Key_A)
+        verify(view.autoAdvance)
+        verify(app.launcher.viewOption("autoAdvance"), "remembered")
+        keyClick(Qt.Key_5)
+        compare(view.row, 11, "the key rated this photo and moved on")
+        keyClick(Qt.Key_X)
+        compare(view.row, 12)
+        compare(app.photos.ratingAt(10), 5)
+        compare(app.photos.flagAt(11), 2)
+        // A new window remembers it.
+        app.library.closeView()
+        launchWithPhotos(39) // the rejected one is not listed
+        app.library.openView(0)
+        tryVerify(() => app.library.viewer.autoAdvance)
+        app.library.closeView()
+    }
+
+    function test_f_makes_the_window_full_screen_without_its_menu_and_escape_brings_it_back() {
+        openOn(0)
+        const header = app.header
+        verify(header.visible)
+        keyClick(Qt.Key_F)
+        tryCompare(app, "visibility", Window.FullScreen)
+        tryVerify(() => !header.visible)
+        keyClick(Qt.Key_Escape)
+        verify(!app.library.viewing)
+        tryVerify(() => app.visibility !== Window.FullScreen)
+        tryVerify(() => header.visible)
+    }
+
+    function test_a_keyboard_only_walk_rates_and_flags_every_photo() {
+        app.library.openView(0)
+        tryVerify(() => app.library.viewing)
+        keyClick(Qt.Key_A) // auto-advance
+        for (let i = 0; i < 40; i++) {
+            compare(view.row, i)
+            keyClick(Qt.Key_1 + (i % 5))
+            if (i % 2 === 0) {
+                // The flag is the next key's: on the same photo, so step back and forward around it.
+                keyClick(Qt.Key_Left)
+                keyClick(Qt.Key_P)
+            }
+        }
+        // Auto-advance stopped at the last photo; every photo has its stars, the even ones are picked.
+        tryVerify(() => {
+            for (let i = 0; i < 40; i++)
+                if (app.photos.ratingAt(i) !== (i % 5) + 1 || app.photos.flagAt(i) !== (i % 2 === 0 ? 1 : 0))
+                    return false
+            return true
+        }, 15000, "every photo has its stars and flag")
+    }
+
+    function test_the_view_speaks_french() {
+        openOn(1)
+        app.launcher.chooseLanguage("fr")
+        wait(300)
+        keyClick(Qt.Key_8)
+        tryVerify(() => app.actions.undo.text === "Annuler l’étiquette", 5000, app.actions.undo.text)
+        compare(app.photos.labelAt(1), "green")
+        snapshot("viewer-fr")
+    }
+}

@@ -68,6 +68,19 @@ pub mod qobject {
         #[cxx_name = "flagSelection"]
         fn flag_selection(self: Pin<&mut PhotoGrid>, kind: &QString) -> i32;
 
+        /// Gives the selection a colour label as one action: `red`, `yellow`, `green`, `blue` or `purple` (the
+        /// label is taken off instead when every selected photo has that colour already), or `none`. How
+        /// many photos were changed.
+        #[qinvokable]
+        #[cxx_name = "labelSelection"]
+        fn label_selection(self: Pin<&mut PhotoGrid>, name: &QString) -> i32;
+
+        /// Says which photos the image view will want next when it shows the photo in `row`: the two after it
+        /// and the one before, made ahead by the preview service.
+        #[qinvokable]
+        #[cxx_name = "prefetchAround"]
+        fn prefetch_around(self: &PhotoGrid, row: i32);
+
         /// For each keyword a selected photo carries, how many selected photos carry it, as JSON
         /// (`{"<keyword id>": 3}`): what the keyword panel shows as none, some or all.
         #[qinvokable]
@@ -95,6 +108,24 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "idAt"]
         fn id_at(self: &PhotoGrid, row: i32) -> QString;
+
+        /// The photo in `row`'s name and camera, for the image view (which shows its stars, flag and colour
+        /// itself).
+        #[qinvokable]
+        #[cxx_name = "infoAt"]
+        fn info_at(self: &PhotoGrid, row: i32) -> QString;
+
+        /// What the grid shows of the photo in `row`: its rating (0 to 5), its flag (0 none, 1 picked, 2
+        /// rejected) and its colour label (`red`... or empty). What the image view shows too.
+        #[qinvokable]
+        #[cxx_name = "ratingAt"]
+        fn rating_at(self: &PhotoGrid, row: i32) -> i32;
+        #[qinvokable]
+        #[cxx_name = "flagAt"]
+        fn flag_at(self: &PhotoGrid, row: i32) -> i32;
+        #[qinvokable]
+        #[cxx_name = "labelAt"]
+        fn label_at(self: &PhotoGrid, row: i32) -> QString;
 
         /// The row of a photo, -1 when it is not listed.
         #[qinvokable]
@@ -538,12 +569,32 @@ const ROLE_PHOTO_ID: i32 = 0x0100;
 const ROLE_RATING: i32 = 0x0101;
 const ROLE_SELECTED: i32 = 0x0102;
 const ROLE_FLAG: i32 = 0x0103;
+const ROLE_LABEL: i32 = 0x0104;
 
 struct Item {
     id: PhotoId,
     rating: u8,
     /// The effective flag: 0 none, 1 picked, 2 rejected.
     flag: u8,
+    /// The colour label: 0 none, else the colour's place in `ColourLabel::ALL` plus one.
+    label: u8,
+}
+
+/// A label's code: 0 for none, or a label that is not one of the five (another program's).
+fn label_code(label: Option<&str>) -> u8 {
+    use auroraw_engine::ColourLabel;
+    label
+        .and_then(|text| text.parse::<ColourLabel>().ok())
+        .and_then(|colour| ColourLabel::ALL.iter().position(|c| *c == colour))
+        .map_or(0, |i| i as u8 + 1)
+}
+
+/// The name QML knows a label by (`red`, `yellow`...), empty for none.
+fn label_name(code: u8) -> &'static str {
+    ["", "red", "yellow", "green", "blue", "purple"]
+        .get(usize::from(code))
+        .copied()
+        .unwrap_or("")
 }
 
 /// What this grid asked the engine for and has not seen it confirm: until the catalogue says the same (or
@@ -551,6 +602,7 @@ struct Item {
 struct Pending {
     rating: Option<u8>,
     flag: Option<u8>,
+    label: Option<u8>,
     at: Instant,
 }
 
@@ -602,6 +654,7 @@ fn load_items(filter: &Filter) -> Vec<Item> {
             id: row.id,
             rating: row.effective_rating,
             flag: row.effective_flag,
+            label: label_code(row.label.as_deref()),
         }));
     }
     items
@@ -619,6 +672,7 @@ impl qobject::PhotoGrid {
             if let Some(pending) = self.pending.get(&item.id) {
                 item.rating = pending.rating.unwrap_or(item.rating);
                 item.flag = pending.flag.unwrap_or(item.flag);
+                item.label = pending.label.unwrap_or(item.label);
             }
         }
         let count = items.len() as i32;
@@ -826,10 +880,90 @@ impl qobject::PhotoGrid {
         for row in &rows {
             let id = self.items[*row].id;
             self.as_mut().rust_mut().items[*row].flag = new;
-            self.as_mut().ask(id, None, Some(new));
+            self.as_mut().ask(id, None, Some(new), None);
         }
         self.as_mut().redraw_all();
         rows.len() as i32
+    }
+
+    fn item_at(&self, row: i32) -> Option<&Item> {
+        usize::try_from(row)
+            .ok()
+            .and_then(|row| self.items.get(row))
+    }
+
+    pub fn rating_at(&self, row: i32) -> i32 {
+        self.item_at(row).map_or(0, |i| i32::from(i.rating))
+    }
+
+    pub fn flag_at(&self, row: i32) -> i32 {
+        self.item_at(row).map_or(0, |i| i32::from(i.flag))
+    }
+
+    pub fn label_at(&self, row: i32) -> QString {
+        QString::from(self.item_at(row).map_or("", |i| label_name(i.label)))
+    }
+
+    pub fn label_selection(mut self: Pin<&mut Self>, name: &QString) -> i32 {
+        use auroraw_engine::ColourLabel;
+        let Some(session) = session::current() else {
+            return 0;
+        };
+        let target: u8 = match name.to_string().as_str() {
+            "red" => 1,
+            "yellow" => 2,
+            "green" => 3,
+            "blue" => 4,
+            "purple" => 5,
+            _ => 0,
+        };
+        let rows = self.selected_rows();
+        if rows.is_empty() {
+            return 0;
+        }
+        // The same colour again takes it off: when every selected photo has it already.
+        let all_have = rows.iter().all(|row| self.items[*row].label == target);
+        let new = if target != 0 && all_have { 0 } else { target };
+        let label = (new != 0).then(|| ColourLabel::ALL[usize::from(new) - 1]);
+        let mut commands: Vec<Command> = rows
+            .iter()
+            .map(|row| Command::SetLabel {
+                photo_id: self.items[*row].id,
+                label,
+            })
+            .collect();
+        let command = if commands.len() == 1 {
+            commands.remove(0)
+        } else {
+            Command::Batch { commands }
+        };
+        let _ = session.engine.submit(command);
+        for row in &rows {
+            let id = self.items[*row].id;
+            self.as_mut().rust_mut().items[*row].label = new;
+            self.as_mut().ask(id, None, None, Some(new));
+        }
+        self.as_mut().redraw_all();
+        rows.len() as i32
+    }
+
+    pub fn prefetch_around(&self, row: i32) {
+        let Some(session) = session::current() else {
+            return;
+        };
+        let Ok(row) = usize::try_from(row) else {
+            return;
+        };
+        let mut next: Vec<PhotoId> = Vec::new();
+        for r in [row + 1, row + 2] {
+            if let Some(item) = self.items.get(r) {
+                next.push(item.id);
+            }
+        }
+        if let Some(item) = row.checked_sub(1).and_then(|r| self.items.get(r)) {
+            next.push(item.id);
+        }
+        session.previews.prefetch(&next);
     }
 
     pub fn keyword_usage(&self) -> QString {
@@ -1004,7 +1138,7 @@ impl qobject::PhotoGrid {
         for row in &rows {
             let id = self.items[*row].id;
             self.as_mut().rust_mut().items[*row].rating = rating;
-            self.as_mut().ask(id, Some(rating), None);
+            self.as_mut().ask(id, Some(rating), None, None);
         }
         self.as_mut().redraw_all();
         rows.len() as i32
@@ -1054,18 +1188,24 @@ impl qobject::PhotoGrid {
         if let Some(pending) = self.pending.get(&id) {
             let fresh = pending.at.elapsed() < PENDING_FOR;
             let stale = pending.rating.is_some_and(|r| r != photo.effective_rating)
-                || pending.flag.is_some_and(|f| f != photo.effective_flag);
+                || pending.flag.is_some_and(|f| f != photo.effective_flag)
+                || pending
+                    .label
+                    .is_some_and(|l| l != label_code(photo.label.as_deref()));
             if fresh && stale {
                 // An older state of a quick series of keys: the last one's own event follows.
                 return;
             }
             self.as_mut().rust_mut().pending.remove(&id);
         }
+        let label = label_code(photo.label.as_deref());
         if self.items[row].rating != photo.effective_rating
             || self.items[row].flag != photo.effective_flag
+            || self.items[row].label != label
         {
             self.as_mut().rust_mut().items[row].rating = photo.effective_rating;
             self.as_mut().rust_mut().items[row].flag = photo.effective_flag;
+            self.as_mut().rust_mut().items[row].label = label;
             self.redraw_photo(row);
         }
     }
@@ -1076,26 +1216,43 @@ impl qobject::PhotoGrid {
         let mut roles = QVector::<i32>::default();
         roles.append(ROLE_RATING);
         roles.append(ROLE_FLAG);
+        roles.append(ROLE_LABEL);
         self.as_mut().data_changed(&index, &index, &roles);
     }
 
     /// Remembers what was asked of the engine for a photo, until the catalogue says the same.
-    fn ask(mut self: Pin<&mut Self>, id: PhotoId, rating: Option<u8>, flag: Option<u8>) {
-        let (before_rating, before_flag) = self
+    fn ask(
+        mut self: Pin<&mut Self>,
+        id: PhotoId,
+        rating: Option<u8>,
+        flag: Option<u8>,
+        label: Option<u8>,
+    ) {
+        let (before_rating, before_flag, before_label) = self
             .pending
             .get(&id)
-            .map_or((None, None), |p| (p.rating, p.flag));
+            .map_or((None, None, None), |p| (p.rating, p.flag, p.label));
         self.as_mut().rust_mut().pending.insert(
             id,
             Pending {
                 rating: rating.or(before_rating),
                 flag: flag.or(before_flag),
+                label: label.or(before_label),
                 at: Instant::now(),
             },
         );
     }
 
+    pub fn info_at(&self, row: i32) -> QString {
+        self.describe(row, false)
+    }
+
     pub fn summary_at(&self, row: i32) -> QString {
+        self.describe(row, true)
+    }
+
+    /// The photo's file and camera, and with `marks` its stars and flag too.
+    fn describe(&self, row: i32, marks: bool) -> QString {
         let Some(item) = usize::try_from(row)
             .ok()
             .and_then(|row| self.items.get(row))
@@ -1119,6 +1276,11 @@ impl qobject::PhotoGrid {
             1 => Some("\u{2714}".to_string()),
             2 => Some("\u{2716}".to_string()),
             _ => None,
+        };
+        let (stars, flag) = if marks {
+            (stars, flag)
+        } else {
+            (String::new(), None)
         };
         let parts: Vec<String> = [Some(photo.filename), photo.camera, Some(stars), flag]
             .into_iter()
@@ -1166,7 +1328,7 @@ impl qobject::PhotoGrid {
         });
         // The cell shows the new rating at once; the engine's own event confirms it.
         self.as_mut().rust_mut().items[row as usize].rating = rating;
-        self.as_mut().ask(id, Some(rating), None);
+        self.as_mut().ask(id, Some(rating), None, None);
         self.redraw_photo(row as usize);
     }
 
@@ -1179,6 +1341,7 @@ impl qobject::PhotoGrid {
             ROLE_RATING => QVariant::from(&i32::from(item.rating)),
             ROLE_SELECTED => QVariant::from(&self.selection.contains(&item.id)),
             ROLE_FLAG => QVariant::from(&i32::from(item.flag)),
+            ROLE_LABEL => QVariant::from(&QString::from(label_name(item.label))),
             _ => QVariant::default(),
         }
     }
@@ -1189,6 +1352,7 @@ impl qobject::PhotoGrid {
         roles.insert(ROLE_RATING, QByteArray::from("rating"));
         roles.insert(ROLE_SELECTED, QByteArray::from("selected"));
         roles.insert(ROLE_FLAG, QByteArray::from("flag"));
+        roles.insert(ROLE_LABEL, QByteArray::from("colourLabel"));
         roles
     }
 

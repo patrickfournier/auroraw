@@ -305,6 +305,7 @@ impl Coordinator {
             Command::Reconcile => self.reconcile(),
             Command::SetRating { .. }
             | Command::SetFlag { .. }
+            | Command::SetLabel { .. }
             | Command::AddKeyword { .. }
             | Command::RemoveKeyword { .. } => {
                 let change = self.apply_edit(&command)?;
@@ -407,6 +408,17 @@ impl Coordinator {
                     after: *flag,
                 })
             }),
+            Command::SetLabel { photo_id, label } => {
+                let after = label.map(|l| l.name().to_string());
+                self.edit_photo(*photo_id, |m| {
+                    let before = std::mem::replace(&mut m.label, after.clone());
+                    (before != after).then_some(Change::Label {
+                        photo: *photo_id,
+                        before,
+                        after: after.clone(),
+                    })
+                })
+            }
             Command::AddKeyword {
                 photo_id,
                 keyword_id,

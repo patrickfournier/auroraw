@@ -26,7 +26,7 @@ TestCase {
     function launch(machine) {
         quit()
         app = createTemporaryObject(appComponent, tc, { machine: machine })
-        verify(app, "the window was made")
+        verify(app, "the window was made: " + appComponent.errorString())
         wait(300)
         app.requestActivate()
         wait(100)

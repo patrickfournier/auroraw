@@ -204,6 +204,18 @@ ApplicationWindow {
     // Photos may have arrived while another task was showing.
     onCurrentTaskChanged: if (currentTask === "cull" && inWorkspace) libraryView.reload()
 
+    // F in the image view: the window goes full screen, and comes back (also when the view is closed).
+    Connections {
+        target: libraryView
+        function onFullScreenToggled() {
+            window.visibility = window.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen
+        }
+        function onViewingChanged() {
+            if (!libraryView.viewing && window.visibility === Window.FullScreen)
+                window.visibility = Window.Windowed
+        }
+    }
+
     // Alt and a section's mnemonic open it.
     Repeater {
         model: 3
@@ -217,7 +229,9 @@ ApplicationWindow {
         }
     }
 
+    // The image view in full screen has the whole window: no menu, no tabs.
     header: ToolBar {
+        visible: !(libraryView.viewing && window.visibility === Window.FullScreen)
         RowLayout {
             anchors.fill: parent
             spacing: 0

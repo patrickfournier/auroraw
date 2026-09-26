@@ -48,6 +48,18 @@ pub fn make_thumbnail(
     long_edge: u32,
     path: &Path,
 ) -> Result<Thumbnail> {
+    make_scaled(image, orientation, long_edge, 85, path)
+}
+
+/// [`make_thumbnail`] with the JPEG quality (1 to 100) chosen by the caller: what the image view is served
+/// at is not what a 256 px thumbnail is.
+pub(crate) fn make_scaled(
+    image: DynamicImage,
+    orientation: Option<u32>,
+    long_edge: u32,
+    quality: u8,
+    path: &Path,
+) -> Result<Thumbnail> {
     let image = apply_orientation(image, orientation);
     let rgb = image.to_rgb8();
     let (src_w, src_h) = rgb.dimensions();
@@ -69,7 +81,7 @@ pub fn make_thumbnail(
     };
 
     let mut jpeg = Vec::new();
-    jpeg_encoder::Encoder::new(&mut jpeg, 85)
+    jpeg_encoder::Encoder::new(&mut jpeg, quality)
         .encode(
             &resized,
             dst_w as u16,

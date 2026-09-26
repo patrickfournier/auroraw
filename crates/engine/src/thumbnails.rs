@@ -172,7 +172,7 @@ impl Drop for ThumbnailService {
 /// A source's root path on this machine, from the workspace's `sources.json` hint (design note
 /// 002 §6.6): the same lookup `engine::import_job` does, read directly since a worker thread
 /// needs no coordination for a read.
-fn source_root(workspace: &Workspace, source_id: SourceId) -> Option<PathBuf> {
+pub(crate) fn source_root(workspace: &Workspace, source_id: SourceId) -> Option<PathBuf> {
     let sources = workspace.read_sources().ok()??.current()?;
     let entry = sources.sources.into_iter().find(|s| s.id == source_id)?;
     entry

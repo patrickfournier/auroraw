@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 use std::path::PathBuf;
 
-use auroraw_format::sidecar::Flag;
+use auroraw_format::sidecar::{ColourLabel, Flag};
 use auroraw_import::Profile;
 use auroraw_types::{KeywordId, PhotoId, SourceId};
 
@@ -34,7 +34,14 @@ pub enum Command {
         /// The new flag, or `None` to clear it.
         flag: Option<Flag>,
     },
-    /// Applies several edits (`SetRating`, `SetFlag`, `AddKeyword`, `RemoveKeyword`, `CreateKeyword`) as **one action**:
+    /// Sets a photo's own colour label (`None` takes it off). A step of the history, and usable in a batch.
+    SetLabel {
+        /// The photo.
+        photo_id: PhotoId,
+        /// The colour, or `None` for no label.
+        label: Option<ColourLabel>,
+    },
+    /// Applies several edits (`SetRating`, `SetFlag`, `SetLabel`, `AddKeyword`, `RemoveKeyword`, `CreateKeyword`) as **one action**:
     /// one step of the history, and all or nothing (a failing edit takes back the ones before it). How a
     /// batch of ratings, a series resolved, or a paste of metadata onto many photos is undone in one go.
     Batch {
