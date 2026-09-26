@@ -211,12 +211,22 @@
         <translation>Supprimer</translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="129"/>
+        <location filename="../qml/AppActions.qml" line="130"/>
         <source>Select all</source>
         <translation>Tout sélectionner</translation>
     </message>
     <message>
         <location filename="../qml/AppActions.qml" line="137"/>
+        <source>Select none</source>
+        <translation>Ne rien sélectionner</translation>
+    </message>
+    <message>
+        <location filename="../qml/AppActions.qml" line="144"/>
+        <source>Invert selection</source>
+        <translation>Inverser la sélection</translation>
+    </message>
+    <message>
+        <location filename="../qml/AppActions.qml" line="152"/>
         <source>About Auroraw</source>
         <translation>À propos d&apos;Auroraw</translation>
     </message>
@@ -234,7 +244,7 @@
         <translation>&amp;Édition</translation>
     </message>
     <message>
-        <location filename="../qml/AppMenu.qml" line="50"/>
+        <location filename="../qml/AppMenu.qml" line="52"/>
         <source>&amp;Help</source>
         <translation>&amp;Aide</translation>
     </message>
@@ -570,45 +580,53 @@
 <context>
     <name>Library</name>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="23"/>
+        <location filename="../qml/Library.qml" line="25"/>
         <source>%n photo(s)</source>
         <translation>
             <numerusform>%n photo</numerusform>
             <numerusform>%n photos</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <location filename="../qml/Library.qml" line="30"/>
+        <source>%n photo(s) selected</source>
+        <translation>
+            <numerusform>%n photo sélectionnée</numerusform>
+            <numerusform>%n photos sélectionnées</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../qml/Library.qml" line="100"/>
+        <location filename="../qml/Library.qml" line="154"/>
         <source>All</source>
         <translation>Tout</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="100"/>
+        <location filename="../qml/Library.qml" line="154"/>
         <source>1+</source>
         <translation>1+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="100"/>
+        <location filename="../qml/Library.qml" line="154"/>
         <source>2+</source>
         <translation>2+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="101"/>
+        <location filename="../qml/Library.qml" line="155"/>
         <source>3+</source>
         <translation>3+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="101"/>
+        <location filename="../qml/Library.qml" line="155"/>
         <source>4+</source>
         <translation>4+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="101"/>
+        <location filename="../qml/Library.qml" line="155"/>
         <source>5</source>
         <translation>5</translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="200"/>
+        <location filename="../qml/Library.qml" line="360"/>
         <source>Photo, %n star(s)</source>
         <translation>
             <numerusform>Photo, %n étoile</numerusform>
@@ -616,12 +634,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="200"/>
+        <location filename="../qml/Library.qml" line="360"/>
         <source>Photo</source>
         <translation>Photo</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="219"/>
+        <location filename="../qml/Library.qml" line="379"/>
         <source>No preview</source>
         <translation>Aucun aperçu</translation>
     </message>
@@ -629,42 +647,42 @@
 <context>
     <name>Main</name>
     <message>
-        <location filename="../qml/Main.qml" line="133"/>
+        <location filename="../qml/Main.qml" line="142"/>
         <source>Cannot open the workspace: %1</source>
         <translation>Impossible d&apos;ouvrir le workspace : %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="216"/>
+        <location filename="../qml/Main.qml" line="225"/>
         <source>Menu</source>
         <translation>Menu</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="231"/>
+        <location filename="../qml/Main.qml" line="240"/>
         <source>Catalogue</source>
         <translation>Catalogue</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="237"/>
+        <location filename="../qml/Main.qml" line="246"/>
         <source>Cull</source>
         <translation>Trier</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="242"/>
+        <location filename="../qml/Main.qml" line="251"/>
         <source>Develop</source>
         <translation>Développer</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="243"/>
+        <location filename="../qml/Main.qml" line="252"/>
         <source>Publish</source>
         <translation>Publier</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="329"/>
+        <location filename="../qml/Main.qml" line="338"/>
         <source>Choose a folder in the folder dialog…</source>
         <translation>Choisissez un dossier dans la fenêtre de sélection…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="340"/>
+        <location filename="../qml/Main.qml" line="349"/>
         <source>Open a workspace</source>
         <translation>Ouvrir un workspace</translation>
     </message>

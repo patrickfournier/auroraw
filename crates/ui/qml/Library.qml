@@ -5,8 +5,10 @@ import QtQuick.Layouts
 import org.auroraw.ui
 
 // The library grid (the cull task): a filter bar with how many photos it lists, the photos as
-// thumbnails from `image://thumbs`, and a strip that describes the selected one. The selection is the
-// `GridView`'s current index; it stays on its photo when the list is read again.
+// thumbnails from `image://thumbs`, and a strip that describes what is selected. Several photos can be
+// selected (D-097): the selection is a set the model keeps by photo (`PhotoGrid`), the cursor (where the
+// keyboard is) is the `GridView`'s current index, and ranges start from the model's anchor. Click, Shift and
+// Ctrl with the mouse and the keys, Space, Escape, and a rubber band, as in a file manager.
 FocusScope {
     id: root
     required property var photoGrid
@@ -18,29 +20,83 @@ FocusScope {
     property alias grid: grid
     property alias filterBar: filterBar
     property alias filterButtons: filterButtons
-    // What the strip under the grid says about the selected photo.
+    // What the strip under the grid says: the selected photo, or how many are selected.
     property string summary: ""
     readonly property string status: qsTr("%n photo(s)", "", photoGrid.count)
+    readonly property int selectedCount: photoGrid.selectedCount
 
-    // Selects a photo (-1 for none) and brings it into view.
-    function select(index) {
+    function updateSummary() {
+        if (photoGrid.selectedCount > 1)
+            summary = qsTr("%n photo(s) selected", "", photoGrid.selectedCount)
+        else if (photoGrid.selectedCount === 1)
+            summary = photoGrid.summaryAt(photoGrid.firstSelectedRow())
+        else
+            summary = ""
+    }
+
+    // Puts the cursor on `index` and brings it into view.
+    function showCursor(index) {
         grid.currentIndex = index
         if (index >= 0)
             grid.positionViewAtIndex(index, GridView.Contain)
+    }
+
+    // The cursor goes to `index`, and the gesture's modifiers say what happens to the selection: nothing
+    // for Ctrl alone, the range from the anchor for Shift (added to the selection with Ctrl too), else
+    // only that photo.
+    function goTo(index, modifiers) {
+        const shift = (modifiers & Qt.ShiftModifier) !== 0
+        const ctrl = (modifiers & Qt.ControlModifier) !== 0
+        if (shift) {
+            // A range needs somewhere to start from: the cursor, when nothing anchors it.
+            if (photoGrid.anchorRow() < 0 && grid.currentIndex >= 0)
+                photoGrid.selectOnly(grid.currentIndex)
+            photoGrid.extendTo(index, ctrl)
+        } else if (!ctrl) {
+            photoGrid.selectOnly(index)
+        }
+        showCursor(index)
         updateSummary()
     }
 
-    function updateSummary() {
-        summary = grid.currentIndex >= 0 ? photoGrid.summaryAt(grid.currentIndex) : ""
+    // Selects only this photo (or nothing, for -1) and puts the cursor there.
+    function select(index) {
+        if (index < 0) {
+            photoGrid.selectNone()
+            grid.currentIndex = -1
+        } else {
+            goTo(index, 0)
+        }
+        updateSummary()
     }
 
-    // Reads the list again (photos arrived): the selection stays on its photo if it is still
-    // listed, and the view where it was.
+    // Ctrl+click or Space: this photo joins the selection or leaves it.
+    function toggle(index) {
+        photoGrid.toggle(index)
+        showCursor(index)
+        updateSummary()
+    }
+
+    function selectAll() { photoGrid.selectAll(); updateSummary() }
+    function selectNone() { photoGrid.selectNone(); updateSummary() }
+    function invertSelection() { photoGrid.invert(); updateSummary() }
+
+    // Rates what is selected (as one action, one step of the history), or the cursor's photo when nothing is.
+    function rate(stars) {
+        if (photoGrid.selectedCount > 0)
+            photoGrid.rateSelection(stars)
+        else if (grid.currentIndex >= 0)
+            photoGrid.setRating(grid.currentIndex, stars)
+        updateSummary()
+    }
+
+    // Reads the list again (photos arrived): the selection stays on its photos and the cursor on its own,
+    // if they are still listed, and the view where it was.
     function reload() {
-        const selected = grid.currentIndex >= 0 ? photoGrid.idAt(grid.currentIndex) : ""
+        const cursor = grid.currentIndex >= 0 ? photoGrid.idAt(grid.currentIndex) : ""
         const scrolled = grid.contentY
         photoGrid.load()
-        grid.currentIndex = selected !== "" ? photoGrid.rowOf(selected) : -1
+        grid.currentIndex = cursor !== "" ? photoGrid.rowOf(cursor) : -1
         grid.contentY = scrolled
         grid.returnToBounds()
         updateSummary()
@@ -55,24 +111,22 @@ FocusScope {
     }
 
     // An action was undone or redone (Edit menu, Ctrl+Z): the photos it touched are shown as they are now,
-    // and the first is selected and brought into view, as a person expects to see what was undone.
+    // selected, and the first is brought into view, as a person expects to see what was undone.
     function historyApplied(photoIds) {
         for (const id of photoIds)
             photoGrid.syncPhoto(id)
         // A filter may now list a photo it did not, or not list one it did.
         if (photoGrid.minRating > 0)
             reload()
-        const row = photoGrid.rowOf(photoIds[0])
-        if (row >= 0)
-            select(row)
-        else
-            updateSummary()
+        photoGrid.selectPhotos(photoIds.join(","))
+        showCursor(photoGrid.rowOf(photoIds[0]))
+        updateSummary()
     }
 
-    // The engine says a photo changed: its cell and, when selected, the strip follow.
+    // The engine says a photo changed: its cell and, when it is what the strip describes, the strip follow.
     function photoChanged(photoId) {
         photoGrid.refreshPhoto(photoId)
-        if (grid.currentIndex >= 0 && photoGrid.idAt(grid.currentIndex) === photoId)
+        if (photoGrid.selectedCount === 1 && photoGrid.isSelected(photoGrid.rowOf(photoId)))
             updateSummary()
     }
 
@@ -134,56 +188,163 @@ FocusScope {
 
             ScrollBar.vertical: ScrollBar {}
 
-            // The window was resized and the rows re-flowed: the selection stays in view (once the
+            // The window was resized and the rows re-flowed: the cursor stays in view (once the
             // view has laid its cells out again).
-            onColumnsChanged: Qt.callLater(keepSelectionInView)
+            onColumnsChanged: Qt.callLater(keepCursorInView)
 
-            function keepSelectionInView() {
+            function keepCursorInView() {
                 if (currentIndex >= 0)
                     positionViewAtIndex(currentIndex, GridView.Contain)
             }
 
-            function move(dx, dy) {
+            // Moves the cursor by a step or a jump; the modifiers say what that does to the selection.
+            function move(dx, dy, modifiers) {
                 if (count === 0)
                     return
-                // With nothing selected, any move selects the first photo.
-                root.select(currentIndex < 0 ? 0 : root.photoGrid.step(currentIndex, dx, dy, columns))
+                // With no cursor, any move goes to the first photo.
+                root.goTo(currentIndex < 0 ? 0 : root.photoGrid.step(currentIndex, dx, dy, columns), modifiers)
             }
 
-            function jump(kind) {
+            function jump(kind, modifiers) {
                 if (count === 0)
                     return
-                root.select(root.photoGrid.jump(kind, Math.max(currentIndex, 0), columns, visibleRows))
+                root.goTo(root.photoGrid.jump(kind, Math.max(currentIndex, 0), columns, visibleRows), modifiers)
             }
 
             Keys.onPressed: event => {
-                if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
+                if (event.modifiers & (Qt.AltModifier | Qt.MetaModifier))
                     return
+                const ctrlOrShift = event.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)
                 if (event.key >= Qt.Key_0 && event.key <= Qt.Key_5) {
-                    if (currentIndex >= 0) {
-                        root.photoGrid.setRating(currentIndex, event.key - Qt.Key_0)
-                        root.updateSummary()
-                    }
+                    if (ctrlOrShift)
+                        return
+                    root.rate(event.key - Qt.Key_0)
                 } else if (event.key === Qt.Key_Left) {
-                    move(-1, 0)
+                    move(-1, 0, event.modifiers)
                 } else if (event.key === Qt.Key_Right) {
-                    move(1, 0)
+                    move(1, 0, event.modifiers)
                 } else if (event.key === Qt.Key_Up) {
-                    move(0, -1)
+                    move(0, -1, event.modifiers)
                 } else if (event.key === Qt.Key_Down) {
-                    move(0, 1)
+                    move(0, 1, event.modifiers)
                 } else if (event.key === Qt.Key_PageUp) {
-                    jump("page-up")
+                    jump("page-up", event.modifiers)
                 } else if (event.key === Qt.Key_PageDown) {
-                    jump("page-down")
+                    jump("page-down", event.modifiers)
                 } else if (event.key === Qt.Key_Home) {
-                    jump("home")
+                    jump("home", event.modifiers)
                 } else if (event.key === Qt.Key_End) {
-                    jump("end")
+                    jump("end", event.modifiers)
+                } else if (event.key === Qt.Key_Space) {
+                    if (currentIndex >= 0)
+                        root.toggle(currentIndex)
+                } else if (event.key === Qt.Key_Escape) {
+                    if (root.selectedCount === 0)
+                        return
+                    root.selectNone()
                 } else {
                     return
                 }
                 event.accepted = true
+            }
+
+            // Every click and drag on the grid, under the cells (they are not clickable themselves): a press
+            // on a photo selects it as the modifiers say, a press on empty space clears the selection, and
+            // a drag from anywhere is a rubber band. It does not let the view take the drag to scroll.
+            MouseArea {
+                id: pointer
+                // In the view's content (so that what it reports is where the photos are, scrolled or
+                // not), under the cells.
+                parent: grid.contentItem
+                z: -1
+                width: grid.width
+                height: Math.max(grid.contentHeight, grid.height)
+                preventStealing: true
+                acceptedButtons: Qt.LeftButton
+
+                property real startX: 0
+                property real startY: 0
+                property real lastX: 0
+                property real lastY: 0
+                property int modifiers: 0
+                property bool onEmpty: false
+                property bool banding: false
+
+                // The photo under a point of the view's content, -1 for none (a gap, empty space).
+                function photoAt(x, y) {
+                    const column = Math.floor(x / grid.cellWidth)
+                    const row = Math.floor(y / grid.cellHeight)
+                    const inside = x - column * grid.cellWidth >= 4 && x - column * grid.cellWidth < 164
+                                   && y - row * grid.cellHeight < 120
+                    const index = row * grid.columns + column
+                    return inside && column < grid.columns && index >= 0 && index < grid.count ? index : -1
+                }
+
+                // The rubber band, now: the cells it covers are selected.
+                function band() {
+                    const left = Math.min(startX, lastX), right = Math.max(startX, lastX)
+                    const top = Math.min(startY, lastY), bottom = Math.max(startY, lastY)
+                    root.photoGrid.rubberTo(Math.floor(top / grid.cellHeight), Math.floor(bottom / grid.cellHeight),
+                                            Math.floor(left / grid.cellWidth), Math.floor(right / grid.cellWidth),
+                                            grid.columns)
+                    root.updateSummary()
+                }
+
+                onPressed: mouse => {
+                    grid.forceActiveFocus()
+                    startX = lastX = mouse.x
+                    startY = lastY = mouse.y
+                    modifiers = mouse.modifiers
+                    banding = false
+                    const index = photoAt(mouse.x, mouse.y)
+                    onEmpty = index < 0
+                    if (index >= 0) {
+                        if ((modifiers & Qt.ControlModifier) && !(modifiers & Qt.ShiftModifier))
+                            root.toggle(index)
+                        else
+                            root.goTo(index, modifiers)
+                    }
+                }
+
+                onPositionChanged: mouse => {
+                    if (!pressed)
+                        return
+                    lastX = Math.max(0, Math.min(mouse.x, width))
+                    lastY = Math.max(0, Math.min(mouse.y, height))
+                    if (!banding && Math.abs(lastX - startX) + Math.abs(lastY - startY) > 6) {
+                        banding = true
+                        root.photoGrid.rubberBegin((modifiers & Qt.ControlModifier) !== 0)
+                    }
+                    if (banding)
+                        band()
+                }
+
+                onReleased: {
+                    if (banding)
+                        root.photoGrid.rubberEnd()
+                    else if (onEmpty && !(modifiers & (Qt.ControlModifier | Qt.ShiftModifier)))
+                        root.selectNone()
+                    banding = false
+                    autoScroll.stop()
+                }
+
+                // A rubber band held at an edge of the view scrolls it.
+                Timer {
+                    id: autoScroll
+                    interval: 30
+                    repeat: true
+                    running: pointer.banding && pointer.pressed
+                    onTriggered: {
+                        const shown = pointer.lastY - grid.contentY
+                        const step = shown < 24 ? -20 : shown > grid.height - 24 ? 20 : 0
+                        if (step === 0)
+                            return
+                        grid.contentY = Math.max(0, Math.min(grid.contentY + step,
+                                                             Math.max(0, grid.contentHeight - grid.height)))
+                        pointer.lastY = Math.max(0, Math.min(pointer.lastY + step, pointer.height))
+                        pointer.band()
+                    }
+                }
             }
 
             delegate: Item {
@@ -191,12 +352,14 @@ FocusScope {
                 required property int index
                 required property string photoId
                 required property int rating
+                required property bool selected
                 // No thumbnail can be made for this photo (it says so instead of staying empty).
                 readonly property bool unavailable: thumbnail.status === Image.Error
                 readonly property bool shown: thumbnail.status === Image.Ready
                 width: grid.cellWidth
                 height: grid.cellHeight
                 Accessible.role: Accessible.ListItem
+                Accessible.selected: cell.selected
                 Accessible.name: cell.rating > 0 ? qsTr("Photo, %n star(s)", "", cell.rating) : qsTr("Photo")
 
                 Rectangle {
@@ -219,6 +382,13 @@ FocusScope {
                         text: qsTr("No preview")
                         color: Theme.grey.placeholder
                     }
+                    // What is selected is tinted, so that a set reads at a glance.
+                    Rectangle {
+                        anchors.fill: parent
+                        visible: cell.selected
+                        color: root.palette.highlight
+                        opacity: 0.38
+                    }
                     // The rating, on a dark chip so that it reads over any picture.
                     Rectangle {
                         x: 4
@@ -239,21 +409,23 @@ FocusScope {
                     Rectangle {
                         anchors.fill: parent
                         color: "transparent"
-                        border.width: cell.GridView.isCurrentItem ? 2 : 0
+                        border.width: cell.selected ? 3 : 0
                         border.color: root.palette.highlight
                     }
-                    MouseArea {
+                    // The cursor, when it is not the only thing selected: where the keyboard is.
+                    Rectangle {
                         anchors.fill: parent
-                        onClicked: {
-                            root.select(cell.index)
-                            grid.forceActiveFocus()
-                        }
+                        anchors.margins: 3
+                        visible: cell.GridView.isCurrentItem && (root.selectedCount !== 1 || !cell.selected)
+                        color: "transparent"
+                        border.width: 1
+                        border.color: root.palette.windowText
                     }
                 }
             }
         }
 
-        // The selected photo: a minimal metadata strip (the panels come with a later work package).
+        // What is selected: the photo, or how many photos (the panels come with a later work package).
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 28

@@ -162,3 +162,12 @@ fn every_view_can_be_shown_and_drawn_in_both_languages() {
     support::write_photos(&home.path().join("Cam101"), "CAM", 1);
     run_suite("views", home.path(), None);
 }
+
+/// Selecting several photos of the grid: clicks and keys with Shift and Ctrl, the rubber band, and rating a
+/// selection as one step.
+#[test]
+fn selecting_several_photos_in_the_grid() {
+    let home = temp_dir();
+    support::machine_with_photos(home.path(), 80);
+    run_suite("selection", home.path(), None);
+}

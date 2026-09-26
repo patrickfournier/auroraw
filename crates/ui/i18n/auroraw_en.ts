@@ -211,12 +211,22 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="129"/>
+        <location filename="../qml/AppActions.qml" line="130"/>
         <source>Select all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/AppActions.qml" line="137"/>
+        <source>Select none</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AppActions.qml" line="144"/>
+        <source>Invert selection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AppActions.qml" line="152"/>
         <source>About Auroraw</source>
         <translation type="unfinished"></translation>
     </message>
@@ -234,7 +244,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppMenu.qml" line="50"/>
+        <location filename="../qml/AppMenu.qml" line="52"/>
         <source>&amp;Help</source>
         <translation type="unfinished"></translation>
     </message>
@@ -570,45 +580,53 @@
 <context>
     <name>Library</name>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="23"/>
+        <location filename="../qml/Library.qml" line="25"/>
         <source>%n photo(s)</source>
         <translation>
             <numerusform>%n photo</numerusform>
             <numerusform>%n photos</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <location filename="../qml/Library.qml" line="30"/>
+        <source>%n photo(s) selected</source>
+        <translation>
+            <numerusform>%n photo selected</numerusform>
+            <numerusform>%n photos selected</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../qml/Library.qml" line="100"/>
+        <location filename="../qml/Library.qml" line="154"/>
         <source>All</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="100"/>
+        <location filename="../qml/Library.qml" line="154"/>
         <source>1+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="100"/>
+        <location filename="../qml/Library.qml" line="154"/>
         <source>2+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="101"/>
+        <location filename="../qml/Library.qml" line="155"/>
         <source>3+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="101"/>
+        <location filename="../qml/Library.qml" line="155"/>
         <source>4+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="101"/>
+        <location filename="../qml/Library.qml" line="155"/>
         <source>5</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="200"/>
+        <location filename="../qml/Library.qml" line="360"/>
         <source>Photo, %n star(s)</source>
         <translation>
             <numerusform>Photo, %n star</numerusform>
@@ -616,12 +634,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="200"/>
+        <location filename="../qml/Library.qml" line="360"/>
         <source>Photo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="219"/>
+        <location filename="../qml/Library.qml" line="379"/>
         <source>No preview</source>
         <translation type="unfinished"></translation>
     </message>
@@ -629,42 +647,42 @@
 <context>
     <name>Main</name>
     <message>
-        <location filename="../qml/Main.qml" line="133"/>
+        <location filename="../qml/Main.qml" line="142"/>
         <source>Cannot open the workspace: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="216"/>
+        <location filename="../qml/Main.qml" line="225"/>
         <source>Menu</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="231"/>
+        <location filename="../qml/Main.qml" line="240"/>
         <source>Catalogue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="237"/>
+        <location filename="../qml/Main.qml" line="246"/>
         <source>Cull</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="242"/>
+        <location filename="../qml/Main.qml" line="251"/>
         <source>Develop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="243"/>
+        <location filename="../qml/Main.qml" line="252"/>
         <source>Publish</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="329"/>
+        <location filename="../qml/Main.qml" line="338"/>
         <source>Choose a folder in the folder dialog…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="340"/>
+        <location filename="../qml/Main.qml" line="349"/>
         <source>Open a workspace</source>
         <translation type="unfinished"></translation>
     </message>

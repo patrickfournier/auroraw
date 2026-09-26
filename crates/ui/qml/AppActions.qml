@@ -124,12 +124,27 @@ QtObject {
             field.remove(before ? cursor - length : cursor, before ? cursor : cursor + length)
         }
     }
+    // Select all is the text field's when one has the keyboard, else the grid's (D-097).
     readonly property Action selectAll: Action {
         property string commandId: "edit.select-all"
         text: qsTr("Select all")
         shortcut: StandardKey.SelectAll
-        enabled: root.host.editTarget !== null
-        onTriggered: root.host.editTarget.selectAll()
+        enabled: root.host.editTarget !== null || root.host.gridActive
+        onTriggered: root.host.editTarget !== null ? root.host.editTarget.selectAll() : root.host.selectPhotos("all")
+    }
+    readonly property Action selectNone: Action {
+        property string commandId: "edit.select-none"
+        text: qsTr("Select none")
+        shortcut: "Ctrl+Shift+A"
+        enabled: root.host.gridActive && root.host.selectedPhotos > 0
+        onTriggered: root.host.selectPhotos("none")
+    }
+    readonly property Action invertSelection: Action {
+        property string commandId: "edit.invert-selection"
+        text: qsTr("Invert selection")
+        shortcut: "Ctrl+Shift+I"
+        enabled: root.host.gridActive
+        onTriggered: root.host.selectPhotos("invert")
     }
 
     readonly property Action about: Action {

@@ -35,6 +35,7 @@ pub mod qobject {
         #[qml_element]
         #[qproperty(i32, count)]
         #[qproperty(i32, min_rating, cxx_name = "minRating")]
+        #[qproperty(i32, selected_count, cxx_name = "selectedCount")]
         type PhotoGrid = super::PhotoGridRust;
 
         /// Loads the open workspace's photos, newest first, those rated `minRating` or more (the
@@ -68,6 +69,84 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "syncPhoto"]
         fn sync_photo(self: Pin<&mut PhotoGrid>, id: &QString);
+
+        /// Selects only the photo in `row`, and anchors ranges there (a click, an arrow).
+        #[qinvokable]
+        #[cxx_name = "selectOnly"]
+        fn select_only(self: Pin<&mut PhotoGrid>, row: i32);
+
+        /// Adds the photo in `row` to the selection, or removes it (Ctrl+click, Space), and anchors there.
+        #[qinvokable]
+        fn toggle(self: Pin<&mut PhotoGrid>, row: i32);
+
+        /// Selects the photos from the anchor to `row`: replacing the selection (Shift), or added to it
+        /// (`additive`, Ctrl+Shift). The anchor stays.
+        #[qinvokable]
+        #[cxx_name = "extendTo"]
+        fn extend_to(self: Pin<&mut PhotoGrid>, row: i32, additive: bool);
+
+        /// Selects every photo listed.
+        #[qinvokable]
+        #[cxx_name = "selectAll"]
+        fn select_all(self: Pin<&mut PhotoGrid>);
+
+        /// Selects nothing.
+        #[qinvokable]
+        #[cxx_name = "selectNone"]
+        fn select_none(self: Pin<&mut PhotoGrid>);
+
+        /// Selects the photos that are not selected, and only those.
+        #[qinvokable]
+        fn invert(self: Pin<&mut PhotoGrid>);
+
+        /// Selects exactly these photos (identifiers joined by commas), those that are listed.
+        #[qinvokable]
+        #[cxx_name = "selectPhotos"]
+        fn select_photos(self: Pin<&mut PhotoGrid>, ids: &QString);
+
+        /// Whether the photo in `row` is selected.
+        #[qinvokable]
+        #[cxx_name = "isSelected"]
+        fn is_selected(self: &PhotoGrid, row: i32) -> bool;
+
+        /// The first selected row, -1 when nothing is selected.
+        #[qinvokable]
+        #[cxx_name = "firstSelectedRow"]
+        fn first_selected_row(self: &PhotoGrid) -> i32;
+
+        /// The row ranges start from, -1 when there is none.
+        #[qinvokable]
+        #[cxx_name = "anchorRow"]
+        fn anchor_row(self: &PhotoGrid) -> i32;
+
+        /// A rubber band starts: what is selected now is kept when `additive` (Ctrl).
+        #[qinvokable]
+        #[cxx_name = "rubberBegin"]
+        fn rubber_begin(self: Pin<&mut PhotoGrid>, additive: bool);
+
+        /// The rubber band covers these rows and columns of the grid (`columns` wide): they are selected,
+        /// besides what `rubberBegin` kept.
+        #[qinvokable]
+        #[cxx_name = "rubberTo"]
+        fn rubber_to(
+            self: Pin<&mut PhotoGrid>,
+            first_row: i32,
+            last_row: i32,
+            first_column: i32,
+            last_column: i32,
+            columns: i32,
+        );
+
+        /// The rubber band is over.
+        #[qinvokable]
+        #[cxx_name = "rubberEnd"]
+        fn rubber_end(self: Pin<&mut PhotoGrid>);
+
+        /// Rates every selected photo (0 clears) as one action, one step of the history; how many were
+        /// rated.
+        #[qinvokable]
+        #[cxx_name = "rateSelection"]
+        fn rate_selection(self: Pin<&mut PhotoGrid>, rating: i32) -> i32;
 
         /// What the status strip says of the photo in `row`: its file, its camera, its stars.
         #[qinvokable]
@@ -279,12 +358,14 @@ use cxx_qt_lib::{
     QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant, QVector,
 };
 
+use crate::selection::Selection;
 use crate::session;
 use crate::source_list::SourceListRust;
 
 /// Qt::UserRole and the next one.
 const ROLE_PHOTO_ID: i32 = 0x0100;
 const ROLE_RATING: i32 = 0x0101;
+const ROLE_SELECTED: i32 = 0x0102;
 
 struct Item {
     id: PhotoId,
@@ -302,6 +383,11 @@ pub struct PhotoGridRust {
     /// The ratings this grid asked the engine for and has not seen it confirm: until the catalogue
     /// says the same (or a moment passes), what it says is an older rating, not to be shown.
     pending: HashMap<PhotoId, (u8, Instant)>,
+    selected_count: i32,
+    /// What was selected when a rubber band started that adds to it.
+    rubber_base: Option<std::collections::HashSet<PhotoId>>,
+    /// The photos selected, by identifier, and where ranges start (D-097).
+    selection: Selection,
 }
 
 /// How long an unconfirmed rating is trusted over the catalogue (a command the engine refused).
@@ -368,12 +454,206 @@ impl qobject::PhotoGrid {
             self.as_mut().rust_mut().rows = rows;
             self.as_mut().end_reset_model();
         }
-        self.set_count(count);
+        self.as_mut().set_count(count);
+        // What was selected and is still listed stays selected.
+        let listed = self.ids();
+        self.as_mut().rust_mut().selection.retain(&listed);
+        let selected = self.selection.len() as i32;
+        self.set_selected_count(selected);
     }
 
     pub fn filter_by(mut self: Pin<&mut Self>, min_rating: i32) {
         self.as_mut().set_min_rating(min_rating.clamp(0, 5));
+        // A new filter is a new list: nothing of the old one stays selected.
+        self.as_mut().rust_mut().selection.none();
         self.load();
+    }
+
+    fn ids(&self) -> Vec<PhotoId> {
+        self.items.iter().map(|item| item.id).collect()
+    }
+
+    fn id_of(&self, row: i32) -> Option<PhotoId> {
+        usize::try_from(row)
+            .ok()
+            .and_then(|row| self.items.get(row))
+            .map(|item| item.id)
+    }
+
+    /// Tells the views that the selection changed: every row's `selected` (only the ones on screen cost).
+    fn selection_changed(mut self: Pin<&mut Self>) {
+        let last = self.items.len() as i32 - 1;
+        if last >= 0 {
+            let (first, end) = (
+                self.index(0, 0, &QModelIndex::default()),
+                self.index(last, 0, &QModelIndex::default()),
+            );
+            let mut roles = QVector::<i32>::default();
+            roles.append(ROLE_SELECTED);
+            self.as_mut().data_changed(&first, &end, &roles);
+        }
+        let selected = self.selection.len() as i32;
+        self.set_selected_count(selected);
+    }
+
+    pub fn select_only(mut self: Pin<&mut Self>, row: i32) {
+        if let Some(id) = self.id_of(row) {
+            self.as_mut().rust_mut().selection.only(id);
+            self.selection_changed();
+        }
+    }
+
+    pub fn toggle(mut self: Pin<&mut Self>, row: i32) {
+        if let Some(id) = self.id_of(row) {
+            self.as_mut().rust_mut().selection.toggle(id);
+            self.selection_changed();
+        }
+    }
+
+    pub fn extend_to(mut self: Pin<&mut Self>, row: i32, additive: bool) {
+        let Some(target) = usize::try_from(row).ok().filter(|r| *r < self.items.len()) else {
+            return;
+        };
+        let anchor = self
+            .selection
+            .anchor()
+            .and_then(|id| self.rows.get(&id).copied())
+            .unwrap_or(target);
+        let ids = self.ids();
+        self.as_mut()
+            .rust_mut()
+            .selection
+            .range(&ids, anchor, target, additive);
+        self.selection_changed();
+    }
+
+    pub fn select_all(mut self: Pin<&mut Self>) {
+        let ids = self.ids();
+        self.as_mut().rust_mut().selection.all(&ids);
+        self.selection_changed();
+    }
+
+    pub fn select_none(mut self: Pin<&mut Self>) {
+        self.as_mut().rust_mut().selection.none();
+        self.selection_changed();
+    }
+
+    pub fn invert(mut self: Pin<&mut Self>) {
+        let ids = self.ids();
+        self.as_mut().rust_mut().selection.invert(&ids);
+        self.selection_changed();
+    }
+
+    pub fn select_photos(mut self: Pin<&mut Self>, ids: &QString) {
+        let listed: Vec<PhotoId> = ids
+            .to_string()
+            .split(',')
+            .filter_map(|text| PhotoId::from_str(text).ok())
+            .filter(|id| self.rows.contains_key(id))
+            .collect();
+        self.as_mut().rust_mut().selection.set(listed);
+        self.selection_changed();
+    }
+
+    pub fn is_selected(&self, row: i32) -> bool {
+        self.id_of(row)
+            .is_some_and(|id| self.selection.contains(&id))
+    }
+
+    pub fn first_selected_row(&self) -> i32 {
+        self.items
+            .iter()
+            .position(|item| self.selection.contains(&item.id))
+            .map_or(-1, |row| row as i32)
+    }
+
+    pub fn anchor_row(&self) -> i32 {
+        self.selection
+            .anchor()
+            .and_then(|id| self.rows.get(&id).copied())
+            .map_or(-1, |row| row as i32)
+    }
+
+    pub fn rubber_begin(mut self: Pin<&mut Self>, additive: bool) {
+        let base = if additive {
+            self.selection.snapshot()
+        } else {
+            Default::default()
+        };
+        self.as_mut().rust_mut().rubber_base = Some(base);
+    }
+
+    pub fn rubber_to(
+        mut self: Pin<&mut Self>,
+        first_row: i32,
+        last_row: i32,
+        first_column: i32,
+        last_column: i32,
+        columns: i32,
+    ) {
+        let Some(base) = self.rubber_base.clone() else {
+            return;
+        };
+        let columns = columns.max(1);
+        let mut covered = Vec::new();
+        for row in first_row.max(0)..=last_row {
+            for column in first_column.max(0)..=last_column.min(columns - 1) {
+                if let Some(item) = self.items.get((row * columns + column) as usize) {
+                    covered.push(item.id);
+                }
+            }
+        }
+        self.as_mut().rust_mut().selection.set_over(&base, covered);
+        self.selection_changed();
+    }
+
+    pub fn rubber_end(mut self: Pin<&mut Self>) {
+        self.as_mut().rust_mut().rubber_base = None;
+    }
+
+    pub fn rate_selection(mut self: Pin<&mut Self>, rating: i32) -> i32 {
+        let Some(session) = session::current() else {
+            return 0;
+        };
+        let rating = rating.clamp(0, 5) as u8;
+        let rows: Vec<usize> = (0..self.items.len())
+            .filter(|row| self.selection.contains(&self.items[*row].id))
+            .collect();
+        if rows.is_empty() {
+            return 0;
+        }
+        let mut commands: Vec<Command> = rows
+            .iter()
+            .map(|row| Command::SetRating {
+                photo_id: self.items[*row].id,
+                rating,
+            })
+            .collect();
+        // One photo is a plain edit; several are one action, one step of the history (D-096).
+        let command = if commands.len() == 1 {
+            commands.remove(0)
+        } else {
+            Command::Batch { commands }
+        };
+        let _ = session.engine.submit(command);
+        // The cells show the new rating at once; the engine's own events confirm it.
+        for row in &rows {
+            let id = self.items[*row].id;
+            self.as_mut().rust_mut().items[*row].rating = rating;
+            self.as_mut()
+                .rust_mut()
+                .pending
+                .insert(id, (rating, Instant::now()));
+        }
+        let last = self.items.len() as i32 - 1;
+        let (first, end) = (
+            self.index(0, 0, &QModelIndex::default()),
+            self.index(last, 0, &QModelIndex::default()),
+        );
+        let mut roles = QVector::<i32>::default();
+        roles.append(ROLE_RATING);
+        self.as_mut().data_changed(&first, &end, &roles);
+        rows.len() as i32
     }
 
     pub fn id_at(&self, row: i32) -> QString {
@@ -517,6 +797,7 @@ impl qobject::PhotoGrid {
         match role {
             ROLE_PHOTO_ID => QVariant::from(&QString::from(item.id.to_string().as_str())),
             ROLE_RATING => QVariant::from(&i32::from(item.rating)),
+            ROLE_SELECTED => QVariant::from(&self.selection.contains(&item.id)),
             _ => QVariant::default(),
         }
     }
@@ -525,6 +806,7 @@ impl qobject::PhotoGrid {
         let mut roles = QHash::<QHashPair_i32_QByteArray>::default();
         roles.insert(ROLE_PHOTO_ID, QByteArray::from("photoId"));
         roles.insert(ROLE_RATING, QByteArray::from("rating"));
+        roles.insert(ROLE_SELECTED, QByteArray::from("selected"));
         roles
     }
 

@@ -99,6 +99,9 @@ ApplicationWindow {
     readonly property bool dialogOpen: newDialog.visible || settingsDialog.visible || importDialog.visible
                                        || aboutDialog.visible || catalogueFlow.dialogOpen || nativeDialogOpen
     readonly property bool inWorkspace: launcher.screen === "workspace"
+    // The grid is what the person is looking at and can act on: the selection commands mean something.
+    readonly property bool gridActive: inWorkspace && currentTask === "cull" && !dialogOpen && photoGrid.count > 0
+    readonly property int selectedPhotos: photoGrid.selectedCount
 
     // The Edit commands act on the text field that has the keyboard. The menu takes the keyboard
     // while it is open, so the field that had it is remembered.
@@ -115,6 +118,12 @@ ApplicationWindow {
     function openWorkspace() { openDialog.pick() }
     function showSettings() { settingsDialog.open() }
     function showAbout() { aboutDialog.open() }
+    // The grid's selection commands (`all`, `none`, `invert`).
+    function selectPhotos(what) {
+        if (what === "all") libraryView.selectAll()
+        else if (what === "none") libraryView.selectNone()
+        else libraryView.invertSelection()
+    }
     // The Import dialog, on `source` (a card) when given.
     function showImport(source) {
         if (inWorkspace && !dialogOpen)

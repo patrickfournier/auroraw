@@ -28,6 +28,7 @@ mod import_settings;
 mod launcher;
 #[allow(unsafe_code)]
 mod models;
+mod selection;
 mod session;
 #[allow(unsafe_code)]
 mod shortcuts;
