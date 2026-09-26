@@ -136,4 +136,28 @@ AppTestCase {
         verify(!app.actions.importPhotos.enabled, "not over a dialog")
         verify(!app.actions.newWorkspace.enabled)
     }
+
+    // Every row of a section is whole the first time the menu opens (the typeface reaches the rows after
+    // Qt has sized the menu), in both languages.
+    property int cutCount: 0
+
+    function test_no_row_is_cut_short_the_first_time_a_menu_opens() {
+        cutCount = 0
+        for (const section of [0, 1, 2, 0, 1, 2]) {
+            launch(freshMachine())
+            createWorkspace("Main")
+            // The first three in English, the others in French (the window is new every time).
+            app.launcher.chooseLanguage(section === undefined || cutCount++ < 3 ? "en" : "fr")
+            wait(250)
+            app.menu.openSection(section)
+            wait(300)
+            const menu = app.menu.itemAt(section).subMenu
+            verify(menu.visible)
+            for (let i = 0; i < menu.count; i++) {
+                const row = menu.itemAt(i)
+                if (row.action)
+                    verify(!row.contentItem.children[0].truncated, "row " + i + " of section " + section + " is cut")
+            }
+        }
+    }
 }
