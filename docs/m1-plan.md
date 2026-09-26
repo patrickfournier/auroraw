@@ -773,6 +773,15 @@ detection and its confirmation (D-047, §6 item 9), **XMP export to source folde
 opt-in), offline **place names** and the place filter. *Stretch*: importing a vocabulary from
 another application.
 
+**Carried over from D-099, to settle here:** sidecars of *existing* photos are edited by two kinds of
+writer, the coordinator and background jobs (the keyword path refresh, the removal of a source, an index
+merge), kept apart by `Workspace::sidecar_guard()`, a lock held per photo. The architecture's own rule is a
+single writer: when this package turns keyword deletion and batch edits into background jobs with progress
+(they need to be split into messages anyway), move those writes to the coordinator (a job sends "rewrite
+this photo's paths" or "move this sidecar to `removed/`" in small messages, and does only the slow reading
+itself) and **remove the lock**, so that a new job cannot forget to take it. Decided with Patrick on
+2026-09-26: keep the lock until then.
+
 Done when: a keyword hierarchy and a rating round trip through ExifTool and one other
 application; an external change to a sidecar is detected, shown and applied on confirmation
 without a feedback loop; a batch edit of 10,000 photos is one transaction, undoable.
