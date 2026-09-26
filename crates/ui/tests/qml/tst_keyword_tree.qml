@@ -156,7 +156,7 @@ AppTestCase {
         tryVerify(() => app.actions.redo.text === "Redo moving the keyword")
     }
 
-    function test_a_keyword_dropped_on_the_top_level_strip_leaves_its_parent() {
+    function test_a_keyword_dropped_where_there_is_no_keyword_goes_to_the_top_level() {
         const places = make("Continent")
         make("Chile", places)
         compare(item("Chile").depth, 1)
@@ -166,13 +166,13 @@ AppTestCase {
         mouseMove(from, x + 12, from.height / 2)
         mouseMove(from, x + 30, from.height / 2 + 4)
         tryVerify(() => app.keywordPanel.dragging)
-        const strip = app.keywordPanel.topLevelStrip
-        tryVerify(() => strip.visible && strip.height > 0)
-        mouseMove(strip, 40, strip.height / 2)
+        // Above the list, among the field and the line that says where new keywords go: no keyword there.
+        const panel = app.keywordPanel
+        mouseMove(panel, panel.width / 2, 100)
         wait(50)
-        mouseMove(strip, 41, strip.height / 2)
-        wait(50)
-        mouseRelease(strip, 41, strip.height / 2)
+        mouseMove(panel, panel.width / 2 + 1, 100)
+        tryVerify(() => panel.topLevelDrop.containsDrag && panel.topLevelDrop.allowed)
+        mouseRelease(panel, panel.width / 2 + 1, 100)
         tryItem("Chile", "depth", 0)
     }
 
@@ -276,6 +276,54 @@ AppTestCase {
         undoNow()
         tryVerify(() => rowOf("Before") >= 0 && rowOf("After") === -1, 5000)
         compare(item("Before").photos, 2)
+    }
+
+    function test_the_filter_label_follows_a_rename() {
+        selectFirst(2)
+        make("Old name")
+        const id = idOf("Old name")
+        app.photos.keywordSelection(id, true)
+        tryVerify(() => item("Old name").photos === 2, 5000)
+        app.library.filterKeyword(id, "Old name")
+        tryCompare(app.photos, "count", 2)
+        compare(app.library.keywordFilterName, "Old name")
+        const dialog = app.keywordPanel.renameDialog
+        dialog.openFor(rowOf("Old name"), "Old name")
+        dialog.nameField.text = "New name"
+        dialog.tryRename()
+        tryVerify(() => app.library.keywordFilterName === "New name", 5000, app.library.keywordFilterName)
+        compare(app.photos.count, 2, "the list is the same")
+    }
+
+    function test_the_list_does_not_move_when_the_line_about_new_keywords_appears() {
+        make("Steady")
+        const tree = app.keywordPanel.tree
+        const before = tree.mapToItem(null, 0, 0).y
+        const row = item("Steady")
+        mouseClick(row, row.depth * 14 + 60, row.height / 2)
+        tryVerify(() => app.keywordPanel.createUnderName === "Steady")
+        wait(100)
+        compare(tree.mapToItem(null, 0, 0).y, before, "the line has its place already")
+        app.keywordPanel.createUnder = ""
+        wait(100)
+        compare(tree.mapToItem(null, 0, 0).y, before)
+    }
+
+    function test_the_context_menu_is_wide_enough_for_its_rows_the_first_time_it_opens() {
+        make("Menu row")
+        const menu = app.keywordPanel.contextMenu
+        menu.row = rowOf("Menu row")
+        menu.keywordId = idOf("Menu row")
+        menu.keywordName = "Menu row"
+        menu.popup()
+        tryVerify(() => menu.visible)
+        wait(100)
+        for (let i = 0; i < menu.count; i++) {
+            const it = menu.itemAt(i)
+            verify(it.implicitWidth + menu.leftPadding + menu.rightPadding <= menu.width,
+                   "row " + i + " (" + it.text + ") fits: " + it.implicitWidth + " in " + menu.width)
+        }
+        menu.close()
     }
 
     function test_the_labels_and_dialogs_speak_french() {

@@ -306,6 +306,15 @@ impl KeywordList {
             .unwrap_or_default()
     }
 
+    pub fn name_of(&self, id: &QString) -> QString {
+        id.to_string()
+            .parse()
+            .ok()
+            .and_then(|id| self.keyword(id))
+            .map(|k| text(&k.name))
+            .unwrap_or_default()
+    }
+
     pub fn has_keyword(&self, id: &QString) -> bool {
         id.to_string()
             .parse()

@@ -52,8 +52,13 @@ FocusScope {
             keywordList.refresh()
             usageTimer.restart()
             // The keyword the list is filtered by was deleted (or its creation undone): back to the whole list.
-            if (photoGrid.keywordFilter !== "" && !keywordList.hasKeyword(photoGrid.keywordFilter))
-                root.filterKeyword("", "")
+            if (photoGrid.keywordFilter !== "") {
+                const name = keywordList.nameOf(photoGrid.keywordFilter)
+                if (name === "")
+                    root.filterKeyword("", "")
+                else
+                    keywordFilterName = name // it may have been renamed
+            }
         }
     }
 

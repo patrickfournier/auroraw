@@ -354,6 +354,11 @@ pub mod qobject {
         #[cxx_name = "findSibling"]
         fn find_sibling(self: &KeywordList, name: &QString, parent: &QString) -> QString;
 
+        /// The name of the keyword `id`, or empty when it is not in the vocabulary.
+        #[qinvokable]
+        #[cxx_name = "nameOf"]
+        fn name_of(self: &KeywordList, id: &QString) -> QString;
+
         /// Whether the keyword `id` is still in the vocabulary.
         #[qinvokable]
         #[cxx_name = "hasKeyword"]

@@ -10,7 +10,8 @@ import org.auroraw.ui
 // ahead (it filters the tree), Enter assigns the best match, and creates the keyword when nothing matches
 // (Shift+Enter creates even when something does). Every assignment is one action, one step of the history,
 // and so is making a keyword (with the photos that first get it), renaming, moving and deleting one. A keyword is
-// moved by dragging it onto another (or onto the strip that appears for the top level), or from its menu.
+// moved by dragging it onto another (or onto any place of the panel that has no keyword, for the top level), or
+// from its menu.
 // It is the first of the panels the inspector will hold (metadata comes with WP10).
 Rectangle {
     id: panel
@@ -29,7 +30,8 @@ Rectangle {
     property alias collapseButton: collapseButton
     property alias moveDialog: moveDialog
     property alias deleteDialog: deleteDialog
-    property alias topLevelStrip: topLevelStrip
+    property alias topLevelDrop: topLevelDrop
+    property alias contextMenu: menu
     property alias ghost: ghost
     // A keyword is being dragged (the top-level strip shows).
     property bool dragging: false
@@ -58,6 +60,25 @@ Rectangle {
         anchors.bottom: parent.bottom
         width: 1
         color: edge.containsMouse || edge.pressed ? palette.highlight : palette.dark
+    }
+
+    // Anywhere in the panel where there is no keyword is a place to drop one to make it a top-level keyword
+    // (the rows and the edge, in front of it, take the drops that are theirs).
+    DropArea {
+        id: topLevelDrop
+        anchors.fill: parent
+        keys: ["keyword"]
+        property bool allowed: false
+        onEntered: drag => allowed = panel.keywords.canMove(drag.source.keywordId, "")
+        onDropped: drop => panel.dropOn(drop.source.keywordId, "")
+    }
+    Rectangle {
+        anchors.fill: parent
+        visible: topLevelDrop.containsDrag && topLevelDrop.allowed
+        color: palette.highlight
+        opacity: 0.18
+        border.color: palette.highlight
+        border.width: 2
     }
 
     // The edge beside the grid: drag it to widen or narrow the panel.
@@ -196,37 +217,28 @@ Rectangle {
         }
 
         // Where a new keyword will go, once a keyword was clicked.
+        // (The row keeps its place when there is nothing to say, so that the list below does not move.)
         RowLayout {
             Layout.fillWidth: true
-            visible: panel.createUnder !== ""
+            Layout.preferredHeight: 30
+            Layout.maximumHeight: 30
             Label {
+                visible: panel.createUnder !== ""
                 Layout.fillWidth: true
                 text: qsTr("New keywords go under %1").arg(panel.createUnderName)
                 color: Theme.quiet
                 elide: Text.ElideRight
             }
             ToolButton {
+                visible: panel.createUnder !== ""
                 text: "×"
                 focusPolicy: Qt.NoFocus
                 Accessible.name: qsTr("New keywords go at the top level")
                 onClicked: panel.createUnder = ""
             }
+            Item { Layout.fillWidth: panel.createUnder === "" }
         }
 
-        Label {
-            Layout.fillWidth: true
-            visible: panel.photoGrid.selectedCount === 0
-            text: qsTr("Select photos to give them keywords.")
-            color: Theme.quiet
-            wrapMode: Text.Wrap
-        }
-        Label {
-            Layout.fillWidth: true
-            visible: panel.note !== ""
-            text: panel.note
-            color: Theme.danger
-            wrapMode: Text.Wrap
-        }
 
         ListView {
             id: tree
@@ -344,27 +356,26 @@ Rectangle {
                 }
             }
         }
+    }
 
-        // While a keyword is dragged: where to drop it to make it a top-level keyword.
-        Rectangle {
-            id: topLevelStrip
-            Layout.fillWidth: true
-            Layout.preferredHeight: panel.dragging ? 30 : 0
-            visible: panel.dragging
-            color: topLevelDrop.containsDrag ? palette.highlight : palette.base
-            border.color: palette.mid
-            Label {
-                anchors.centerIn: parent
-                text: qsTr("Drop here for the top level")
-                color: topLevelDrop.containsDrag ? palette.highlightedText : Theme.quiet
-            }
-            DropArea {
-                id: topLevelDrop
-                property alias strip: topLevelStrip
-                anchors.fill: parent
-                keys: ["keyword"]
-                onDropped: drop => panel.dropOn(drop.source.keywordId, "")
-            }
+    // Why something was refused: over the bottom of the list, so that nothing moves to make room for it.
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 6
+        visible: panel.expanded && panel.note !== ""
+        height: noteLabel.implicitHeight + 12
+        radius: 3
+        color: palette.window
+        border.color: Theme.danger
+        Label {
+            id: noteLabel
+            anchors.fill: parent
+            anchors.margins: 6
+            text: panel.note
+            color: Theme.danger
+            wrapMode: Text.Wrap
         }
     }
 
@@ -405,7 +416,7 @@ Rectangle {
         onClicked: panel.expanded = true
     }
 
-    Menu {
+    AppSubMenu {
         id: menu
         property int row: -1
         property string keywordId: ""
