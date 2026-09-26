@@ -90,10 +90,23 @@ AppTestCase {
         wait(150)
     }
 
+    // Waits until a row of the tree has `value` for `property`. (Asks again every time: the list rebuilds its
+    // rows when a keyword moves, comes back or goes, so a row found earlier may be gone.)
+    function tryItem(name, property, value) {
+        tryVerify(() => {
+            const row = rowOf(name)
+            if (row < 0)
+                return false
+            app.keywordPanel.tree.positionViewAtIndex(row, ListView.Contain)
+            const it = app.keywordPanel.tree.itemAtIndex(row)
+            return it !== null && it !== undefined && it[property] === value
+        }, 5000, name + "." + property + " never became " + value)
+    }
+
     function test_a_keyword_typed_in_the_field_is_made_and_given_to_the_selection() {
         selectFirst(3)
         typeKeyword("Peru")
-        tryCompare(item("Peru"), "carried", 2)
+        tryItem("Peru", "carried", 2)
         compare(item("Peru").photos, 3)
         compare(app.keywordPanel.filterField.text, "", "the field is emptied")
         tryVerify(() => app.actions.undo.enabled, 5000)
@@ -107,28 +120,28 @@ AppTestCase {
         click(5)
         typeKeyword("lima")
         compare(app.library.keywords.count, before, "the same keyword")
-        tryCompare(item("Lima"), "photos", 3)
+        tryItem("Lima", "photos", 3)
     }
 
     function test_the_check_says_none_some_or_all_and_a_click_gives_or_takes_off() {
         selectFirst(3)
         typeKeyword("Tri")
-        tryCompare(item("Tri"), "carried", 2)
+        tryItem("Tri", "carried", 2)
         selectFirst(5)
-        tryCompare(item("Tri"), "carried", 1) // some of the five
+        tryItem("Tri", "carried", 1) // some of the five
         compare(item("Tri").photos, 3)
         clickCheck("Tri")
-        tryCompare(item("Tri"), "carried", 2)
+        tryItem("Tri", "carried", 2)
         compare(item("Tri").photos, 5)
         clickCheck("Tri")
-        tryCompare(item("Tri"), "carried", 0)
+        tryItem("Tri", "carried", 0)
         compare(item("Tri").photos, 0)
     }
 
     function test_undoing_the_making_of_a_keyword_takes_it_and_its_photos_back() {
         selectFirst(3)
         typeKeyword("Undoable")
-        tryCompare(item("Undoable"), "carried", 2)
+        tryItem("Undoable", "carried", 2)
         wait(300)
         keyClick(Qt.Key_Escape)
         verify(app.library.grid.activeFocus, "Escape gives the keyboard back to the grid")
@@ -139,30 +152,30 @@ AppTestCase {
         compare(app.actions.redo.text, "Redo creating the keyword")
         keyClick(Qt.Key_Y, Qt.ControlModifier)
         tryVerify(() => rowOf("Undoable") >= 0, 5000)
-        tryCompare(item("Undoable"), "carried", 2)
+        tryItem("Undoable", "carried", 2)
         compare(item("Undoable").photos, 3)
     }
 
     function test_giving_a_keyword_that_exists_is_undone_as_keywords_of_photos() {
         selectFirst(3)
         typeKeyword("Given")
-        tryCompare(item("Given"), "photos", 3)
+        tryItem("Given", "photos", 3)
         click(5)
         click(7, Qt.ShiftModifier)
         typeKeyword("given")
-        tryCompare(item("Given"), "photos", 6)
+        tryItem("Given", "photos", 6)
         tryVerify(() => app.actions.undo.text === "Undo keywords of 3 photos", 5000, app.actions.undo.text)
         wait(300)
         keyClick(Qt.Key_Escape)
         keyClick(Qt.Key_Z, Qt.ControlModifier)
-        tryCompare(item("Given"), "photos", 3)
+        tryItem("Given", "photos", 3)
         tryVerify(() => app.actions.redo.text === "Redo keywords of 3 photos")
     }
 
     function test_nothing_is_given_when_nothing_is_selected() {
         typeKeyword("Orphan")
         compare(app.photos.selectedCount, 0)
-        tryCompare(item("Orphan"), "photos", 0)
+        tryItem("Orphan", "photos", 0)
         compare(item("Orphan").carried, 0)
     }
 
@@ -211,13 +224,13 @@ AppTestCase {
         typeKeyword("Se", Qt.ShiftModifier)
         compare(app.library.keywords.count, before + 1)
         verify(rowOf("Se") >= 0)
-        tryCompare(item("Se"), "photos", 1)
+        tryItem("Se", "photos", 1)
     }
 
     function test_the_list_can_be_filtered_by_a_keyword() {
         selectFirst(4)
         typeKeyword("Filtered")
-        tryCompare(item("Filtered"), "photos", 4)
+        tryItem("Filtered", "photos", 4)
         const id = app.library.keywords.idAt(rowOf("Filtered"))
         app.library.filterKeyword(id, "Filtered")
         tryCompare(app.photos, "count", 4)

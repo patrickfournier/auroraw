@@ -123,6 +123,19 @@ AppTestCase {
         keyClick(Qt.Key_Z, Qt.ControlModifier)
     }
 
+    // Waits until a row of the tree has `value` for `property`. (Asks again every time: the list rebuilds its
+    // rows when a keyword moves, comes back or goes, so a row found earlier may be gone.)
+    function tryItem(name, property, value) {
+        tryVerify(() => {
+            const row = rowOf(name)
+            if (row < 0)
+                return false
+            app.keywordPanel.tree.positionViewAtIndex(row, ListView.Contain)
+            const it = app.keywordPanel.tree.itemAtIndex(row)
+            return it !== null && it !== undefined && it[property] === value
+        }, 5000, name + "." + property + " never became " + value)
+    }
+
     function test_a_keyword_dragged_onto_another_becomes_its_child_and_undo_puts_it_back() {
         make("Places")
         make("Peru")
@@ -135,11 +148,11 @@ AppTestCase {
         mouseRelease(places, 101, places.height / 2)
         wait(200)
         verify(!app.keywordPanel.dragging)
-        tryCompare(item("Peru"), "depth", 1)
+        tryItem("Peru", "depth", 1)
         compare(rowOf("Peru"), rowOf("Places") + 1)
         tryVerify(() => app.actions.undo.text === "Undo moving the keyword", 5000, app.actions.undo.text)
         undoNow()
-        tryCompare(item("Peru"), "depth", 0)
+        tryItem("Peru", "depth", 0)
         tryVerify(() => app.actions.redo.text === "Redo moving the keyword")
     }
 
@@ -160,7 +173,7 @@ AppTestCase {
         mouseMove(strip, 41, strip.height / 2)
         wait(50)
         mouseRelease(strip, 41, strip.height / 2)
-        tryCompare(item("Chile"), "depth", 0)
+        tryItem("Chile", "depth", 0)
     }
 
     function test_a_drop_that_cannot_be_done_changes_nothing_and_says_why() {
@@ -198,7 +211,7 @@ AppTestCase {
         dialog.targetBox.currentIndex = paths.indexOf("Holder")
         dialog.tryMove()
         tryVerify(() => !dialog.visible)
-        tryCompare(item("Movable"), "depth", 1)
+        tryItem("Movable", "depth", 1)
         compare(rowOf("Movable"), rowOf("Holder") + 1)
         compare(item("Inside").depth, 2, "with its branch")
     }
@@ -227,8 +240,8 @@ AppTestCase {
         undoNow()
         tryVerify(() => rowOf("Birds") >= 0 && rowOf("Animals") >= 0, 5000)
         compare(item("Birds").depth, 1)
-        tryCompare(item("Birds"), "photos", 4)
-        tryCompare(item("Animals"), "photos", 1)
+        tryItem("Birds", "photos", 4)
+        tryItem("Animals", "photos", 1)
         tryVerify(() => app.actions.redo.text === "Redo deleting 2 keywords")
         wait(300)
         keyClick(Qt.Key_Y, Qt.ControlModifier)
