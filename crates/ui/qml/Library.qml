@@ -12,6 +12,7 @@ import org.auroraw.ui
 FocusScope {
     id: root
     required property var photoGrid
+    required property var launcher
 
     // The rating's star (a literal U+2605: a regression test reads it back, since a compiler that
     // took the source for a legacy code page once turned it into mojibake on Windows).
@@ -571,6 +572,7 @@ FocusScope {
             keywords: root.keywords
             photoGrid: root.photoGrid
             library: root
+            launcher: root.launcher
         }
     }
 }

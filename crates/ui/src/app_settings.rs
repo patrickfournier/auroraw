@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! What the application remembers about a person, not about a workspace: for now, the language of
-//! the interface. A plain JSON file in the machine's data folder; a missing or unreadable file is a
+//! the interface and the width of the keyword panel. A plain JSON file in the machine's data folder; a missing or unreadable file is a
 //! first run, never an error.
 
 use std::path::Path;
@@ -17,12 +17,20 @@ pub const LANGUAGES: &[&str] = &["en", "fr"];
 pub struct AppSettings {
     /// `system` (follow the machine) or one of [`LANGUAGES`].
     pub language: String,
+    /// The width the keyword panel was dragged to, in pixels.
+    pub keyword_panel_width: i32,
 }
+
+/// The keyword panel's width when nothing was chosen, and the limits of what can be.
+pub const KEYWORD_PANEL_WIDTH: i32 = 280;
+pub const KEYWORD_PANEL_MIN: i32 = 200;
+pub const KEYWORD_PANEL_MAX: i32 = 640;
 
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
             language: "system".into(),
+            keyword_panel_width: KEYWORD_PANEL_WIDTH,
         }
     }
 }
@@ -32,7 +40,14 @@ impl AppSettings {
     pub fn load(path: &Path) -> Self {
         std::fs::read(path)
             .ok()
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .and_then(|bytes| serde_json::from_slice::<Self>(&bytes).ok())
+            .map(|mut settings| {
+                // A hand-edited file cannot make the panel unusable.
+                settings.keyword_panel_width = settings
+                    .keyword_panel_width
+                    .clamp(KEYWORD_PANEL_MIN, KEYWORD_PANEL_MAX);
+                settings
+            })
             .unwrap_or_default()
     }
 
@@ -81,9 +96,29 @@ mod tests {
 
         let chosen = AppSettings {
             language: "fr".into(),
+            keyword_panel_width: 350,
         };
         chosen.save(&path);
         assert_eq!(AppSettings::load(&path), chosen);
+    }
+
+    #[test]
+    fn the_panel_width_has_a_default_and_stays_within_its_limits() {
+        let dir = auroraw_testkit::temp_dir();
+        let path = dir.path().join("app-settings.json");
+        // A file from before the width existed.
+        std::fs::write(&path, br#"{ "language": "fr" }"#).unwrap();
+        let old = AppSettings::load(&path);
+        assert_eq!(old.language, "fr");
+        assert_eq!(old.keyword_panel_width, KEYWORD_PANEL_WIDTH);
+        for (written, read) in [
+            (5, KEYWORD_PANEL_MIN),
+            (5000, KEYWORD_PANEL_MAX),
+            (400, 400),
+        ] {
+            std::fs::write(&path, format!(r#"{{ "keyword_panel_width": {written} }}"#)).unwrap();
+            assert_eq!(AppSettings::load(&path).keyword_panel_width, read);
+        }
     }
 
     #[test]

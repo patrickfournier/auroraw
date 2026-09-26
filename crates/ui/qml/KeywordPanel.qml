@@ -15,6 +15,7 @@ Rectangle {
     required property var keywords
     required property var photoGrid
     required property var library
+    required property var launcher
 
     property bool expanded: true
     // New keywords go under this one (an identifier), if a keyword was clicked.
@@ -30,6 +31,14 @@ Rectangle {
     readonly property int minimumWidth: 200
     readonly property int maximumWidth: 640
     property int panelWidth: defaultWidth
+    // The remembered width is read when the library is shown (the launcher knows its folders by then).
+    Connections {
+        target: panel.library
+        function onVisibleChanged() {
+            if (panel.library.visible && !edge.pressed)
+                panel.panelWidth = panel.launcher.keywordPanelWidth()
+        }
+    }
     property alias edge: edge
 
     Layout.preferredWidth: expanded ? panelWidth : 30
@@ -65,7 +74,12 @@ Rectangle {
                 panel.panelWidth = Math.max(panel.minimumWidth, Math.min(panel.maximumWidth, Math.round(startWidth + dx)))
             }
         }
-        onDoubleClicked: panel.panelWidth = panel.defaultWidth
+        // The width is remembered once the drag is over, not at every pixel.
+        onReleased: panel.launcher.setKeywordPanelWidth(panel.panelWidth)
+        onDoubleClicked: {
+            panel.panelWidth = panel.defaultWidth
+            panel.launcher.setKeywordPanelWidth(panel.panelWidth)
+        }
     }
 
     // Shows the panel and puts the keyboard in its field.

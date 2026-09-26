@@ -303,6 +303,7 @@ ApplicationWindow {
                 anchors.fill: parent
                 visible: window.inWorkspace && window.currentTask === "cull"
                 photoGrid: photoGrid
+                launcher: launcher
             }
         }
     }

@@ -74,6 +74,16 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "chooseLanguage"]
         fn choose_language(self: Pin<&mut Launcher>, code: &QString);
+
+        /// The width the keyword panel was last dragged to.
+        #[qinvokable]
+        #[cxx_name = "keywordPanelWidth"]
+        fn keyword_panel_width(self: &Launcher) -> i32;
+
+        /// Remembers the width of the keyword panel.
+        #[qinvokable]
+        #[cxx_name = "setKeywordPanelWidth"]
+        fn set_keyword_panel_width(self: &Launcher, width: i32);
     }
 }
 
@@ -304,6 +314,7 @@ impl qobject::Launcher {
         let code = code.to_string();
         let settings = AppSettings {
             language: code.clone(),
+            ..AppSettings::load(&self.settings_path())
         };
         settings.save(&self.settings_path());
         let effective = resolve_language(&code);
@@ -314,5 +325,23 @@ impl qobject::Launcher {
         }
         self.as_mut().set_language(text(&code));
         self.as_mut().set_effective_language(text(effective));
+    }
+
+    pub fn keyword_panel_width(&self) -> i32 {
+        match &self.dirs {
+            Some(_) => AppSettings::load(&self.settings_path()).keyword_panel_width,
+            None => crate::app_settings::KEYWORD_PANEL_WIDTH,
+        }
+    }
+
+    pub fn set_keyword_panel_width(&self, width: i32) {
+        if self.dirs.is_some() {
+            let path = self.settings_path();
+            AppSettings {
+                keyword_panel_width: width,
+                ..AppSettings::load(&path)
+            }
+            .save(&path);
+        }
     }
 }

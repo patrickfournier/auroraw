@@ -255,6 +255,23 @@ AppTestCase {
         tryCompare(panel, "width", 280)
     }
 
+    function test_the_width_of_the_panel_is_remembered() {
+        const edge = app.keywordPanel.edge
+        mousePress(edge, 2, 100)
+        mouseMove(edge, -98, 100)
+        mouseRelease(edge, -98, 100)
+        tryCompare(app.keywordPanel, "width", 380)
+        // A window made later on the same machine has the panel as it was left.
+        launch("")
+        app.width = 1680
+        wait(300)
+        tryCompare(app.keywordPanel, "width", 380)
+        mouseDoubleClickSequence(app.keywordPanel.edge, 2, 100)
+        tryCompare(app.keywordPanel, "width", 280)
+        launch("")
+        tryCompare(app.keywordPanel, "width", 280, 5000, "the default is remembered too")
+    }
+
     function test_the_panel_speaks_french() {
         selectFirst(3)
         typeKeyword("Vue")
