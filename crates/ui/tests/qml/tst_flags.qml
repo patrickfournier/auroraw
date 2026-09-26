@@ -101,8 +101,8 @@ AppTestCase {
         compare(app.photos.count, 40, "it did not leave under the cursor")
         snapshot("grid-flags-en")
         wait(2200) // what was asked is confirmed by the catalogue
-        app.library.reload()
-        compare(app.photos.count, 39, "the list read again hides it")
+        mouseClick(app.library.refreshButton)
+        compare(app.photos.count, 39, "the Refresh button reads the list again and hides it")
         compare(app.library.status, "39 photos")
         app.library.filterFlags(3)
         tryCompare(app.photos, "count", 1)

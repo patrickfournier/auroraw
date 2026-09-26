@@ -658,7 +658,7 @@
 <context>
     <name>Library</name>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="25"/>
+        <location filename="../qml/Library.qml" line="29"/>
         <source>%n photo(s)</source>
         <translation>
             <numerusform>%n photo</numerusform>
@@ -666,27 +666,27 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="49"/>
+        <location filename="../qml/Library.qml" line="53"/>
         <source>Not rejected</source>
         <translation>Non refusées</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="49"/>
+        <location filename="../qml/Library.qml" line="53"/>
         <source>All photos</source>
         <translation>Toutes les photos</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="50"/>
+        <location filename="../qml/Library.qml" line="54"/>
         <source>Picked</source>
         <translation>Retenues</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="50"/>
+        <location filename="../qml/Library.qml" line="54"/>
         <source>Rejected</source>
         <translation>Refusées</translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="56"/>
+        <location filename="../qml/Library.qml" line="28"/>
         <source>%n photo(s) selected</source>
         <translation>
             <numerusform>%n photo sélectionnée</numerusform>
@@ -694,47 +694,52 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="216"/>
+        <location filename="../qml/Library.qml" line="215"/>
         <source>All</source>
         <translation>Tout</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="216"/>
+        <location filename="../qml/Library.qml" line="215"/>
         <source>1+</source>
         <translation>1+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="216"/>
+        <location filename="../qml/Library.qml" line="215"/>
         <source>2+</source>
         <translation>2+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="217"/>
+        <location filename="../qml/Library.qml" line="216"/>
         <source>3+</source>
         <translation>3+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="217"/>
+        <location filename="../qml/Library.qml" line="216"/>
         <source>4+</source>
         <translation>4+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="217"/>
+        <location filename="../qml/Library.qml" line="216"/>
         <source>5</source>
         <translation>5</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="234"/>
+        <location filename="../qml/Library.qml" line="233"/>
         <source>Show photos by flag</source>
         <translation>Afficher les photos selon le drapeau</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="248"/>
+        <location filename="../qml/Library.qml" line="247"/>
         <source>Keyword: %1</source>
         <translation>Mot-clé : %1</translation>
     </message>
+    <message>
+        <location filename="../qml/Library.qml" line="262"/>
+        <source>Refresh</source>
+        <translation>Actualiser</translation>
+    </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="459"/>
+        <location filename="../qml/Library.qml" line="468"/>
         <source>Photo, %n star(s)</source>
         <translation>
             <numerusform>Photo, %n étoile</numerusform>
@@ -742,12 +747,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="459"/>
+        <location filename="../qml/Library.qml" line="468"/>
         <source>Photo</source>
         <translation>Photo</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="480"/>
+        <location filename="../qml/Library.qml" line="489"/>
         <source>No preview</source>
         <translation>Aucun aperçu</translation>
     </message>

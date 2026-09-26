@@ -20,6 +20,7 @@ FocusScope {
     property alias grid: grid
     property alias filterBar: filterBar
     property alias filterButtons: filterButtons
+    property alias refreshButton: refreshButton
     // What the strip under the grid says: the selected photo, or how many are selected.
     // (For several photos the text is a binding, so that a change of language reaches it.)
     property string single: ""
@@ -254,6 +255,16 @@ FocusScope {
                         text: root.status
                         color: Theme.quiet
                         Layout.leftMargin: 6
+                    }
+                    // Reads the list again: photos that arrived, and rejected ones that were left in place.
+                    AppButton {
+                        id: refreshButton
+                        text: qsTr("Refresh")
+                        focusPolicy: Qt.NoFocus
+                        onClicked: {
+                            root.reload()
+                            grid.forceActiveFocus()
+                        }
                     }
                     Item { Layout.fillWidth: true }
                 }
