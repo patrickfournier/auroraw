@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 
-use auroraw_catalogue::{Cursor, dataset, rebuild_to_file};
+use auroraw_catalogue::{Cursor, Filter, FlagFilter, dataset, keyword_paths, rebuild_to_file};
 use auroraw_testkit::temp_dir;
 use auroraw_types::WorkspaceId;
 
@@ -278,4 +278,148 @@ fn photos_with_keywords_matches_direct_membership_only() {
         .collect();
     assert_eq!(got, expected);
     assert!(cat.photos_with_keywords(&[]).unwrap().is_empty());
+}
+
+fn every_row(
+    cat: &auroraw_catalogue::Catalogue,
+    filter: &Filter,
+    page: u32,
+) -> Vec<auroraw_catalogue::PhotoRow> {
+    let mut rows = Vec::new();
+    let mut cursor = None;
+    loop {
+        let next = cat.list_filtered(filter, cursor, page).unwrap();
+        if next.is_empty() {
+            return rows;
+        }
+        cursor = Some(next.last().unwrap().cursor());
+        rows.extend(next);
+    }
+}
+
+/// The filters compose, and each combination lists exactly what a plain loop over every photo keeps, in
+/// the grid's order and without a gap or a repeat between pages.
+#[test]
+fn list_filtered_agrees_with_a_plain_filter_for_every_combination() {
+    let (data, cat, _dir) = built(1400, 21);
+    let paths = keyword_paths(&data.vocabulary);
+    // A keyword with descendants that photos carry, and a leaf.
+    let parent = data
+        .vocabulary
+        .iter()
+        .find(|k| data.vocabulary.iter().any(|c| c.parent == Some(k.id)))
+        .expect("the generated tree has a parent");
+    let everything = every_row(
+        &cat,
+        &Filter {
+            flags: FlagFilter::All,
+            ..Filter::default()
+        },
+        211,
+    );
+    assert_eq!(everything.len(), data.photos.len());
+    let carrying = |row: &auroraw_catalogue::PhotoRow, keyword: &auroraw_types::KeywordId| {
+        let root = &paths[keyword];
+        data.photos
+            .iter()
+            .find(|(p, _)| p.photo_id == row.id)
+            .unwrap()
+            .0
+            .meta
+            .keyword_ids
+            .iter()
+            .any(|k| {
+                let path = &paths[k];
+                path == root || path.starts_with(&format!("{root}|"))
+            })
+    };
+    for min_rating in [0u8, 3] {
+        for flags in [
+            FlagFilter::NotRejected,
+            FlagFilter::All,
+            FlagFilter::Picked,
+            FlagFilter::Rejected,
+        ] {
+            for keyword in [None, Some(parent.id)] {
+                let filter = Filter {
+                    min_rating,
+                    flags,
+                    keyword,
+                };
+                let got: Vec<_> = every_row(&cat, &filter, 97)
+                    .into_iter()
+                    .map(|r| r.id)
+                    .collect();
+                let expected: Vec<_> = everything
+                    .iter()
+                    .filter(|r| r.effective_rating >= min_rating)
+                    .filter(|r| match flags {
+                        FlagFilter::NotRejected => r.effective_flag != 2,
+                        FlagFilter::All => true,
+                        FlagFilter::Picked => r.effective_flag == 1,
+                        FlagFilter::Rejected => r.effective_flag == 2,
+                    })
+                    .filter(|r| keyword.as_ref().is_none_or(|k| carrying(r, k)))
+                    .map(|r| r.id)
+                    .collect();
+                assert_eq!(got, expected, "{filter:?}");
+                let unique: HashSet<_> = got.iter().collect();
+                assert_eq!(unique.len(), got.len(), "no photo twice: {filter:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_default_filter_hides_rejected_photos_and_nothing_else() {
+    let (_, cat, _dir) = built(600, 5);
+    let all = every_row(
+        &cat,
+        &Filter {
+            flags: FlagFilter::All,
+            ..Filter::default()
+        },
+        100,
+    );
+    let shown = every_row(&cat, &Filter::default(), 100);
+    let rejected = all.iter().filter(|r| r.effective_flag == 2).count();
+    assert!(rejected > 0, "the dataset has rejected photos");
+    assert_eq!(shown.len(), all.len() - rejected);
+}
+
+#[test]
+fn keywords_come_with_their_counts_and_a_selection_says_which_it_carries() {
+    let (data, cat, _dir) = built(700, 8);
+    let keywords = cat.keywords_with_counts().unwrap();
+    assert_eq!(keywords.len(), data.vocabulary.len());
+    let paths: Vec<_> = keywords.iter().map(|k| k.path.clone()).collect();
+    let mut sorted = paths.clone();
+    sorted.sort();
+    assert_eq!(paths, sorted, "a parent comes before its children");
+    for row in &keywords {
+        let direct = data
+            .photos
+            .iter()
+            .filter(|(p, _)| p.meta.keyword_ids.contains(&row.id))
+            .count() as u64;
+        assert_eq!(row.photos, direct, "{}", row.path);
+    }
+    // For a few photos: each keyword's usage is how many of them carry it.
+    let some: Vec<_> = data
+        .photos
+        .iter()
+        .take(40)
+        .map(|(p, _)| p.photo_id)
+        .collect();
+    let usage = cat.keyword_usage(&some).unwrap();
+    for keyword in &data.vocabulary {
+        let expected = data
+            .photos
+            .iter()
+            .take(40)
+            .filter(|(p, _)| p.meta.keyword_ids.contains(&keyword.id))
+            .count();
+        assert_eq!(usage.get(&keyword.id).copied().unwrap_or(0), expected);
+    }
+    assert!(cat.keyword_usage(&[]).unwrap().is_empty());
 }

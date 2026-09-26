@@ -222,11 +222,16 @@
     </message>
     <message>
         <location filename="../qml/AppActions.qml" line="144"/>
+        <source>Keywords</source>
+        <translation>Mots-clés</translation>
+    </message>
+    <message>
+        <location filename="../qml/AppActions.qml" line="151"/>
         <source>Invert selection</source>
         <translation>Inverser la sélection</translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="152"/>
+        <location filename="../qml/AppActions.qml" line="159"/>
         <source>About Auroraw</source>
         <translation>À propos d&apos;Auroraw</translation>
     </message>
@@ -244,7 +249,7 @@
         <translation>&amp;Édition</translation>
     </message>
     <message>
-        <location filename="../qml/AppMenu.qml" line="52"/>
+        <location filename="../qml/AppMenu.qml" line="54"/>
         <source>&amp;Help</source>
         <translation>&amp;Aide</translation>
     </message>
@@ -578,6 +583,79 @@
     </message>
 </context>
 <context>
+    <name>KeywordPanel</name>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="92"/>
+        <source>Keywords</source>
+        <translation>Mots-clés</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="100"/>
+        <source>Hide the keyword panel</source>
+        <translation>Masquer le panneau des mots-clés</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="108"/>
+        <source>Find or add a keyword…</source>
+        <translation>Chercher ou ajouter un mot-clé…</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="109"/>
+        <source>Find or add a keyword</source>
+        <translation>Chercher ou ajouter un mot-clé</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="128"/>
+        <source>New keywords go under %1</source>
+        <translation>Les nouveaux mots-clés vont sous %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="135"/>
+        <source>New keywords go at the top level</source>
+        <translation>Les nouveaux mots-clés vont au premier niveau</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="143"/>
+        <source>Select photos to give them keywords.</source>
+        <translation>Sélectionnez des photos pour leur donner des mots-clés.</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="239"/>
+        <source>Show the keyword panel</source>
+        <translation>Afficher le panneau des mots-clés</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="249"/>
+        <source>Show the photos with this keyword</source>
+        <translation>Afficher les photos avec ce mot-clé</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="253"/>
+        <source>Rename…</source>
+        <translation>Renommer…</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="264"/>
+        <source>Rename the keyword</source>
+        <translation>Renommer le mot-clé</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="288"/>
+        <source>Name</source>
+        <translation>Nom</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="302"/>
+        <source>Rename</source>
+        <translation>Renommer</translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="308"/>
+        <source>Cancel</source>
+        <translation>Annuler</translation>
+    </message>
+</context>
+<context>
     <name>Library</name>
     <message numerus="yes">
         <location filename="../qml/Library.qml" line="25"/>
@@ -587,8 +665,28 @@
             <numerusform>%n photos</numerusform>
         </translation>
     </message>
+    <message>
+        <location filename="../qml/Library.qml" line="49"/>
+        <source>Not rejected</source>
+        <translation>Non refusées</translation>
+    </message>
+    <message>
+        <location filename="../qml/Library.qml" line="49"/>
+        <source>All photos</source>
+        <translation>Toutes les photos</translation>
+    </message>
+    <message>
+        <location filename="../qml/Library.qml" line="50"/>
+        <source>Picked</source>
+        <translation>Retenues</translation>
+    </message>
+    <message>
+        <location filename="../qml/Library.qml" line="50"/>
+        <source>Rejected</source>
+        <translation>Refusées</translation>
+    </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="30"/>
+        <location filename="../qml/Library.qml" line="56"/>
         <source>%n photo(s) selected</source>
         <translation>
             <numerusform>%n photo sélectionnée</numerusform>
@@ -596,37 +694,47 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="154"/>
+        <location filename="../qml/Library.qml" line="216"/>
         <source>All</source>
         <translation>Tout</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="154"/>
+        <location filename="../qml/Library.qml" line="216"/>
         <source>1+</source>
         <translation>1+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="154"/>
+        <location filename="../qml/Library.qml" line="216"/>
         <source>2+</source>
         <translation>2+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="155"/>
+        <location filename="../qml/Library.qml" line="217"/>
         <source>3+</source>
         <translation>3+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="155"/>
+        <location filename="../qml/Library.qml" line="217"/>
         <source>4+</source>
         <translation>4+</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="155"/>
+        <location filename="../qml/Library.qml" line="217"/>
         <source>5</source>
         <translation>5</translation>
     </message>
+    <message>
+        <location filename="../qml/Library.qml" line="234"/>
+        <source>Show photos by flag</source>
+        <translation>Afficher les photos selon le drapeau</translation>
+    </message>
+    <message>
+        <location filename="../qml/Library.qml" line="248"/>
+        <source>Keyword: %1</source>
+        <translation>Mot-clé : %1</translation>
+    </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="360"/>
+        <location filename="../qml/Library.qml" line="459"/>
         <source>Photo, %n star(s)</source>
         <translation>
             <numerusform>Photo, %n étoile</numerusform>
@@ -634,12 +742,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="360"/>
+        <location filename="../qml/Library.qml" line="459"/>
         <source>Photo</source>
         <translation>Photo</translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="379"/>
+        <location filename="../qml/Library.qml" line="480"/>
         <source>No preview</source>
         <translation>Aucun aperçu</translation>
     </message>
@@ -647,42 +755,42 @@
 <context>
     <name>Main</name>
     <message>
-        <location filename="../qml/Main.qml" line="142"/>
+        <location filename="../qml/Main.qml" line="145"/>
         <source>Cannot open the workspace: %1</source>
         <translation>Impossible d&apos;ouvrir le workspace : %1</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="225"/>
+        <location filename="../qml/Main.qml" line="228"/>
         <source>Menu</source>
         <translation>Menu</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="240"/>
+        <location filename="../qml/Main.qml" line="243"/>
         <source>Catalogue</source>
         <translation>Catalogue</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="246"/>
+        <location filename="../qml/Main.qml" line="249"/>
         <source>Cull</source>
         <translation>Trier</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="251"/>
+        <location filename="../qml/Main.qml" line="254"/>
         <source>Develop</source>
         <translation>Développer</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="252"/>
+        <location filename="../qml/Main.qml" line="255"/>
         <source>Publish</source>
         <translation>Publier</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="338"/>
+        <location filename="../qml/Main.qml" line="341"/>
         <source>Choose a folder in the folder dialog…</source>
         <translation>Choisissez un dossier dans la fenêtre de sélection…</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="349"/>
+        <location filename="../qml/Main.qml" line="352"/>
         <source>Open a workspace</source>
         <translation>Ouvrir un workspace</translation>
     </message>

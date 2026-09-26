@@ -31,7 +31,9 @@ mod thumbnails;
 mod workspaces;
 
 pub use auroraw_catalogue::SourceCounts;
+pub use auroraw_format::sidecar::Flag;
 pub use auroraw_import::{ItemOutcome, MetadataTemplate, PairRule, Profile};
+pub use auroraw_types::KeywordId;
 pub use command::Command;
 pub use coordinator::Outcome;
 pub use error::{EngineError, Result};

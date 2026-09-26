@@ -36,6 +36,8 @@ pub mod qobject {
         #[qproperty(i32, count)]
         #[qproperty(i32, min_rating, cxx_name = "minRating")]
         #[qproperty(i32, selected_count, cxx_name = "selectedCount")]
+        #[qproperty(i32, flag_filter, cxx_name = "flagFilter")]
+        #[qproperty(QString, keyword_filter, cxx_name = "keywordFilter")]
         type PhotoGrid = super::PhotoGridRust;
 
         /// Loads the open workspace's photos, newest first, those rated `minRating` or more (the
@@ -47,6 +49,36 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "filterBy"]
         fn filter_by(self: Pin<&mut PhotoGrid>, min_rating: i32);
+
+        /// Lists photos by flag: 0 everything but the rejected (the default), 1 all, 2 picked, 3 rejected.
+        /// The rating and keyword filters stay; nothing is selected any more.
+        #[qinvokable]
+        #[cxx_name = "filterFlags"]
+        fn filter_flags(self: Pin<&mut PhotoGrid>, flags: i32);
+
+        /// Lists only the photos with this keyword or one under it (an identifier; empty for no keyword
+        /// filter). The other filters stay; nothing is selected any more.
+        #[qinvokable]
+        #[cxx_name = "filterKeyword"]
+        fn filter_keyword(self: Pin<&mut PhotoGrid>, keyword: &QString);
+
+        /// Flags the selection as one action: `pick`, `reject` (the flag is cleared instead when every
+        /// selected photo has it already) or `clear`. How many photos were changed.
+        #[qinvokable]
+        #[cxx_name = "flagSelection"]
+        fn flag_selection(self: Pin<&mut PhotoGrid>, kind: &QString) -> i32;
+
+        /// For each keyword a selected photo carries, how many selected photos carry it, as JSON
+        /// (`{"<keyword id>": 3}`): what the keyword panel shows as none, some or all.
+        #[qinvokable]
+        #[cxx_name = "keywordUsage"]
+        fn keyword_usage(self: &PhotoGrid) -> QString;
+
+        /// Adds a keyword (an identifier) to every selected photo, or removes it, as one action. How
+        /// many photos.
+        #[qinvokable]
+        #[cxx_name = "keywordSelection"]
+        fn keyword_selection(self: Pin<&mut PhotoGrid>, keyword: &QString, add: bool) -> i32;
 
         /// The photo in `row` (its identifier, empty when there is none).
         #[qinvokable]
@@ -259,6 +291,94 @@ pub mod qobject {
         #[base = QAbstractListModel]
         #[qml_element]
         #[qproperty(i32, count)]
+        type KeywordList = super::KeywordListRust;
+
+        /// Reads the vocabulary and how many photos carry each keyword again.
+        #[qinvokable]
+        fn refresh(self: Pin<&mut KeywordList>);
+
+        /// Shows the keywords whose name contains `text` (any case) with their ancestors; nothing typed
+        /// shows the whole tree, with what was collapsed.
+        #[qinvokable]
+        #[cxx_name = "setFilter"]
+        fn set_filter(self: Pin<&mut KeywordList>, text: &QString);
+
+        /// Collapses or expands the keyword in `row`.
+        #[qinvokable]
+        #[cxx_name = "toggleExpanded"]
+        fn toggle_expanded(self: Pin<&mut KeywordList>, row: i32);
+
+        /// Tells which keywords the selection carries (`KeywordUsage` JSON) and how many photos it has.
+        #[qinvokable]
+        #[cxx_name = "applyUsage"]
+        fn apply_usage(self: Pin<&mut KeywordList>, usage: &QString, selected: i32);
+
+        /// The keyword in `row` (its identifier) and its name.
+        #[qinvokable]
+        #[cxx_name = "idAt"]
+        fn id_at(self: &KeywordList, row: i32) -> QString;
+        #[qinvokable]
+        #[cxx_name = "nameAt"]
+        fn name_at(self: &KeywordList, row: i32) -> QString;
+
+        /// The row of the best match for what was typed (the name itself, else the first that starts with
+        /// it, else the first that contains it), -1 when there is none.
+        #[qinvokable]
+        #[cxx_name = "bestMatch"]
+        fn best_match(self: &KeywordList, text: &QString) -> i32;
+
+        /// Adds `name` to the vocabulary under the keyword `parent` (an identifier; empty for the top
+        /// level); its identifier, or the existing keyword's when that name is there already, or `error:`
+        /// and why not.
+        #[qinvokable]
+        fn create(self: Pin<&mut KeywordList>, name: &QString, parent: &QString) -> QString;
+
+        /// Renames the keyword in `row`; empty, or why not.
+        #[qinvokable]
+        fn rename(self: Pin<&mut KeywordList>, row: i32, name: &QString) -> QString;
+    }
+
+    unsafe extern "RustQt" {
+        #[inherit]
+        #[cxx_name = "beginResetModel"]
+        unsafe fn begin_reset_model(self: Pin<&mut KeywordList>);
+        #[inherit]
+        #[cxx_name = "endResetModel"]
+        unsafe fn end_reset_model(self: Pin<&mut KeywordList>);
+        #[inherit]
+        #[qsignal]
+        #[cxx_name = "dataChanged"]
+        fn data_changed(
+            self: Pin<&mut KeywordList>,
+            top_left: &QModelIndex,
+            bottom_right: &QModelIndex,
+            roles: &QVector_i32,
+        );
+        #[inherit]
+        fn index(self: &KeywordList, row: i32, column: i32, parent: &QModelIndex) -> QModelIndex;
+    }
+
+    extern "RustQt" {
+        #[qinvokable]
+        #[cxx_override]
+        fn data(self: &KeywordList, index: &QModelIndex, role: i32) -> QVariant;
+
+        #[qinvokable]
+        #[cxx_override]
+        #[cxx_name = "roleNames"]
+        fn role_names(self: &KeywordList) -> QHash_i32_QByteArray;
+
+        #[qinvokable]
+        #[cxx_override]
+        #[cxx_name = "rowCount"]
+        fn row_count(self: &KeywordList, _parent: &QModelIndex) -> i32;
+    }
+
+    extern "RustQt" {
+        #[qobject]
+        #[base = QAbstractListModel]
+        #[qml_element]
+        #[qproperty(i32, count)]
         #[qproperty(QString, job)]
         type SourceList = super::SourceListRust;
 
@@ -350,7 +470,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 
-use auroraw_catalogue::Cursor;
+use auroraw_catalogue::{Cursor, Filter, FlagFilter};
 use auroraw_engine::{Command, Engine, KnownWorkspace};
 use auroraw_types::PhotoId;
 use cxx_qt::CxxQtType;
@@ -358,6 +478,7 @@ use cxx_qt_lib::{
     QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant, QVector,
 };
 
+use crate::keyword_list::KeywordListRust;
 use crate::selection::Selection;
 use crate::session;
 use crate::source_list::SourceListRust;
@@ -366,10 +487,21 @@ use crate::source_list::SourceListRust;
 const ROLE_PHOTO_ID: i32 = 0x0100;
 const ROLE_RATING: i32 = 0x0101;
 const ROLE_SELECTED: i32 = 0x0102;
+const ROLE_FLAG: i32 = 0x0103;
 
 struct Item {
     id: PhotoId,
     rating: u8,
+    /// The effective flag: 0 none, 1 picked, 2 rejected.
+    flag: u8,
+}
+
+/// What this grid asked the engine for and has not seen it confirm: until the catalogue says the same (or
+/// a moment passes), what it says is older than what was asked, and not to be shown.
+struct Pending {
+    rating: Option<u8>,
+    flag: Option<u8>,
+    at: Instant,
 }
 
 /// The Rust side of the grid model.
@@ -377,12 +509,13 @@ struct Item {
 pub struct PhotoGridRust {
     count: i32,
     min_rating: i32,
+    flag_filter: i32,
+    keyword_filter: QString,
     items: Vec<Item>,
     /// Where each listed photo is.
     rows: HashMap<PhotoId, usize>,
-    /// The ratings this grid asked the engine for and has not seen it confirm: until the catalogue
-    /// says the same (or a moment passes), what it says is an older rating, not to be shown.
-    pending: HashMap<PhotoId, (u8, Instant)>,
+    /// The ratings and flags asked for and not yet confirmed (a quick series of keys must not flicker back).
+    pending: HashMap<PhotoId, Pending>,
     selected_count: i32,
     /// What was selected when a rubber band started that adds to it.
     rubber_base: Option<std::collections::HashSet<PhotoId>>,
@@ -395,7 +528,7 @@ const PENDING_FOR: Duration = Duration::from_secs(2);
 
 /// Every photo the catalogue lists in the grid's own order (spike 3: the whole ordered list is cheap
 /// even at 100,000 photos; only thumbnails are lazy), rated `min_rating` or more.
-fn load_items(min_rating: u8) -> Vec<Item> {
+fn load_items(filter: &Filter) -> Vec<Item> {
     let Some(session) = session::current() else {
         return Vec::new();
     };
@@ -405,12 +538,7 @@ fn load_items(min_rating: u8) -> Vec<Item> {
     let mut items = Vec::new();
     let mut after = None;
     loop {
-        let page = if min_rating == 0 {
-            catalogue.list_recent(after, 5000)
-        } else {
-            catalogue.list_by_min_rating(min_rating, after, 5000)
-        };
-        let Ok(page) = page else {
+        let Ok(page) = catalogue.list_filtered(filter, after, 5000) else {
             break;
         };
         if page.is_empty() {
@@ -423,6 +551,7 @@ fn load_items(min_rating: u8) -> Vec<Item> {
         items.extend(page.into_iter().map(|row| Item {
             id: row.id,
             rating: row.effective_rating,
+            flag: row.effective_flag,
         }));
     }
     items
@@ -430,15 +559,16 @@ fn load_items(min_rating: u8) -> Vec<Item> {
 
 impl qobject::PhotoGrid {
     pub fn load(mut self: Pin<&mut Self>) {
-        let mut items = load_items(self.min_rating.clamp(0, 5) as u8);
-        // A rating asked for a moment ago may not be in the catalogue yet: it stays what was asked.
+        let mut items = load_items(&self.filter());
+        // A rating or a flag asked for a moment ago may not be in the catalogue yet: it stays what was asked.
         self.as_mut()
             .rust_mut()
             .pending
-            .retain(|_, (_, at)| at.elapsed() < PENDING_FOR);
+            .retain(|_, pending| pending.at.elapsed() < PENDING_FOR);
         for item in &mut items {
-            if let Some(&(asked, _)) = self.pending.get(&item.id) {
-                item.rating = asked;
+            if let Some(pending) = self.pending.get(&item.id) {
+                item.rating = pending.rating.unwrap_or(item.rating);
+                item.flag = pending.flag.unwrap_or(item.flag);
             }
         }
         let count = items.len() as i32;
@@ -465,6 +595,32 @@ impl qobject::PhotoGrid {
     pub fn filter_by(mut self: Pin<&mut Self>, min_rating: i32) {
         self.as_mut().set_min_rating(min_rating.clamp(0, 5));
         // A new filter is a new list: nothing of the old one stays selected.
+        self.as_mut().rust_mut().selection.none();
+        self.load();
+    }
+
+    /// What the grid lists now: the rating, the flags and the keyword filters together.
+    fn filter(&self) -> Filter {
+        Filter {
+            min_rating: self.min_rating.clamp(0, 5) as u8,
+            flags: match self.flag_filter {
+                1 => FlagFilter::All,
+                2 => FlagFilter::Picked,
+                3 => FlagFilter::Rejected,
+                _ => FlagFilter::NotRejected,
+            },
+            keyword: auroraw_types::KeywordId::from_str(&self.keyword_filter.to_string()).ok(),
+        }
+    }
+
+    pub fn filter_flags(mut self: Pin<&mut Self>, flags: i32) {
+        self.as_mut().set_flag_filter(flags.clamp(0, 3));
+        self.as_mut().rust_mut().selection.none();
+        self.load();
+    }
+
+    pub fn filter_keyword(mut self: Pin<&mut Self>, keyword: &QString) {
+        self.as_mut().set_keyword_filter(keyword.clone());
         self.as_mut().rust_mut().selection.none();
         self.load();
     }
@@ -574,6 +730,133 @@ impl qobject::PhotoGrid {
             .map_or(-1, |row| row as i32)
     }
 
+    /// The selected photos in row order.
+    fn selected_rows(&self) -> Vec<usize> {
+        (0..self.items.len())
+            .filter(|row| self.selection.contains(&self.items[*row].id))
+            .collect()
+    }
+
+    pub fn flag_selection(mut self: Pin<&mut Self>, kind: &QString) -> i32 {
+        use auroraw_engine::Flag;
+        let Some(session) = session::current() else {
+            return 0;
+        };
+        let target: u8 = match kind.to_string().as_str() {
+            "pick" => 1,
+            "reject" => 2,
+            _ => 0,
+        };
+        let rows = self.selected_rows();
+        if rows.is_empty() {
+            return 0;
+        }
+        // The same key again takes the flag off: when every selected photo has it already.
+        let all_have = rows.iter().all(|row| self.items[*row].flag == target);
+        let new = if target != 0 && all_have { 0 } else { target };
+        let flag = match new {
+            1 => Some(Flag::Picked),
+            2 => Some(Flag::Rejected),
+            _ => None,
+        };
+        let mut commands: Vec<Command> = rows
+            .iter()
+            .map(|row| Command::SetFlag {
+                photo_id: self.items[*row].id,
+                flag,
+            })
+            .collect();
+        let command = if commands.len() == 1 {
+            commands.remove(0)
+        } else {
+            Command::Batch { commands }
+        };
+        let _ = session.engine.submit(command);
+        // The cells show it at once (a rejected one stays, dimmed, until the list is read again).
+        for row in &rows {
+            let id = self.items[*row].id;
+            self.as_mut().rust_mut().items[*row].flag = new;
+            self.as_mut().ask(id, None, Some(new));
+        }
+        self.as_mut().redraw_all();
+        rows.len() as i32
+    }
+
+    pub fn keyword_usage(&self) -> QString {
+        let Some(session) = session::current() else {
+            return QString::from("{}");
+        };
+        let selected: Vec<PhotoId> = self
+            .selected_rows()
+            .iter()
+            .map(|row| self.items[*row].id)
+            .collect();
+        let usage = session
+            .engine
+            .read_catalogue()
+            .ok()
+            .and_then(|catalogue| catalogue.keyword_usage(&selected).ok())
+            .unwrap_or_default();
+        let map: serde_json::Map<String, serde_json::Value> = usage
+            .into_iter()
+            .map(|(id, count)| (id.to_string(), serde_json::Value::from(count)))
+            .collect();
+        QString::from(serde_json::Value::Object(map).to_string().as_str())
+    }
+
+    pub fn keyword_selection(self: Pin<&mut Self>, keyword: &QString, add: bool) -> i32 {
+        let Some(session) = session::current() else {
+            return 0;
+        };
+        let Ok(keyword_id) = auroraw_types::KeywordId::from_str(&keyword.to_string()) else {
+            return 0;
+        };
+        let rows = self.selected_rows();
+        if rows.is_empty() {
+            return 0;
+        }
+        let mut commands: Vec<Command> = rows
+            .iter()
+            .map(|row| {
+                let photo_id = self.items[*row].id;
+                if add {
+                    Command::AddKeyword {
+                        photo_id,
+                        keyword_id,
+                    }
+                } else {
+                    Command::RemoveKeyword {
+                        photo_id,
+                        keyword_id,
+                    }
+                }
+            })
+            .collect();
+        let command = if commands.len() == 1 {
+            commands.remove(0)
+        } else {
+            Command::Batch { commands }
+        };
+        let _ = session.engine.submit(command);
+        rows.len() as i32
+    }
+
+    /// Redraws every cell's rating and flag.
+    fn redraw_all(mut self: Pin<&mut Self>) {
+        let last = self.items.len() as i32 - 1;
+        if last < 0 {
+            return;
+        }
+        let (first, end) = (
+            self.index(0, 0, &QModelIndex::default()),
+            self.index(last, 0, &QModelIndex::default()),
+        );
+        let mut roles = QVector::<i32>::default();
+        roles.append(ROLE_RATING);
+        roles.append(ROLE_FLAG);
+        self.as_mut().data_changed(&first, &end, &roles);
+    }
+
     pub fn rubber_begin(mut self: Pin<&mut Self>, additive: bool) {
         let base = if additive {
             self.selection.snapshot()
@@ -640,19 +923,9 @@ impl qobject::PhotoGrid {
         for row in &rows {
             let id = self.items[*row].id;
             self.as_mut().rust_mut().items[*row].rating = rating;
-            self.as_mut()
-                .rust_mut()
-                .pending
-                .insert(id, (rating, Instant::now()));
+            self.as_mut().ask(id, Some(rating), None);
         }
-        let last = self.items.len() as i32 - 1;
-        let (first, end) = (
-            self.index(0, 0, &QModelIndex::default()),
-            self.index(last, 0, &QModelIndex::default()),
-        );
-        let mut roles = QVector::<i32>::default();
-        roles.append(ROLE_RATING);
-        self.as_mut().data_changed(&first, &end, &roles);
+        self.as_mut().redraw_all();
         rows.len() as i32
     }
 
@@ -697,24 +970,48 @@ impl qobject::PhotoGrid {
         else {
             return;
         };
-        if let Some(&(asked, at)) = self.pending.get(&id) {
-            if photo.effective_rating != asked && at.elapsed() < PENDING_FOR {
-                // An older rating of a quick series of keys: the last one's own event follows.
+        if let Some(pending) = self.pending.get(&id) {
+            let fresh = pending.at.elapsed() < PENDING_FOR;
+            let stale = pending.rating.is_some_and(|r| r != photo.effective_rating)
+                || pending.flag.is_some_and(|f| f != photo.effective_flag);
+            if fresh && stale {
+                // An older state of a quick series of keys: the last one's own event follows.
                 return;
             }
             self.as_mut().rust_mut().pending.remove(&id);
         }
-        if self.items[row].rating != photo.effective_rating {
+        if self.items[row].rating != photo.effective_rating
+            || self.items[row].flag != photo.effective_flag
+        {
             self.as_mut().rust_mut().items[row].rating = photo.effective_rating;
-            self.redraw_rating(row);
+            self.as_mut().rust_mut().items[row].flag = photo.effective_flag;
+            self.redraw_photo(row);
         }
     }
 
-    fn redraw_rating(mut self: Pin<&mut Self>, row: usize) {
+    /// Redraws a cell's rating and flag.
+    fn redraw_photo(mut self: Pin<&mut Self>, row: usize) {
         let index = self.index(row as i32, 0, &QModelIndex::default());
         let mut roles = QVector::<i32>::default();
         roles.append(ROLE_RATING);
+        roles.append(ROLE_FLAG);
         self.as_mut().data_changed(&index, &index, &roles);
+    }
+
+    /// Remembers what was asked of the engine for a photo, until the catalogue says the same.
+    fn ask(mut self: Pin<&mut Self>, id: PhotoId, rating: Option<u8>, flag: Option<u8>) {
+        let (before_rating, before_flag) = self
+            .pending
+            .get(&id)
+            .map_or((None, None), |p| (p.rating, p.flag));
+        self.as_mut().rust_mut().pending.insert(
+            id,
+            Pending {
+                rating: rating.or(before_rating),
+                flag: flag.or(before_flag),
+                at: Instant::now(),
+            },
+        );
     }
 
     pub fn summary_at(&self, row: i32) -> QString {
@@ -737,7 +1034,12 @@ impl qobject::PhotoGrid {
         };
         // The file, the camera and the stars, as many of them as there are.
         let stars = "\u{2605}".repeat(usize::from(photo.rating));
-        let parts: Vec<String> = [Some(photo.filename), photo.camera, Some(stars)]
+        let flag = match photo.effective_flag {
+            1 => Some("\u{2714}".to_string()),
+            2 => Some("\u{2716}".to_string()),
+            _ => None,
+        };
+        let parts: Vec<String> = [Some(photo.filename), photo.camera, Some(stars), flag]
             .into_iter()
             .flatten()
             .filter(|part| !part.is_empty())
@@ -783,11 +1085,8 @@ impl qobject::PhotoGrid {
         });
         // The cell shows the new rating at once; the engine's own event confirms it.
         self.as_mut().rust_mut().items[row as usize].rating = rating;
-        self.as_mut()
-            .rust_mut()
-            .pending
-            .insert(id, (rating, Instant::now()));
-        self.redraw_rating(row as usize);
+        self.as_mut().ask(id, Some(rating), None);
+        self.redraw_photo(row as usize);
     }
 
     pub fn data(&self, index: &QModelIndex, role: i32) -> QVariant {
@@ -798,6 +1097,7 @@ impl qobject::PhotoGrid {
             ROLE_PHOTO_ID => QVariant::from(&QString::from(item.id.to_string().as_str())),
             ROLE_RATING => QVariant::from(&i32::from(item.rating)),
             ROLE_SELECTED => QVariant::from(&self.selection.contains(&item.id)),
+            ROLE_FLAG => QVariant::from(&i32::from(item.flag)),
             _ => QVariant::default(),
         }
     }
@@ -807,6 +1107,7 @@ impl qobject::PhotoGrid {
         roles.insert(ROLE_PHOTO_ID, QByteArray::from("photoId"));
         roles.insert(ROLE_RATING, QByteArray::from("rating"));
         roles.insert(ROLE_SELECTED, QByteArray::from("selected"));
+        roles.insert(ROLE_FLAG, QByteArray::from("flag"));
         roles
     }
 

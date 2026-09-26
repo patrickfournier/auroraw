@@ -139,6 +139,13 @@ QtObject {
         enabled: root.host.gridActive && root.host.selectedPhotos > 0
         onTriggered: root.host.selectPhotos("none")
     }
+    readonly property Action editKeywords: Action {
+        property string commandId: "edit.keywords"
+        text: qsTr("Keywords")
+        shortcut: "Ctrl+K"
+        enabled: root.host.gridActive
+        onTriggered: root.host.focusKeywords()
+    }
     readonly property Action invertSelection: Action {
         property string commandId: "edit.invert-selection"
         text: qsTr("Invert selection")

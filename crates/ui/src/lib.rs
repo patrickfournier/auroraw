@@ -25,6 +25,8 @@ mod history;
 mod import_form;
 mod import_settings;
 #[allow(unsafe_code)]
+mod keyword_list;
+#[allow(unsafe_code)]
 mod launcher;
 #[allow(unsafe_code)]
 mod models;

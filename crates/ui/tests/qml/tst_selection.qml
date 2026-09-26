@@ -14,6 +14,9 @@ AppTestCase {
 
     function init() {
         launch("")
+        // The keyword panel takes 280 px: this width leaves the grid its 1400.
+        app.width = 1680
+        wait(300)
         tryCompare(app.photos, "count", 80)
         grid = app.library.grid
         compare(grid.columns, 8)

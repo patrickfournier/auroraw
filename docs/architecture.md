@@ -172,6 +172,9 @@ runs in a separate helper process, so that its crash or corruption stays out of 
   photo that has gone is dropped. The history is in memory, for the open workspace, and bounded (500
   steps); `Event::HistoryChanged` says what Undo and Redo would do and `Event::HistoryApplied` which photos
   were touched. Something new that a person can undo adds a `Change` variant, nothing else.
+- The grid's list is **one composed catalogue query** (`Filter` and `Catalogue::list_filtered`, D-098):
+  minimum rating, flag view (not rejected, all, picked, rejected) and keyword (with its descendants)
+  are conditions joined in one keyset-paged statement, so a new filter is a field, not a function.
 - Every long job has a **deadline** and reports progress; a watchdog ends anything that does
   not.
 

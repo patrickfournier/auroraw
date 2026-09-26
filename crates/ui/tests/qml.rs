@@ -171,3 +171,19 @@ fn selecting_several_photos_in_the_grid() {
     support::machine_with_photos(home.path(), 80);
     run_suite("selection", home.path(), None);
 }
+
+/// Flags: P, X and U, the same key taking the flag off, the flag filter, undo, and rejected photos.
+#[test]
+fn flagging_photos_in_the_grid() {
+    let home = temp_dir();
+    support::machine_with_photos(home.path(), 40);
+    run_suite("flags", home.path(), None);
+}
+
+/// Keywords: the panel's field, the tri-state check, undo, the hierarchy, type-ahead, rename.
+#[test]
+fn keywords_in_the_panel() {
+    let home = temp_dir();
+    support::machine_with_photos(home.path(), 40);
+    run_suite("keywords", home.path(), None);
+}

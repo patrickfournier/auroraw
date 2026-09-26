@@ -33,6 +33,7 @@ fn main() {
         QmlFile::from("qml/Welcome.qml"),
         QmlFile::from("qml/NewWorkspaceDialog.qml"),
         QmlFile::from("qml/Library.qml"),
+        QmlFile::from("qml/KeywordPanel.qml"),
     ];
     let mut builder = CxxQtBuilder::new_qml_module(QmlModule::new("org.auroraw.ui").qml_files(qml))
         .qt_module("Quick")

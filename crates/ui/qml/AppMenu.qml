@@ -47,6 +47,8 @@ AppSubMenu {
         AppMenuItem { action: root.actions.selectAll }
         AppMenuItem { action: root.actions.selectNone }
         AppMenuItem { action: root.actions.invertSelection }
+        MenuSeparator {}
+        AppMenuItem { action: root.actions.editKeywords }
     }
     AppSubMenu {
         title: qsTr("&Help")

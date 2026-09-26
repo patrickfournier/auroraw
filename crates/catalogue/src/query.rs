@@ -3,6 +3,8 @@
 //! the same at the start or the end of a 100,000-photo catalogue, spike 3), counts, a full-text
 //! search, and a lookup by keyword. See `docs/spikes/03-catalogue-and-grid.md` for the budgets.
 
+use std::collections::HashMap;
+
 use auroraw_types::{ContentHash, Fingerprint, KeywordId, PhotoId, SeriesId, SourceId};
 use rusqlite::{OptionalExtension, Row, params};
 
@@ -101,6 +103,48 @@ pub struct Cursor {
     pub id: PhotoId,
 }
 
+/// Which flags a listing shows (spec §5.3: rejected photos are hidden by default).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FlagFilter {
+    /// Everything but the rejected photos: the default.
+    #[default]
+    NotRejected,
+    /// Every photo, rejected ones included.
+    All,
+    /// Picked photos only.
+    Picked,
+    /// Rejected photos only (the Rejected view).
+    Rejected,
+}
+
+/// What a listing of the grid is restricted to: the filters compose (a rating and a flag and a keyword).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Filter {
+    /// Photos whose effective rating is at least this (0 for all).
+    pub min_rating: u8,
+    /// Which flags are shown.
+    pub flags: FlagFilter,
+    /// Photos carrying this keyword or any keyword under it in the vocabulary tree.
+    pub keyword: Option<KeywordId>,
+}
+
+/// One keyword of the vocabulary, with how many photos carry it directly.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeywordRow {
+    /// Its identifier.
+    pub id: KeywordId,
+    /// Its parent, `None` for a top-level keyword.
+    pub parent: Option<KeywordId>,
+    /// Its name.
+    pub name: String,
+    /// Its path in the tree (`Place|Canada|Quebec`).
+    pub path: String,
+    /// Whether it is written at export (the "do not export" flag is the opposite).
+    pub export: bool,
+    /// How many photos carry it directly.
+    pub photos: u64,
+}
+
 impl PhotoRow {
     /// The cursor that continues the list right after this row.
     pub fn cursor(&self) -> Cursor {
@@ -131,6 +175,110 @@ impl Catalogue {
             None => stmt.query_map(params![limit], photo_row)?,
         };
         Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The photos a [`Filter`] lets through, most recent first, in the same keyset order as
+    /// [`Self::list_recent`]: what the grid lists. The filters compose in one statement.
+    pub fn list_filtered(
+        &self,
+        filter: &Filter,
+        after: Option<Cursor>,
+        limit: u32,
+    ) -> Result<Vec<PhotoRow>> {
+        use rusqlite::types::Value;
+        let mut conditions: Vec<String> = Vec::new();
+        let mut values: Vec<Value> = Vec::new();
+        if filter.min_rating > 0 {
+            conditions.push("p.effective_rating >= ?".into());
+            values.push(Value::Integer(i64::from(filter.min_rating)));
+        }
+        match filter.flags {
+            FlagFilter::NotRejected => conditions.push("p.effective_flag != 2".into()),
+            FlagFilter::All => {}
+            FlagFilter::Picked => conditions.push("p.effective_flag = 1".into()),
+            FlagFilter::Rejected => conditions.push("p.effective_flag = 2".into()),
+        }
+        if let Some(keyword) = &filter.keyword {
+            conditions.push(
+                "p.id IN (SELECT pk.photo_id FROM photo_keyword pk JOIN keyword k ON k.id = pk.keyword_id
+                          WHERE k.id = ? OR k.path LIKE (SELECT path || '|%' FROM keyword WHERE id = ?))"
+                    .into(),
+            );
+            values.push(Value::Text(keyword.to_string()));
+            values.push(Value::Text(keyword.to_string()));
+        }
+        if let Some(c) = after {
+            conditions.push("(p.capture_time, p.id) < (?, ?)".into());
+            values.push(Value::Integer(c.capture_time));
+            values.push(Value::Text(c.id.to_string()));
+        }
+        values.push(Value::Integer(i64::from(limit)));
+        let clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
+        };
+        let sql = format!(
+            "SELECT {COLUMNS} {FROM} {clause} ORDER BY p.capture_time DESC, p.id DESC LIMIT ?"
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(values), photo_row)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The whole vocabulary, in path order (a parent before its children), with how many photos carry
+    /// each keyword directly.
+    pub fn keywords_with_counts(&self) -> Result<Vec<KeywordRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT k.id, k.parent_id, k.name, k.path, k.export,
+                    (SELECT COUNT(*) FROM photo_keyword pk WHERE pk.keyword_id = k.id)
+             FROM keyword k ORDER BY k.path",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            let id: String = r.get(0)?;
+            let parent: Option<String> = r.get(1)?;
+            let bad = |column: usize| {
+                rusqlite::Error::InvalidColumnType(
+                    column,
+                    "keyword id".into(),
+                    rusqlite::types::Type::Text,
+                )
+            };
+            Ok(KeywordRow {
+                id: id.parse().map_err(|_| bad(0))?,
+                parent: parent.and_then(|p| p.parse().ok()),
+                name: r.get(2)?,
+                path: r.get(3)?,
+                export: r.get::<_, i64>(4)? != 0,
+                photos: r.get::<_, i64>(5)? as u64,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// For each keyword, how many of `photos` carry it directly (keywords none of them carry are left
+    /// out): what a keyword panel shows for a selection (none, some or all of it).
+    pub fn keyword_usage(&self, photos: &[PhotoId]) -> Result<HashMap<KeywordId, usize>> {
+        let mut usage: HashMap<KeywordId, usize> = HashMap::new();
+        for chunk in photos.chunks(500) {
+            let placeholders = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            let sql = format!(
+                "SELECT keyword_id, COUNT(*) FROM photo_keyword WHERE photo_id IN ({placeholders})
+                 GROUP BY keyword_id"
+            );
+            let mut stmt = self.conn.prepare(&sql)?;
+            let texts: Vec<String> = chunk.iter().map(ToString::to_string).collect();
+            let rows = stmt.query_map(rusqlite::params_from_iter(&texts), |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+            })?;
+            for row in rows {
+                let (keyword, count) = row?;
+                if let Ok(keyword) = keyword.parse() {
+                    *usage.entry(keyword).or_default() += count as usize;
+                }
+            }
+        }
+        Ok(usage)
     }
 
     /// How many photos there are in total.

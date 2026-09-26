@@ -11,6 +11,7 @@ AppTestCase {
 
     function init() {
         launch("")
+        app.width = 1400 + panelWidth
         compare(app.launcher.screen, "workspace")
         compare(app.currentTask, "cull", "a workspace with photos opens on the grid")
         tryCompare(app.photos, "count", 80)
@@ -33,7 +34,9 @@ AppTestCase {
         wait(60)
     }
 
-    function shownWidth(columns) { return columns * 164 }
+    // The keyword panel takes 280 px of the window; the grid has the rest.
+    readonly property int panelWidth: 280
+    function shownWidth(columns) { return columns * 164 + panelWidth }
 
     // The tests share the machine, and a rating is kept in the catalogue: what a test rated is
     // cleared afterwards (and the language put back), so that the next one starts from the same photos.
@@ -275,26 +278,26 @@ AppTestCase {
     }
 
     function test_a_resized_window_shows_as_many_columns_as_fit_and_keeps_the_selected_photo() {
-        app.width = 1400
+        app.width = 1400 + panelWidth
         wait(300)
         compare(grid.columns, 8)
         clickCell(3)
         // 1100 wide holds six cells.
-        app.width = 1100
+        app.width = 1100 + panelWidth
         wait(300)
         compare(grid.columns, 6)
         compare(grid.currentIndex, 3, "the selection stays on its photo")
         // Narrower than one cell would still show one column; the window's minimum shows three.
-        app.width = 640
+        app.width = 640 + panelWidth
         wait(300)
         compare(grid.columns, 3)
-        app.width = 1900
+        app.width = 1900 + panelWidth
         wait(300)
         compare(grid.columns, 11)
         compare(grid.currentIndex, 3)
         // A selection that a resize pushed out of view is brought back.
         app.library.select(60)
-        app.width = 1400
+        app.width = 1400 + panelWidth
         wait(300)
         const item = grid.itemAtIndex(60)
         verify(item && item.y + item.height > grid.contentY && item.y < grid.contentY + grid.height,

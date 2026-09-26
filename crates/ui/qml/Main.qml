@@ -48,6 +48,7 @@ ApplicationWindow {
     // What the tests reach into (tests/qml/tst_*.qml).
     property alias welcome: welcomeView
     property alias library: libraryView
+    property alias keywordPanel: libraryView.keywordPanel
     property alias catalogue: catalogueView
     property alias flow: catalogueFlow
     property alias sources: sourceList
@@ -96,7 +97,7 @@ ApplicationWindow {
     property bool nativeDialogForced: false
     readonly property bool nativeDialogOpen: nativeDialogForced || openDialog.visible || catalogueFlow.browsing || newDialog.browsing
                                             || importDialog.browsing
-    readonly property bool dialogOpen: newDialog.visible || settingsDialog.visible || importDialog.visible
+    readonly property bool dialogOpen: newDialog.visible || settingsDialog.visible || importDialog.visible || libraryView.dialogOpen
                                        || aboutDialog.visible || catalogueFlow.dialogOpen || nativeDialogOpen
     readonly property bool inWorkspace: launcher.screen === "workspace"
     // The grid is what the person is looking at and can act on: the selection commands mean something.
@@ -118,6 +119,8 @@ ApplicationWindow {
     function openWorkspace() { openDialog.pick() }
     function showSettings() { settingsDialog.open() }
     function showAbout() { aboutDialog.open() }
+    // Ctrl+K: the keyboard goes to the keyword field.
+    function focusKeywords() { libraryView.focusKeywords() }
     // The grid's selection commands (`all`, `none`, `invert`).
     function selectPhotos(what) {
         if (what === "all") libraryView.selectAll()

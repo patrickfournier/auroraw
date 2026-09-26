@@ -643,8 +643,8 @@ file would have made a **reformatted card reusing file names skip files it had n
 backup root has its own namespace, and a job that ends without a failure removes its state. A
 resumed import's final report now also counts the files an earlier run settled.
 
-**Not done in this pass, still WP8's or a later package's:** the keywords, collections and metadata
-panels, undo, general settings, the 4K/laptop layout check, the pseudo-locale, thumbnails generated during the import rather than on first display, GPX wiring, and a
+**Not done in this pass, still WP8's or a later package's:** the collections and metadata
+panels, general settings, the 4K/laptop layout check, the pseudo-locale, thumbnails generated during the import rather than on first display, GPX wiring, and a
 CLI `import`. **Verified on a real display** (Patrick's local session, X11), before the freezes
 below: the shell renders, French is applied, clicking selects, `0`-`5` rate, arrows move, Tab moves
 between the fields, the Import view renders in the dark scheme and its labels fit in French. Filling the form
@@ -725,7 +725,7 @@ card banner's Import button and the Catalogue and Cull tabs do nothing (the menu
 Quit still work), and the scan's question about restoring removed photos waits until the open dialog
 is closed instead of replacing it.
 
-**Still open in WP8:** the keywords, collections and metadata panels, the 4K/laptop layout check, the pseudo-locale, GPX in the import dialog, a CLI `import`, importing individual files rather than a folder, source
+**Still open in WP8:** the collections and metadata panels, the 4K/laptop layout check, the pseudo-locale, GPX in the import dialog, a CLI `import`, importing individual files rather than a folder, source
 plugins for network and cloud kinds (`Engine::source_kinds` is ready for them), and the copy-on-demand
 of a non-local original when it is developed (M2). **Not verified on a real machine:** the native
 folder dialogs (including that they stay over the window on X11 and Wayland), a real card insertion, the hamburger's look, typing with an input method.
@@ -746,6 +746,7 @@ packages (WP9 onward) is built on the Qt shell.
 **Q6 (2026-09-25)** is parity: all 54 Slint scenarios have a Qt counterpart (`docs/ui-parity-checklist.md`), every view is drawn to a PNG in both languages and kept as a CI artifact, and the application's own start-up is a test (it found that Qt 6.4 does not look in the resources for the module by itself, so the theme was undefined in the real application, and a binding loop with Qt 6.8). Also found: a `Repeater` whose model held translated text was rebuilt by a change of language and crashed Qt 6.4's layout when the dialog was next opened, and the welcome note was built in Rust, untranslated. What remains for Q6 is Patrick's pass on Linux and Windows. Linux (2026-09-25): dialogs fully modal, typing, shortcuts and grid fine; from it, IBM Plex Sans 11 pt carried by the application (D-095), the Alt mnemonics underlined in the menu, disabled buttons dimmed, and a workspace opened over another (New or Open) now starts every view over.
 **Multiple selection in the grid (2026-09-26, D-097):** Shift (range), Ctrl (add or remove one) and both, with the mouse and the keys (arrows, Home, End, PageUp, PageDown), Space, Escape, a rubber band, Select all, none and invert in the Edit menu, "12 photos selected" in the strip, and the rating keys rate the whole selection as one undoable step. WP9's culling actions and WP10's batches act on this selection through `Command::Batch`.
 **Undo and Redo of photo actions (2026-09-26, D-096):** the engine keeps a bounded in-memory history of ratings, flags and keywords (before and after pairs, one entry per action, `Command::Batch` for many photos), the Edit menu names the step ("Undo rating"), Ctrl+Z and Ctrl+Y act on the grid when no text field has the keyboard, and the photo undone is selected and shown. WP9's "resolving a series and undoing it" and WP10's "a batch edit of 10,000 photos is one transaction, undoable" build on `Command::Batch`.
+**Flags and keywords in the interface (2026-09-26, D-098):** P, X and U (toggling, on a selection as one undoable step), rejected photos dimmed and kept until the list is read again, the flag filter (not rejected, all, picked, rejected) composed with the rating and keyword filters in one catalogue query, and a keyword panel beside the grid: the vocabulary as a tree with counts, a none/some/all check for the selection, type-ahead with Enter to give or create, Shift+Enter to create, rename, and *show the photos with this keyword*. Collections and the metadata panel are WP10's.
 **Q7 (2026-09-25) is done: the cutover.** `crates/ui` is the Qt Quick interface (the Slint crate is deleted; its last state is the tag `slint-shell-final`), `auroraw-app` runs it with no feature to choose, Slint and its dependencies are out of `Cargo.lock`, `deny.toml` and CI, and the branch is merged into `dev`. Windows was not looked at by hand before the merge (a decision of Patrick's); CI runs its suites.
 
 ### WP9 Culling (XL). Needs WP5, WP8
