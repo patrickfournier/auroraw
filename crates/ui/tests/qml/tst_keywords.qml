@@ -97,7 +97,7 @@ AppTestCase {
         compare(item("Peru").photos, 3)
         compare(app.keywordPanel.filterField.text, "", "the field is emptied")
         tryVerify(() => app.actions.undo.enabled, 5000)
-        compare(app.actions.undo.text, "Undo keywords of 3 photos")
+        compare(app.actions.undo.text, "Undo creating the keyword", "making it and giving it to the photos is one step")
     }
 
     function test_typing_a_keyword_that_exists_gives_it_and_does_not_make_another() {
@@ -125,7 +125,7 @@ AppTestCase {
         compare(item("Tri").photos, 0)
     }
 
-    function test_undo_and_redo_bring_the_panel_along() {
+    function test_undoing_the_making_of_a_keyword_takes_it_and_its_photos_back() {
         selectFirst(3)
         typeKeyword("Undoable")
         tryCompare(item("Undoable"), "carried", 2)
@@ -133,13 +133,30 @@ AppTestCase {
         keyClick(Qt.Key_Escape)
         verify(app.library.grid.activeFocus, "Escape gives the keyboard back to the grid")
         keyClick(Qt.Key_Z, Qt.ControlModifier)
-        tryCompare(item("Undoable"), "carried", 0)
-        compare(item("Undoable").photos, 0)
+        tryVerify(() => rowOf("Undoable") === -1, 5000, "the keyword is gone from the panel")
+        compare(app.photos.selectedCount, 3, "the selection stays: a keyword coming back is not about the photos")
         tryVerify(() => app.actions.redo.enabled)
-        compare(app.actions.redo.text, "Redo keywords of 3 photos")
+        compare(app.actions.redo.text, "Redo creating the keyword")
         keyClick(Qt.Key_Y, Qt.ControlModifier)
+        tryVerify(() => rowOf("Undoable") >= 0, 5000)
         tryCompare(item("Undoable"), "carried", 2)
         compare(item("Undoable").photos, 3)
+    }
+
+    function test_giving_a_keyword_that_exists_is_undone_as_keywords_of_photos() {
+        selectFirst(3)
+        typeKeyword("Given")
+        tryCompare(item("Given"), "photos", 3)
+        click(5)
+        click(7, Qt.ShiftModifier)
+        typeKeyword("given")
+        tryCompare(item("Given"), "photos", 6)
+        tryVerify(() => app.actions.undo.text === "Undo keywords of 3 photos", 5000, app.actions.undo.text)
+        wait(300)
+        keyClick(Qt.Key_Escape)
+        keyClick(Qt.Key_Z, Qt.ControlModifier)
+        tryCompare(item("Given"), "photos", 3)
+        tryVerify(() => app.actions.redo.text === "Redo keywords of 3 photos")
     }
 
     function test_nothing_is_given_when_nothing_is_selected() {
@@ -278,7 +295,7 @@ AppTestCase {
         app.launcher.chooseLanguage("fr")
         wait(250)
         compare(app.keywordPanel.filterField.placeholderText, "Chercher ou ajouter un mot-clé…")
-        tryVerify(() => app.actions.undo.text === "Annuler les mots-clés de 3 photos", 5000, app.actions.undo.text)
+        tryVerify(() => app.actions.undo.text === "Annuler la création du mot-clé", 5000, app.actions.undo.text)
         compare(app.library.summary, "3 photos sélectionnées", "what is already on screen changes language")
         snapshot("keywords-fr")
     }

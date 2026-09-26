@@ -220,10 +220,11 @@ impl KeywordList {
         {
             return text(&existing.id.to_string());
         }
-        match session
-            .engine
-            .submit_and_wait(Command::CreateKeyword { name, parent })
-        {
+        match session.engine.submit_and_wait(Command::CreateKeyword {
+            name,
+            parent,
+            id: None,
+        }) {
             Ok(Outcome::KeywordCreated(id)) => {
                 self.as_mut().refresh();
                 text(&id.to_string())
@@ -245,6 +246,162 @@ impl KeywordList {
             keyword_id: id,
             new_name,
         }) {
+            Ok(_) => {
+                self.as_mut().refresh();
+                QString::default()
+            }
+            Err(e) => text(&e.to_string()),
+        }
+    }
+
+    /// `id` and every keyword under it.
+    fn branch_of(&self, id: KeywordId) -> Vec<KeywordId> {
+        let mut branch = vec![id];
+        let mut i = 0;
+        while i < branch.len() {
+            let parent = branch[i];
+            branch.extend(
+                self.all
+                    .iter()
+                    .filter(|k| k.parent == Some(parent))
+                    .map(|k| k.id),
+            );
+            i += 1;
+        }
+        branch
+    }
+
+    fn keyword(&self, id: KeywordId) -> Option<&KeywordRow> {
+        self.all.iter().find(|k| k.id == id)
+    }
+
+    /// Whether the keyword `id` can be put under `parent` (`None`: the top level): it is not where it is
+    /// already, not under itself or one of its own, and no sibling there has its name.
+    fn may_move(&self, id: KeywordId, parent: Option<KeywordId>) -> bool {
+        let Some(keyword) = self.keyword(id) else {
+            return false;
+        };
+        if keyword.parent == parent {
+            return false;
+        }
+        if let Some(parent) = parent
+            && (self.keyword(parent).is_none() || self.branch_of(id).contains(&parent))
+        {
+            return false;
+        }
+        let name = keyword.name.to_lowercase();
+        !self
+            .all
+            .iter()
+            .any(|k| k.parent == parent && k.id != id && k.name.to_lowercase() == name)
+    }
+
+    pub fn find_sibling(&self, name: &QString, parent: &QString) -> QString {
+        let name = name.to_string().trim().to_lowercase();
+        let parent: Option<KeywordId> = parent.to_string().parse().ok();
+        self.all
+            .iter()
+            .find(|k| k.parent == parent && k.name.to_lowercase() == name)
+            .map(|k| text(&k.id.to_string()))
+            .unwrap_or_default()
+    }
+
+    pub fn has_keyword(&self, id: &QString) -> bool {
+        id.to_string()
+            .parse()
+            .is_ok_and(|id| self.keyword(id).is_some())
+    }
+
+    pub fn can_move(&self, id: &QString, parent: &QString) -> bool {
+        let Ok(id) = id.to_string().parse::<KeywordId>() else {
+            return false;
+        };
+        let parent = parent.to_string();
+        let parent = if parent.is_empty() {
+            None
+        } else {
+            match parent.parse::<KeywordId>() {
+                Ok(parent) => Some(parent),
+                Err(_) => return false,
+            }
+        };
+        self.may_move(id, parent)
+    }
+
+    /// Where the keyword can go, for the Move dialog: JSON `[{"id": ..., "path": "A › B"}]`, in the tree's
+    /// order, without the keyword's own branch and the places it would clash.
+    pub fn move_targets(&self, id: &QString) -> QString {
+        let Ok(id) = id.to_string().parse::<KeywordId>() else {
+            return text("[]");
+        };
+        let targets: Vec<serde_json::Value> = self
+            .all
+            .iter()
+            .filter(|k| self.may_move(id, Some(k.id)))
+            .map(|k| serde_json::json!({ "id": k.id.to_string(), "path": k.path.replace('|', " › ") }))
+            .collect();
+        text(&serde_json::Value::Array(targets).to_string())
+    }
+
+    /// What deleting the keyword takes with it, for the confirmation: JSON `{"name", "keywords", "photos"}`
+    /// (how many keywords are in the branch, and how many photos carry one of them).
+    pub fn branch(&self, id: &QString) -> QString {
+        let Some(keyword) = id
+            .to_string()
+            .parse::<KeywordId>()
+            .ok()
+            .and_then(|id| self.keyword(id))
+        else {
+            return text("{}");
+        };
+        let ids = self.branch_of(keyword.id);
+        let photos = session::current()
+            .and_then(|s| s.engine.read_catalogue().ok())
+            .and_then(|c| c.photos_with_keywords(&ids).ok())
+            .map_or(0, |p| p.len());
+        text(
+            &serde_json::json!({ "name": keyword.name, "keywords": ids.len(), "photos": photos })
+                .to_string(),
+        )
+    }
+
+    /// Puts the keyword under `parent` (an identifier; empty for the top level); empty, or why not.
+    pub fn move_keyword(mut self: Pin<&mut Self>, id: &QString, parent: &QString) -> QString {
+        let Some(session) = session::current() else {
+            return text("no workspace is open");
+        };
+        let Ok(keyword_id) = id.to_string().parse::<KeywordId>() else {
+            return text("no such keyword");
+        };
+        let new_parent: Option<KeywordId> = parent.to_string().parse().ok();
+        // What was moved is to be seen where it went.
+        if let Some(parent) = new_parent {
+            self.as_mut().rust_mut().collapsed.remove(&parent);
+        }
+        match session.engine.submit_and_wait(Command::MoveKeyword {
+            keyword_id,
+            new_parent,
+        }) {
+            Ok(_) => {
+                self.as_mut().refresh();
+                QString::default()
+            }
+            Err(e) => text(&e.to_string()),
+        }
+    }
+
+    /// Deletes the keyword and its branch (one step of the history); empty, or why not.
+    pub fn remove(mut self: Pin<&mut Self>, id: &QString) -> QString {
+        let Some(session) = session::current() else {
+            return text("no workspace is open");
+        };
+        let Ok(keyword_id) = id.to_string().parse::<KeywordId>() else {
+            return text("no such keyword");
+        };
+        match session
+            .engine
+            .submit_and_wait(Command::DeleteKeyword { keyword_id })
+        {
             Ok(_) => {
                 self.as_mut().refresh();
                 QString::default()

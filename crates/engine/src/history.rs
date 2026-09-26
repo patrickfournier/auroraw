@@ -14,6 +14,7 @@
 use std::collections::VecDeque;
 
 use auroraw_format::sidecar::{Flag, Metadata};
+use auroraw_format::state::KeywordEntry;
 use auroraw_types::{KeywordId, PhotoId};
 
 /// How many steps the history keeps before it forgets the oldest.
@@ -38,7 +39,31 @@ pub enum Direction {
     Redo,
 }
 
-/// One state change of one photo, as it was and as it became.
+/// What was done to the vocabulary (it names the step, and tells the engine what to check).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VocabularyAction {
+    /// A keyword was made.
+    Create,
+    /// A keyword was renamed.
+    Rename,
+    /// A keyword was moved under another (or to the top level).
+    Move,
+    /// A keyword and its branch were deleted.
+    Delete,
+}
+
+/// One keyword of the vocabulary, as it was and as it became (`None`: it did not exist).
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeywordDelta {
+    /// Which keyword.
+    pub id: KeywordId,
+    /// The entry before.
+    pub before: Option<KeywordEntry>,
+    /// The entry after.
+    pub after: Option<KeywordEntry>,
+}
+
+/// One state change of one photo, or of the vocabulary, as it was and as it became.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Change {
     /// The photo's own rating.
@@ -68,15 +93,24 @@ pub enum Change {
         /// The keywords after.
         after: KeywordSet,
     },
+    /// The vocabulary: only the entries that changed. Applied by the coordinator (it also brings the
+    /// catalogue and the sidecars' path snapshots in line), not by [`Change::apply`].
+    Vocabulary {
+        /// What was done.
+        action: VocabularyAction,
+        /// The keywords it touched.
+        keywords: Vec<KeywordDelta>,
+    },
 }
 
 impl Change {
-    /// The photo the change is about.
-    pub fn photo(&self) -> PhotoId {
+    /// The photo the change is about (none for a change of the vocabulary).
+    pub fn photo(&self) -> Option<PhotoId> {
         match self {
             Change::Rating { photo, .. }
             | Change::Flag { photo, .. }
-            | Change::Keywords { photo, .. } => *photo,
+            | Change::Keywords { photo, .. } => Some(*photo),
+            Change::Vocabulary { .. } => None,
         }
     }
 
@@ -85,10 +119,16 @@ impl Change {
             Change::Rating { .. } => LabelKind::Rating,
             Change::Flag { .. } => LabelKind::Flag,
             Change::Keywords { .. } => LabelKind::Keywords,
+            Change::Vocabulary { action, .. } => match action {
+                VocabularyAction::Create => LabelKind::KeywordCreate,
+                VocabularyAction::Rename => LabelKind::KeywordRename,
+                VocabularyAction::Move => LabelKind::KeywordMove,
+                VocabularyAction::Delete => LabelKind::KeywordDelete,
+            },
         }
     }
 
-    /// Puts `meta` in the state `direction` leads to.
+    /// Puts `meta` in the state `direction` leads to (nothing for a change of the vocabulary).
     pub fn apply(&self, meta: &mut Metadata, direction: Direction) {
         let undo = direction == Direction::Undo;
         match self {
@@ -101,6 +141,7 @@ impl Change {
                 meta.keyword_ids = set.ids.clone();
                 meta.keyword_paths = set.paths.clone();
             }
+            Change::Vocabulary { .. } => {}
         }
     }
 }
@@ -116,6 +157,14 @@ pub enum LabelKind {
     Keywords,
     /// Several kinds of change at once.
     Batch,
+    /// A keyword was made (with or without photos given it).
+    KeywordCreate,
+    /// A keyword was renamed.
+    KeywordRename,
+    /// A keyword was moved.
+    KeywordMove,
+    /// A keyword and its branch were deleted.
+    KeywordDelete,
 }
 
 impl LabelKind {
@@ -126,16 +175,20 @@ impl LabelKind {
             LabelKind::Flag => "flag",
             LabelKind::Keywords => "keywords",
             LabelKind::Batch => "batch",
+            LabelKind::KeywordCreate => "keyword-create",
+            LabelKind::KeywordRename => "keyword-rename",
+            LabelKind::KeywordMove => "keyword-move",
+            LabelKind::KeywordDelete => "keyword-delete",
         }
     }
 }
 
-/// What a step is: a kind and how many photos it touched.
+/// What a step is: a kind and how many photos (or, for a change of the vocabulary, keywords) it touched.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Label {
     /// What kind of change.
     pub kind: LabelKind,
-    /// How many photos.
+    /// How many photos, or keywords for a change of the vocabulary.
     pub count: usize,
 }
 
@@ -149,30 +202,45 @@ pub struct Entry {
 }
 
 impl Entry {
-    /// An entry for `changes` (not empty), labelled by what they have in common.
+    /// An entry for `changes` (not empty), labelled by what they have in common. An action that changed the
+    /// vocabulary is named by that change, whatever photos it also touched (making a keyword and giving it to
+    /// three photos is "keyword created"), and counts keywords.
     pub fn new(changes: Vec<Change>) -> Self {
         debug_assert!(!changes.is_empty());
-        let kind = match changes.first().map(Change::kind) {
-            Some(first) if changes.iter().all(|c| c.kind() == first) => first,
-            _ => LabelKind::Batch,
+        let vocabulary = changes.iter().find_map(|c| match c {
+            Change::Vocabulary { keywords, .. } => Some((c.kind(), keywords.len())),
+            _ => None,
+        });
+        let label = match vocabulary {
+            Some((kind, count)) => Label { kind, count },
+            None => {
+                let kind = match changes.first().map(Change::kind) {
+                    Some(first) if changes.iter().all(|c| c.kind() == first) => first,
+                    _ => LabelKind::Batch,
+                };
+                let mut photos: Vec<PhotoId> = changes.iter().filter_map(Change::photo).collect();
+                photos.sort_by_key(|p| p.to_string());
+                photos.dedup();
+                Label {
+                    kind,
+                    count: photos.len(),
+                }
+            }
         };
-        let mut photos: Vec<PhotoId> = changes.iter().map(Change::photo).collect();
-        photos.sort_by_key(|p| p.to_string());
-        photos.dedup();
-        Self {
-            label: Label {
-                kind,
-                count: photos.len(),
-            },
-            changes,
-        }
+        Self { label, changes }
+    }
+
+    /// Whether the entry changed the vocabulary.
+    pub fn has_vocabulary(&self) -> bool {
+        self.changes
+            .iter()
+            .any(|c| matches!(c, Change::Vocabulary { .. }))
     }
 
     /// The photos the entry touches, each once, in the order of the changes.
     pub fn photos(&self) -> Vec<PhotoId> {
         let mut seen = Vec::new();
-        for change in &self.changes {
-            let photo = change.photo();
+        for photo in self.changes.iter().filter_map(Change::photo) {
             if !seen.contains(&photo) {
                 seen.push(photo);
             }
@@ -247,14 +315,25 @@ impl History {
         }
     }
 
-    /// Forgets every step that is about `photo` (it left the workspace): whether anything went.
+    /// Forgets what the history holds about `photo` (it left the workspace): whether anything went. A step
+    /// that is only about it goes; a step that also changed the vocabulary stays without that photo's
+    /// changes, so that a deleted keyword can still be brought back for the photos that remain.
     pub fn forget_photo(&mut self, photo: PhotoId) -> bool {
+        let mut forgot = false;
+        for entry in self.undo.iter_mut().chain(self.redo.iter_mut()) {
+            if entry.has_vocabulary() {
+                let before = entry.changes.len();
+                entry.changes.retain(|c| c.photo() != Some(photo));
+                forgot |= entry.changes.len() != before;
+            }
+        }
         let before = self.undo.len() + self.redo.len();
-        self.undo
-            .retain(|entry| entry.changes.iter().all(|c| c.photo() != photo));
-        self.redo
-            .retain(|entry| entry.changes.iter().all(|c| c.photo() != photo));
-        self.undo.len() + self.redo.len() != before
+        let keep = |entry: &Entry| {
+            entry.has_vocabulary() || entry.changes.iter().all(|c| c.photo() != Some(photo))
+        };
+        self.undo.retain(keep);
+        self.redo.retain(keep);
+        forgot || self.undo.len() + self.redo.len() != before
     }
 
     /// What Undo and Redo would do.
@@ -395,5 +474,75 @@ mod tests {
         assert!(history.forget_photo(a));
         assert!(!history.forget_photo(a), "nothing left to forget");
         assert_eq!(history.undo_depth(), 1);
+    }
+
+    fn vocabulary_change(action: VocabularyAction, n: usize) -> Change {
+        let keywords = (0..n)
+            .map(|_| KeywordDelta {
+                id: KeywordId::random(),
+                before: None,
+                after: None,
+            })
+            .collect();
+        Change::Vocabulary { action, keywords }
+    }
+
+    #[test]
+    fn a_step_that_changed_the_vocabulary_is_named_by_it_and_counts_keywords() {
+        let photo = PhotoId::random();
+        let deleted = Entry::new(vec![
+            Change::Keywords {
+                photo,
+                before: KeywordSet::default(),
+                after: KeywordSet::default(),
+            },
+            vocabulary_change(VocabularyAction::Delete, 3),
+        ]);
+        assert_eq!(
+            deleted.label,
+            Label {
+                kind: LabelKind::KeywordDelete,
+                count: 3
+            }
+        );
+        assert!(deleted.has_vocabulary());
+        assert_eq!(deleted.photos(), vec![photo]);
+        let created = Entry::new(vec![
+            vocabulary_change(VocabularyAction::Create, 1),
+            rating(photo, None, Some(1)),
+        ]);
+        assert_eq!(created.label.kind, LabelKind::KeywordCreate);
+        let mut meta = Metadata::default();
+        vocabulary_change(VocabularyAction::Move, 1).apply(&mut meta, Direction::Redo);
+        assert_eq!(meta, Metadata::default(), "a photo is not what it changes");
+    }
+
+    #[test]
+    fn a_photo_that_left_takes_its_own_steps_but_only_its_share_of_a_vocabulary_step() {
+        let (a, b) = (PhotoId::random(), PhotoId::random());
+        let mut history = History::default();
+        history.record(one(a, 1));
+        history.record(Entry::new(vec![
+            Change::Keywords {
+                photo: a,
+                before: KeywordSet::default(),
+                after: KeywordSet::default(),
+            },
+            Change::Keywords {
+                photo: b,
+                before: KeywordSet::default(),
+                after: KeywordSet::default(),
+            },
+            vocabulary_change(VocabularyAction::Delete, 1),
+        ]));
+        assert!(history.forget_photo(a));
+        assert_eq!(
+            history.undo_depth(),
+            1,
+            "the rating of `a` went, the delete stayed"
+        );
+        let delete = history.take_undo().unwrap();
+        assert_eq!(delete.photos(), vec![b], "without the photo that left");
+        assert!(delete.has_vocabulary());
     }
 }

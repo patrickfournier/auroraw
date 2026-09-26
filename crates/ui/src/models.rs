@@ -80,6 +80,17 @@ pub mod qobject {
         #[cxx_name = "keywordSelection"]
         fn keyword_selection(self: Pin<&mut PhotoGrid>, keyword: &QString, add: bool) -> i32;
 
+        /// Makes the keyword `name` under `parent` (an identifier; empty for the top level) and gives it to
+        /// every selected photo, as one action (one step of the history). Its identifier, or `error:` and
+        /// why not.
+        #[qinvokable]
+        #[cxx_name = "createKeywordSelection"]
+        fn create_keyword_selection(
+            self: Pin<&mut PhotoGrid>,
+            name: &QString,
+            parent: &QString,
+        ) -> QString;
+
         /// The photo in `row` (its identifier, empty when there is none).
         #[qinvokable]
         #[cxx_name = "idAt"]
@@ -336,6 +347,40 @@ pub mod qobject {
         /// Renames the keyword in `row`; empty, or why not.
         #[qinvokable]
         fn rename(self: Pin<&mut KeywordList>, row: i32, name: &QString) -> QString;
+
+        /// The identifier of the keyword named `name` (any case) under `parent` (empty for the top level),
+        /// or empty when there is none.
+        #[qinvokable]
+        #[cxx_name = "findSibling"]
+        fn find_sibling(self: &KeywordList, name: &QString, parent: &QString) -> QString;
+
+        /// Whether the keyword `id` is still in the vocabulary.
+        #[qinvokable]
+        #[cxx_name = "hasKeyword"]
+        fn has_keyword(self: &KeywordList, id: &QString) -> bool;
+
+        /// Whether the keyword `id` can be put under `parent` (empty for the top level).
+        #[qinvokable]
+        #[cxx_name = "canMove"]
+        fn can_move(self: &KeywordList, id: &QString, parent: &QString) -> bool;
+
+        /// Where `id` can go (JSON `[{"id", "path"}]`), for the Move dialog.
+        #[qinvokable]
+        #[cxx_name = "moveTargets"]
+        fn move_targets(self: &KeywordList, id: &QString) -> QString;
+
+        /// What deleting `id` takes with it (JSON `{"name", "keywords", "photos"}`).
+        #[qinvokable]
+        fn branch(self: &KeywordList, id: &QString) -> QString;
+
+        /// Puts `id` under `parent` (empty for the top level); empty, or why not.
+        #[qinvokable]
+        #[cxx_name = "moveKeyword"]
+        fn move_keyword(self: Pin<&mut KeywordList>, id: &QString, parent: &QString) -> QString;
+
+        /// Deletes `id` and its branch; empty, or why not.
+        #[qinvokable]
+        fn remove(self: Pin<&mut KeywordList>, id: &QString) -> QString;
     }
 
     unsafe extern "RustQt" {
@@ -839,6 +884,37 @@ impl qobject::PhotoGrid {
         };
         let _ = session.engine.submit(command);
         rows.len() as i32
+    }
+
+    pub fn create_keyword_selection(
+        self: Pin<&mut Self>,
+        name: &QString,
+        parent: &QString,
+    ) -> QString {
+        let Some(session) = session::current() else {
+            return QString::from("error:no workspace is open");
+        };
+        let rows = self.selected_rows();
+        let keyword_id = auroraw_types::KeywordId::random();
+        let parent = auroraw_types::KeywordId::from_str(&parent.to_string()).ok();
+        let mut commands = vec![Command::CreateKeyword {
+            name: name.to_string(),
+            parent,
+            id: Some(keyword_id),
+        }];
+        commands.extend(rows.iter().map(|row| Command::AddKeyword {
+            photo_id: self.items[*row].id,
+            keyword_id,
+        }));
+        let command = if commands.len() == 1 {
+            commands.remove(0)
+        } else {
+            Command::Batch { commands }
+        };
+        match session.engine.submit_and_wait(command) {
+            Ok(_) => QString::from(keyword_id.to_string().as_str()),
+            Err(e) => QString::from(format!("error:{e}").as_str()),
+        }
     }
 
     /// Redraws every cell's rating and flag.

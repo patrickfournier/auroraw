@@ -62,6 +62,11 @@ pub enum Event {
         /// How many sidecars it will touch.
         affected: usize,
     },
+    /// A keyword and its branch were moved (the catalogue already reflects it; the sidecars' path
+    /// snapshots follow in a background job).
+    KeywordMoved(KeywordId),
+    /// A keyword and its branch were deleted.
+    KeywordDeleted(KeywordId),
     /// A background job made progress.
     JobProgress {
         /// The job.

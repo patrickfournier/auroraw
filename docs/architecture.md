@@ -171,7 +171,13 @@ runs in a separate helper process, so that its crash or corruption stays out of 
   other direction; a new edit discards what was undone; a same-value edit is not a step; a step about a
   photo that has gone is dropped. The history is in memory, for the open workspace, and bounded (500
   steps); `Event::HistoryChanged` says what Undo and Redo would do and `Event::HistoryApplied` which photos
-  were touched. Something new that a person can undo adds a `Change` variant, nothing else.
+  were touched. Something new that a person can undo adds a `Change` variant, nothing else. The vocabulary is
+  one of them (D-099): `Change::Vocabulary` holds the keyword entries that changed, before and after, and an
+  action that deletes a keyword records the photos that lost it and then the vocabulary change, so that undo
+  brings the vocabulary back before the photos.
+- **Sidecar edits are serialised** (D-099): every read-modify-write of one photo's files, from the coordinator or
+  from a background job (the path refresh after a keyword edit, the removal of a source, an index merge), holds
+  `Workspace::sidecar_guard()`; refresh jobs run one at a time, in the order asked.
 - The grid's list is **one composed catalogue query** (`Filter` and `Catalogue::list_filtered`, D-098):
   minimum rating, flag view (not rejected, all, picked, rejected) and keyword (with its descendants)
   are conditions joined in one keyset-paged statement, so a new filter is a field, not a function.

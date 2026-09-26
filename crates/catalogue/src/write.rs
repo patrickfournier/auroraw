@@ -9,7 +9,7 @@
 
 use auroraw_format::sidecar::{PhotoSidecar, VersionSidecar};
 use auroraw_format::state::{KeywordEntry, SourceEntry};
-use auroraw_types::{ContentHash, Fingerprint, PhotoId, SourceId};
+use auroraw_types::{ContentHash, Fingerprint, KeywordId, PhotoId, SourceId};
 use rusqlite::{OptionalExtension, params};
 
 use crate::SidecarStat;
@@ -109,6 +109,23 @@ impl Catalogue {
                 parent_id = excluded.parent_id, name = excluded.name, path = excluded.path, export = excluded.export",
             params![entry.id.to_string(), entry.parent.map(|p| p.to_string()), entry.name, path, entry.export as i64],
         )?;
+        Ok(())
+    }
+
+    /// Removes keywords from the catalogue: the photos and versions that carry them stop carrying
+    /// them, then the rows go (parents and children in one transaction, so the order among them does
+    /// not matter). The sidecars are the caller's: it has already taken these keywords off the photos
+    /// (or, undoing the creation of a keyword, nobody has them).
+    pub fn remove_keywords(&mut self, ids: &[KeywordId]) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute_batch("PRAGMA defer_foreign_keys = ON")?;
+        for id in ids {
+            let id = id.to_string();
+            tx.execute("DELETE FROM photo_keyword WHERE keyword_id = ?1", [&id])?;
+            tx.execute("DELETE FROM version_keyword WHERE keyword_id = ?1", [&id])?;
+            tx.execute("DELETE FROM keyword WHERE id = ?1", [&id])?;
+        }
+        tx.commit()?;
         Ok(())
     }
 
@@ -320,6 +337,36 @@ mod tests {
             "untouched by a rating change"
         );
         assert_eq!(after.camera, before.camera, "untouched by a rating change");
+    }
+
+    #[test]
+    fn remove_keywords_drops_the_rows_and_what_carried_them() {
+        let mut cat = Catalogue::open_in_memory(WorkspaceId::random()).unwrap();
+        let (photo, stat) = one_photo();
+        let mut vocab = vocabulary();
+        // "Lake" is a child of "Heron": both go in one call, in any order.
+        vocab[1].parent = Some(vocab[0].id);
+        build(
+            &mut cat,
+            &RebuildInput {
+                photos: &[(photo.clone(), stat)],
+                vocabulary: &vocab,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(cat.keywords_with_counts().unwrap().len(), 2);
+        let ids: Vec<KeywordId> = vocab.iter().map(|k| k.id).collect();
+        cat.remove_keywords(&ids).unwrap();
+        assert!(cat.keywords_with_counts().unwrap().is_empty());
+        assert_eq!(
+            cat.list_by_keyword(&ids[0], false, None, 10).unwrap().len(),
+            0
+        );
+        assert!(
+            cat.photo(&photo.photo_id).unwrap().is_some(),
+            "the photo stays"
+        );
     }
 
     #[test]

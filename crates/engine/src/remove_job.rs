@@ -47,6 +47,9 @@ fn run(job: RemoveJob) {
             let _ = job.events.send(Event::JobCancelled(job.job));
             return;
         }
+        // Read, then rewritten or moved away, without another writer in between (a path refresh that read
+        // this sidecar just before would otherwise write it back after it has left).
+        let _guard = job.workspace.sidecar_guard();
         let sidecar = job
             .workspace
             .read_photo(&photo_id)

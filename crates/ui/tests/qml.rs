@@ -187,3 +187,11 @@ fn keywords_in_the_panel() {
     support::machine_with_photos(home.path(), 40);
     run_suite("keywords", home.path(), None);
 }
+
+/// Reorganising the vocabulary: drag and drop, the Move dialog, deleting a branch, undo.
+#[test]
+fn reorganising_the_keyword_tree() {
+    let home = temp_dir();
+    support::machine_with_photos(home.path(), 40);
+    run_suite("keyword_tree", home.path(), None);
+}

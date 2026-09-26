@@ -195,7 +195,7 @@ ApplicationWindow {
             History.redoCount = redoCount
         }
         // An action was undone or redone: the grid shows the photos it touched.
-        function onHistoryApplied(photoIds) { libraryView.historyApplied(photoIds.split(",")) }
+        function onHistoryApplied(photoIds) { libraryView.historyApplied(photoIds === "" ? [] : photoIds.split(",")) }
         function onJobCancelled() { libraryView.reload() }
         function onPhotoChanged(photoId) { libraryView.photoChanged(photoId) }
     }

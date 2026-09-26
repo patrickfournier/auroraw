@@ -245,6 +245,7 @@ fn cmd_keyword_create(args: &[String]) -> Result<(), CliError> {
     let Outcome::KeywordCreated(id) = engine.submit_and_wait(Command::CreateKeyword {
         name: name.clone(),
         parent,
+        id: None,
     })?
     else {
         unreachable!("CreateKeyword always returns KeywordCreated");

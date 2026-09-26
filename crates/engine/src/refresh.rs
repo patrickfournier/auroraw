@@ -9,7 +9,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::mpsc;
-use std::time::SystemTime;
 
 use auroraw_types::{KeywordId, PhotoId};
 use auroraw_workspace::Workspace;
@@ -18,13 +17,9 @@ use crate::coordinator::Inbound;
 use crate::event::Event;
 use crate::job::{CancelToken, JobId};
 
-fn stat_of(size: u64, modified: Option<SystemTime>) -> auroraw_catalogue::SidecarStat {
-    let modified = modified
-        .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs() as i64);
-    auroraw_catalogue::SidecarStat { size, modified }
-}
-
+/// Refreshes the path snapshot of `photo_ids`' sidecars from `paths`. Each photo is read, changed and
+/// written under the workspace's sidecar guard (a photo that another job moved away is not there any more
+/// under it, and is skipped instead of being written back); the catalogue's row follows on the coordinator.
 pub(crate) fn spawn(
     job: JobId,
     workspace: Arc<Workspace>,
@@ -40,41 +35,32 @@ pub(crate) fn spawn(
             let done = done + 1;
             if cancel.is_cancelled() {
                 let _ = events.send(Event::JobCancelled(job));
+                let _ = inbound.send(Inbound::RefreshDone);
                 return;
             }
-            if let Some(loaded) = workspace.read_photo(&id).ok().flatten()
-                && let Some(mut photo) = loaded.current()
             {
-                for (path, keyword_id) in photo
-                    .meta
-                    .keyword_paths
-                    .iter_mut()
-                    .zip(photo.meta.keyword_ids.iter())
+                let _guard = workspace.sidecar_guard();
+                if let Some(loaded) = workspace.read_photo(&id).ok().flatten()
+                    && let Some(mut photo) = loaded.current()
                 {
-                    if let Some(fresh) = paths.get(keyword_id) {
-                        *path = fresh.clone();
+                    for (path, keyword_id) in photo
+                        .meta
+                        .keyword_paths
+                        .iter_mut()
+                        .zip(photo.meta.keyword_ids.iter())
+                    {
+                        if let Some(fresh) = paths.get(keyword_id) {
+                            *path = fresh.clone();
+                        }
                     }
-                }
-                if workspace.write_photo(&photo).is_ok()
-                    && let Ok(meta) = std::fs::metadata(workspace.photo_path(&id))
-                {
-                    let stat = stat_of(meta.len(), meta.modified().ok());
-                    let main_version = photo.main_version.and_then(|v| {
-                        workspace
-                            .read_version(&id, &v)
-                            .ok()
-                            .flatten()
-                            .and_then(|l| l.current())
-                    });
-                    let _ = inbound.send(Inbound::Refreshed {
-                        photo: Box::new(photo),
-                        stat,
-                        main_version: main_version.map(Box::new),
-                    });
+                    if workspace.write_photo(&photo).is_ok() {
+                        let _ = inbound.send(Inbound::Refreshed { photo_id: id });
+                    }
                 }
             }
             let _ = events.send(Event::JobProgress { job, done, total });
         }
         let _ = events.send(Event::JobFinished(job));
+        let _ = inbound.send(Inbound::RefreshDone);
     });
 }

@@ -57,6 +57,10 @@ QtObject {
         case "rating": return qsTr("Undo %n rating(s)", "", count)
         case "flag": return qsTr("Undo %n flag(s)", "", count)
         case "keywords": return qsTr("Undo keywords of %n photo(s)", "", count)
+        case "keyword-create": return qsTr("Undo creating the keyword")
+        case "keyword-rename": return qsTr("Undo renaming the keyword")
+        case "keyword-move": return qsTr("Undo moving the keyword")
+        case "keyword-delete": return qsTr("Undo deleting %n keyword(s)", "", count)
         case "batch": return qsTr("Undo the change to %n photo(s)", "", count)
         }
         return qsTr("Undo")
@@ -67,6 +71,10 @@ QtObject {
         case "rating": return qsTr("Redo %n rating(s)", "", count)
         case "flag": return qsTr("Redo %n flag(s)", "", count)
         case "keywords": return qsTr("Redo keywords of %n photo(s)", "", count)
+        case "keyword-create": return qsTr("Redo creating the keyword")
+        case "keyword-rename": return qsTr("Redo renaming the keyword")
+        case "keyword-move": return qsTr("Redo moving the keyword")
+        case "keyword-delete": return qsTr("Redo deleting %n keyword(s)", "", count)
         case "batch": return qsTr("Redo the change to %n photo(s)", "", count)
         }
         return qsTr("Redo")

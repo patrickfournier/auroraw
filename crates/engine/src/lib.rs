@@ -38,7 +38,9 @@ pub use command::Command;
 pub use coordinator::Outcome;
 pub use error::{EngineError, Result};
 pub use event::Event;
-pub use history::{Change, HistoryState, KeywordSet, Label, LabelKind};
+pub use history::{
+    Change, HistoryState, KeywordDelta, KeywordSet, Label, LabelKind, VocabularyAction,
+};
 pub use import_flow::{
     DestinationKind, ImportRequest, ImportSourceInfo, ImportStarted, VolumeInfo,
 };
@@ -358,6 +360,7 @@ mod tests {
             .submit_and_wait(Command::CreateKeyword {
                 name: "Heron".into(),
                 parent: None,
+                id: None,
             })
             .unwrap()
         else {
@@ -449,6 +452,7 @@ mod tests {
             .submit_and_wait(Command::CreateKeyword {
                 name: "Heron".into(),
                 parent: None,
+                id: None,
             })
             .unwrap()
         else {

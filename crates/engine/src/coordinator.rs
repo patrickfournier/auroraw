@@ -3,7 +3,7 @@
 //! connection, applying commands strictly one at a time. Everything that changes the workspace or
 //! the catalogue goes through here, whichever thread asked for it.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc;
@@ -22,7 +22,9 @@ use auroraw_workspace::{FileStat, Workspace};
 use crate::command::Command;
 use crate::error::{EngineError, Result};
 use crate::event::Event;
-use crate::history::{Change, Direction, Entry, History, HistoryState, KeywordSet};
+use crate::history::{
+    Change, Direction, Entry, History, HistoryState, KeywordDelta, KeywordSet, VocabularyAction,
+};
 use crate::import_job::{self, ImportJob};
 use crate::index_job::{self, IndexJob};
 use crate::job::{CancelToken, JobId};
@@ -74,6 +76,14 @@ pub enum Outcome {
         /// The job scanning the source.
         job: JobId,
     },
+    /// `MoveKeyword`'s and `DeleteKeyword`'s report: how many keywords the action touched and how many
+    /// photos it changed (a move: how many sidecars will have their paths refreshed).
+    KeywordsChanged {
+        /// Keywords moved or deleted (with their branch).
+        keywords: usize,
+        /// Photos changed.
+        photos: usize,
+    },
     /// `RemoveSource`'s background job.
     RemoveStarted {
         /// The job removing the source.
@@ -121,13 +131,12 @@ pub(crate) enum Inbound {
         command: Command,
         reply: Option<Reply>,
     },
-    /// A background job finished refreshing one sidecar: apply the same change to the
-    /// catalogue's row, on the coordinator thread, like everything else.
-    Refreshed {
-        photo: Box<PhotoSidecar>,
-        stat: SidecarStat,
-        main_version: Option<Box<VersionSidecar>>,
-    },
+    /// A background job refreshed one sidecar: read it again and bring the catalogue's row in line, on the
+    /// coordinator thread, like everything else (what the job read may be older than what a person did
+    /// to the photo since, so the message carries no metadata).
+    Refreshed { photo_id: PhotoId },
+    /// The path-refresh job that was running is over (finished or cancelled): the next one may start.
+    RefreshDone,
     /// An import job (`crate::import_job`) landed one photo, or discovered (while checking a
     /// fingerprint match) the whole-file hash of a photo that only had a fingerprint recorded:
     /// `photo` and `stat` are `None` for a check that found nothing to register, `backfill` is
@@ -168,6 +177,24 @@ pub(crate) struct Coordinator {
     next_job: u64,
     /// What the person did to their photos, for Undo and Redo (D-096).
     history: History,
+    /// The path refreshes of the sidecars (after a keyword is renamed, moved, or one of those is undone)
+    /// run one at a time, in the order asked, so that the last vocabulary wins.
+    refresh_queue: VecDeque<RefreshRequest>,
+    refresh_running: bool,
+}
+
+/// A path refresh waiting for its turn.
+struct RefreshRequest {
+    job: JobId,
+    photo_ids: Vec<PhotoId>,
+    paths: HashMap<KeywordId, String>,
+}
+
+/// What a change of the vocabulary set going: the refresh job (when there is one) and how many photos it
+/// will touch.
+struct Refresh {
+    job: Option<JobId>,
+    affected: usize,
 }
 
 impl Coordinator {
@@ -186,6 +213,8 @@ impl Coordinator {
             index_decisions: HashMap::new(),
             next_job: 0,
             history: History::default(),
+            refresh_queue: VecDeque::new(),
+            refresh_running: false,
         }
     }
 
@@ -232,11 +261,13 @@ impl Coordinator {
                     announce,
                 } => self.finish_remove_source(job, source_id, removed, kept, announce),
                 Inbound::Command { command, reply } => self.handle_command(command, reply),
-                Inbound::Refreshed {
-                    photo,
-                    stat,
-                    main_version,
-                } => self.handle_refreshed(*photo, stat, main_version.as_deref()),
+                Inbound::Refreshed { photo_id } => self.handle_refreshed(photo_id),
+                Inbound::RefreshDone => {
+                    self.refresh_running = false;
+                    if let Some(next) = self.refresh_queue.pop_front() {
+                        self.start_refresh(next);
+                    }
+                }
                 Inbound::Imported {
                     photo,
                     stat,
@@ -283,11 +314,20 @@ impl Coordinator {
             Command::Batch { commands } => self.batch(commands),
             Command::Undo => self.travel(Direction::Undo),
             Command::Redo => self.travel(Direction::Redo),
-            Command::CreateKeyword { name, parent } => self.create_keyword(name, parent),
+            Command::CreateKeyword { name, parent, id } => {
+                let (id, change) = self.make_keyword(&name, parent, id)?;
+                self.record(vec![change]);
+                Ok(Outcome::KeywordCreated(id))
+            }
             Command::RenameKeyword {
                 keyword_id,
                 new_name,
             } => self.rename_keyword(keyword_id, new_name),
+            Command::MoveKeyword {
+                keyword_id,
+                new_parent,
+            } => self.move_keyword(keyword_id, new_parent),
+            Command::DeleteKeyword { keyword_id } => self.delete_keyword(keyword_id),
             Command::CancelJob { job_id } => self.cancel_job(job_id),
             Command::AddSource { name, root, kind } => self.add_source(name, root, kind),
             Command::ScanSource { source_id } => self.scan_source(source_id),
@@ -411,6 +451,9 @@ impl Coordinator {
                     after: keyword_set(m),
                 })
             }),
+            Command::CreateKeyword { name, parent, id } => {
+                Ok(Some(self.make_keyword(name, *parent, *id)?.1))
+            }
             other => Err(EngineError::InvalidCommand(format!(
                 "{other:?} is not an edit of a photo: it cannot be part of a batch"
             ))),
@@ -424,6 +467,8 @@ impl Coordinator {
         photo_id: PhotoId,
         edit: impl FnOnce(&mut auroraw_format::sidecar::Metadata) -> Option<Change>,
     ) -> Result<Option<Change>> {
+        let workspace = self.workspace.clone();
+        let _guard = workspace.sidecar_guard();
         let (mut photo, _) = self.read_photo(&photo_id)?;
         let change = edit(&mut photo.meta);
         // (A same-value edit still writes: it is how a sidecar that was changed outside is written back.)
@@ -486,12 +531,15 @@ impl Coordinator {
         let Some(entry) = taken else {
             return Ok(Outcome::Nothing);
         };
-        // Every photo has to be there, or the step is dropped (and the rest of the history stays).
+        // Every photo has to be there, or the step is dropped (and the rest of the history stays). A step
+        // that changed the vocabulary is done for the photos that remain instead: a keyword that was
+        // deleted must be able to come back even if some of its photos left with a source meanwhile.
+        let vocabulary = entry.has_vocabulary();
         if let Some(missing) = entry
             .changes
             .iter()
-            .map(Change::photo)
-            .find(|photo| self.read_photo(photo).is_err())
+            .filter_map(Change::photo)
+            .find(|photo| !vocabulary && self.read_photo(photo).is_err())
         {
             self.report_history();
             return Err(EngineError::NotFound {
@@ -504,12 +552,23 @@ impl Coordinator {
             Direction::Redo => entry.changes.iter().collect(),
         };
         for change in ordered {
+            if vocabulary
+                && let Some(photo) = change.photo()
+                && self.read_photo(&photo).is_err()
+            {
+                continue;
+            }
             if let Err(e) = self.write_change(change, direction) {
                 self.report_history();
                 return Err(e);
             }
         }
-        let photos = entry.photos();
+        // (The photos of a step about the vocabulary are not shown: a keyword coming back is not about them.)
+        let photos = if vocabulary {
+            Vec::new()
+        } else {
+            entry.photos()
+        };
         match direction {
             Direction::Undo => self.history.put_redo(entry),
             Direction::Redo => self.history.put_undo(entry),
@@ -524,7 +583,16 @@ impl Coordinator {
 
     /// Puts a photo in the state one change leads to.
     fn write_change(&mut self, change: &Change, direction: Direction) -> Result<()> {
-        let (mut photo, _) = self.read_photo(&change.photo())?;
+        if let Change::Vocabulary { keywords, .. } = change {
+            self.apply_vocabulary(keywords, direction, false)?;
+            return Ok(());
+        }
+        let photo_id = change
+            .photo()
+            .expect("a change that is not about the vocabulary has a photo");
+        let workspace = self.workspace.clone();
+        let _guard = workspace.sidecar_guard();
+        let (mut photo, _) = self.read_photo(&photo_id)?;
         change.apply(&mut photo.meta, direction);
         self.persist_photo(photo)
     }
@@ -552,49 +620,86 @@ impl Coordinator {
         }
     }
 
-    fn create_keyword(&mut self, name: String, parent: Option<KeywordId>) -> Result<Outcome> {
-        let mut vocabulary = self.read_vocabulary()?;
-        let id = KeywordId::random();
-        vocabulary.keywords.push(KeywordEntry {
+    /// Makes a keyword: the change to record, and the keyword's identifier.
+    fn make_keyword(
+        &mut self,
+        name: &str,
+        parent: Option<KeywordId>,
+        id: Option<KeywordId>,
+    ) -> Result<(KeywordId, Change)> {
+        let name = checked_name(name)?;
+        let vocabulary = self.read_vocabulary()?;
+        if let Some(parent) = parent {
+            find_keyword(&vocabulary.keywords, parent)?;
+        }
+        ensure_name_is_free(&vocabulary.keywords, &name, parent, None)?;
+        let id = id.unwrap_or_else(KeywordId::random);
+        if vocabulary.keywords.iter().any(|k| k.id == id) {
+            return Err(EngineError::InvalidCommand(format!(
+                "the keyword identifier {id} is already used"
+            )));
+        }
+        let delta = KeywordDelta {
             id,
-            name,
-            parent,
-            synonyms: Vec::new(),
-            export: true,
-            extra: Default::default(),
-        });
-        vocabulary.updated = Timestamp::now();
-        self.workspace.write_vocabulary(&vocabulary)?;
-        let path = auroraw_catalogue::keyword_paths(&vocabulary.keywords)
-            .remove(&id)
-            .unwrap_or_default();
-        let entry = vocabulary
-            .keywords
-            .into_iter()
-            .find(|k| k.id == id)
-            .expect("just inserted");
-        self.catalogue.apply_keyword(&entry, &path)?;
+            before: None,
+            after: Some(KeywordEntry {
+                id,
+                name,
+                parent,
+                synonyms: Vec::new(),
+                export: true,
+                extra: Default::default(),
+            }),
+        };
+        self.apply_vocabulary(std::slice::from_ref(&delta), Direction::Redo, false)?;
         let _ = self.events.send(Event::KeywordCreated(id));
-        Ok(Outcome::KeywordCreated(id))
+        Ok((
+            id,
+            Change::Vocabulary {
+                action: VocabularyAction::Create,
+                keywords: vec![delta],
+            },
+        ))
     }
 
-    fn rename_keyword(&mut self, keyword_id: KeywordId, new_name: String) -> Result<Outcome> {
+    /// Puts the vocabulary in the state the deltas lead to (`Redo`: after, `Undo`: before): the file, the
+    /// catalogue's keyword rows (the changed keywords and every keyword under them, whose paths moved),
+    /// and, for the photos that carry those, the sidecars' path snapshots in a background job. The one
+    /// place a change of the vocabulary is made, whether it is done, undone or redone.
+    fn apply_vocabulary(
+        &mut self,
+        keywords: &[KeywordDelta],
+        direction: Direction,
+        always_job: bool,
+    ) -> Result<Refresh> {
         let mut vocabulary = self.read_vocabulary()?;
-        if !vocabulary.keywords.iter().any(|k| k.id == keyword_id) {
-            return Err(EngineError::NotFound {
-                kind: "keyword",
-                id: keyword_id.to_string(),
-            });
-        }
-        if let Some(entry) = vocabulary.keywords.iter_mut().find(|k| k.id == keyword_id) {
-            entry.name = new_name;
+        let mut removed = Vec::new();
+        for delta in keywords {
+            let target = match direction {
+                Direction::Undo => &delta.before,
+                Direction::Redo => &delta.after,
+            };
+            vocabulary.keywords.retain(|k| k.id != delta.id);
+            match target {
+                Some(entry) => vocabulary.keywords.push(entry.clone()),
+                None => removed.push(delta.id),
+            }
         }
         vocabulary.updated = Timestamp::now();
         self.workspace.write_vocabulary(&vocabulary)?;
 
-        let affected = descendants_of(&vocabulary.keywords, keyword_id);
         let paths = auroraw_catalogue::keyword_paths(&vocabulary.keywords);
-        for id in &affected {
+        let mut changed: Vec<KeywordId> = Vec::new();
+        for delta in keywords.iter().filter(|d| !removed.contains(&d.id)) {
+            for id in descendants_of(&vocabulary.keywords, delta.id) {
+                if !changed.contains(&id) {
+                    changed.push(id);
+                }
+            }
+        }
+        // Parents before children, for the catalogue's foreign key.
+        changed.sort_by_key(|id| paths.get(id).map_or(0, |p| p.matches('|').count()));
+        for id in &changed {
             if let (Some(entry), Some(path)) = (
                 vocabulary.keywords.iter().find(|k| k.id == *id),
                 paths.get(id),
@@ -602,27 +707,198 @@ impl Coordinator {
                 self.catalogue.apply_keyword(entry, path)?;
             }
         }
+        self.catalogue.remove_keywords(&removed)?;
 
-        let photo_ids = self.catalogue.photos_with_keywords(&affected)?;
+        let photo_ids = self.catalogue.photos_with_keywords(&changed)?;
+        let affected = photo_ids.len();
+        if photo_ids.is_empty() && !always_job {
+            return Ok(Refresh {
+                job: None,
+                affected,
+            });
+        }
         let job = self.spawn_job();
-        crate::refresh::spawn(
+        self.queue_refresh(RefreshRequest {
             job,
-            self.workspace.clone(),
-            photo_ids.clone(),
+            photo_ids,
             paths,
+        });
+        Ok(Refresh {
+            job: Some(job),
+            affected,
+        })
+    }
+
+    fn queue_refresh(&mut self, request: RefreshRequest) {
+        if self.refresh_running {
+            self.refresh_queue.push_back(request);
+        } else {
+            self.start_refresh(request);
+        }
+    }
+
+    fn start_refresh(&mut self, request: RefreshRequest) {
+        self.refresh_running = true;
+        crate::refresh::spawn(
+            request.job,
+            self.workspace.clone(),
+            request.photo_ids,
+            request.paths,
             self.events.clone(),
             self.inbound.clone(),
-            self.jobs[&job].clone(),
+            self.jobs[&request.job].clone(),
         );
+    }
+
+    fn rename_keyword(&mut self, keyword_id: KeywordId, new_name: String) -> Result<Outcome> {
+        let name = checked_name(&new_name)?;
+        let vocabulary = self.read_vocabulary()?;
+        let entry = find_keyword(&vocabulary.keywords, keyword_id)?.clone();
+        ensure_name_is_free(&vocabulary.keywords, &name, entry.parent, Some(keyword_id))?;
+        let delta = KeywordDelta {
+            id: keyword_id,
+            after: Some(KeywordEntry {
+                name,
+                ..entry.clone()
+            }),
+            before: Some(entry),
+        };
+        let refresh = self.apply_vocabulary(std::slice::from_ref(&delta), Direction::Redo, true)?;
+        self.record(vec![Change::Vocabulary {
+            action: VocabularyAction::Rename,
+            keywords: vec![delta],
+        }]);
+        let job = refresh.job.expect("a rename always has its job");
         let _ = self.events.send(Event::KeywordRenamed {
             keyword_id,
             job,
-            affected: photo_ids.len(),
+            affected: refresh.affected,
         });
         Ok(Outcome::RenameStarted {
             job,
-            affected: photo_ids.len(),
+            affected: refresh.affected,
         })
+    }
+
+    fn move_keyword(
+        &mut self,
+        keyword_id: KeywordId,
+        new_parent: Option<KeywordId>,
+    ) -> Result<Outcome> {
+        let vocabulary = self.read_vocabulary()?;
+        let entry = find_keyword(&vocabulary.keywords, keyword_id)?.clone();
+        if entry.parent == new_parent {
+            return Ok(Outcome::Applied);
+        }
+        if let Some(parent) = new_parent {
+            find_keyword(&vocabulary.keywords, parent)?;
+            if descendants_of(&vocabulary.keywords, keyword_id).contains(&parent) {
+                return Err(EngineError::InvalidCommand(
+                    "a keyword cannot be moved under itself or under one of its own keywords"
+                        .into(),
+                ));
+            }
+        }
+        ensure_name_is_free(
+            &vocabulary.keywords,
+            &entry.name,
+            new_parent,
+            Some(keyword_id),
+        )?;
+        let branch = descendants_of(&vocabulary.keywords, keyword_id).len();
+        let delta = KeywordDelta {
+            id: keyword_id,
+            after: Some(KeywordEntry {
+                parent: new_parent,
+                ..entry.clone()
+            }),
+            before: Some(entry),
+        };
+        let refresh =
+            self.apply_vocabulary(std::slice::from_ref(&delta), Direction::Redo, false)?;
+        self.record(vec![Change::Vocabulary {
+            action: VocabularyAction::Move,
+            keywords: vec![delta],
+        }]);
+        let _ = self.events.send(Event::KeywordMoved(keyword_id));
+        Ok(Outcome::KeywordsChanged {
+            keywords: branch,
+            photos: refresh.affected,
+        })
+    }
+
+    /// Deletes a keyword and its branch: the photos that carry any of it lose it first (one change per
+    /// photo, as `RemoveKeyword`), then the vocabulary loses the entries, so that a rebuild never finds
+    /// a sidecar naming a keyword that is gone. All or nothing.
+    fn delete_keyword(&mut self, keyword_id: KeywordId) -> Result<Outcome> {
+        let vocabulary = self.read_vocabulary()?;
+        find_keyword(&vocabulary.keywords, keyword_id)?;
+        let branch = descendants_of(&vocabulary.keywords, keyword_id);
+        let photos = self.catalogue.photos_with_keywords(&branch)?;
+
+        let mut changes: Vec<Change> = Vec::new();
+        for photo in &photos {
+            let edited = self.edit_photo(*photo, |m| {
+                if !m.keyword_ids.iter().any(|k| branch.contains(k)) {
+                    return None;
+                }
+                let before = keyword_set(m);
+                let mut i = 0;
+                while i < m.keyword_ids.len() {
+                    if branch.contains(&m.keyword_ids[i]) {
+                        m.keyword_ids.remove(i);
+                        if i < m.keyword_paths.len() {
+                            m.keyword_paths.remove(i);
+                        }
+                    } else {
+                        i += 1;
+                    }
+                }
+                Some(Change::Keywords {
+                    photo: *photo,
+                    before,
+                    after: keyword_set(m),
+                })
+            });
+            match edited {
+                Ok(change) => changes.extend(change),
+                Err(e) => {
+                    self.take_back(&changes);
+                    return Err(e);
+                }
+            }
+        }
+        let deltas: Vec<KeywordDelta> = branch
+            .iter()
+            .filter_map(|id| vocabulary.keywords.iter().find(|k| k.id == *id))
+            .map(|entry| KeywordDelta {
+                id: entry.id,
+                before: Some(entry.clone()),
+                after: None,
+            })
+            .collect();
+        if let Err(e) = self.apply_vocabulary(&deltas, Direction::Redo, false) {
+            self.take_back(&changes);
+            return Err(e);
+        }
+        let touched = changes.len();
+        changes.push(Change::Vocabulary {
+            action: VocabularyAction::Delete,
+            keywords: deltas,
+        });
+        self.record(changes);
+        let _ = self.events.send(Event::KeywordDeleted(keyword_id));
+        Ok(Outcome::KeywordsChanged {
+            keywords: branch.len(),
+            photos: touched,
+        })
+    }
+
+    /// Takes back changes that were made, newest first (an action that failed half way).
+    fn take_back(&mut self, changes: &[Change]) {
+        for change in changes.iter().rev() {
+            let _ = self.write_change(change, Direction::Undo);
+        }
     }
 
     fn spawn_job(&mut self) -> JobId {
@@ -636,24 +912,31 @@ impl Coordinator {
         if let Some(token) = self.jobs.get(&job_id) {
             token.cancel();
         }
+        // A path refresh that has not started is simply dropped.
+        if let Some(position) = self.refresh_queue.iter().position(|r| r.job == job_id) {
+            self.refresh_queue.remove(position);
+            let _ = self.events.send(Event::JobCancelled(job_id));
+        }
         Ok(Outcome::Applied)
     }
 
-    fn handle_refreshed(
-        &mut self,
-        photo: PhotoSidecar,
-        stat: SidecarStat,
-        main_version: Option<&VersionSidecar>,
-    ) {
-        let id = photo.photo_id;
+    fn handle_refreshed(&mut self, id: PhotoId) {
+        let workspace = self.workspace.clone();
+        let _guard = workspace.sidecar_guard();
+        // A photo that has gone since (a removed source) is not an error: reconcile would catch it.
+        let Ok((photo, stat)) = self.read_photo(&id) else {
+            return;
+        };
+        let Ok(main_version) = self.main_version_of(&photo) else {
+            return;
+        };
         if self
             .catalogue
-            .apply_photo_metadata(&photo, stat, main_version)
+            .apply_photo_metadata(&photo, stat, main_version.as_ref())
             .is_ok()
         {
             let _ = self.events.send(Event::PhotoChanged(id));
         }
-        // A failure here (the photo vanished mid-refresh) is not fatal: reconcile will catch it.
     }
 
     fn rebuild(&mut self) -> Result<Outcome> {
@@ -1219,4 +1502,44 @@ fn descendants_of(vocabulary: &[KeywordEntry], id: KeywordId) -> Vec<KeywordId> 
         }
     }
     out
+}
+
+/// A keyword's name as it will be kept: trimmed, not empty, without the `|` that separates a path.
+fn checked_name(name: &str) -> Result<String> {
+    let name = name.trim();
+    if name.is_empty() || name.contains('|') {
+        return Err(EngineError::InvalidCommand(
+            "a keyword needs a name, without |".into(),
+        ));
+    }
+    Ok(name.to_string())
+}
+
+fn find_keyword(vocabulary: &[KeywordEntry], id: KeywordId) -> Result<&KeywordEntry> {
+    vocabulary
+        .iter()
+        .find(|k| k.id == id)
+        .ok_or_else(|| EngineError::NotFound {
+            kind: "keyword",
+            id: id.to_string(),
+        })
+}
+
+/// Two siblings do not share a name (whatever the case); `except` is the keyword being renamed or moved.
+fn ensure_name_is_free(
+    vocabulary: &[KeywordEntry],
+    name: &str,
+    parent: Option<KeywordId>,
+    except: Option<KeywordId>,
+) -> Result<()> {
+    let wanted = name.to_lowercase();
+    if vocabulary
+        .iter()
+        .any(|k| k.parent == parent && Some(k.id) != except && k.name.to_lowercase() == wanted)
+    {
+        return Err(EngineError::InvalidCommand(format!(
+            "there is already a keyword named {name} there"
+        )));
+    }
+    Ok(())
 }

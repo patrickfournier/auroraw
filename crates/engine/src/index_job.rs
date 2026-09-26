@@ -284,6 +284,7 @@ fn merge_sources(job: &IndexJob, catalogue: &Catalogue) -> Vec<String> {
     for (inner, prefix) in &job.merge {
         let mut moved = 0;
         for photo_id in catalogue.photos_in_source(inner).unwrap_or_default() {
+            let _guard = job.workspace.sidecar_guard();
             let Some(mut photo) = job
                 .workspace
                 .read_photo(&photo_id)

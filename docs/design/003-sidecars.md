@@ -245,7 +245,7 @@ reader does not understand is opened **read-only for the development** and its m
   refuses it.
 - **A keyword removed from the vocabulary** (deleted, or merged into another) is removed from the
   photos, or replaced by its merge target, **in one batch job** (this one does need to touch the
-  sidecars, since the photos' keyword sets change), and the identifier is never reused.
+  sidecars, since the photos' keyword sets change), and the identifier is never reused. In M1 the deletion is done on the coordinator, as one undoable action (D-099), not in a background job.
 - **Do-not-export keywords** (D-045) are written in the workspace, which is private, and **dropped
   from what leaves it**: exports and the XMP export to the source folders (§8).
 

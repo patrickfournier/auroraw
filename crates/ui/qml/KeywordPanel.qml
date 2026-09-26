@@ -8,7 +8,9 @@ import org.auroraw.ui
 // with a check that says whether the selected photos carry it none, some or all, and the number of photos
 // that have it. A click on the check gives it to the whole selection, or takes it off; the field above types
 // ahead (it filters the tree), Enter assigns the best match, and creates the keyword when nothing matches
-// (Shift+Enter creates even when something does). Every assignment is one action, one step of the history.
+// (Shift+Enter creates even when something does). Every assignment is one action, one step of the history,
+// and so is making a keyword (with the photos that first get it), renaming, moving and deleting one. A keyword is
+// moved by dragging it onto another (or onto the strip that appears for the top level), or from its menu.
 // It is the first of the panels the inspector will hold (metadata comes with WP10).
 Rectangle {
     id: panel
@@ -25,6 +27,12 @@ Rectangle {
     property alias renameDialog: renameDialog
     property alias tree: tree
     property alias collapseButton: collapseButton
+    property alias moveDialog: moveDialog
+    property alias deleteDialog: deleteDialog
+    property alias topLevelStrip: topLevelStrip
+    property alias ghost: ghost
+    // A keyword is being dragged (the top-level strip shows).
+    property bool dragging: false
 
     // The width the person dragged the panel to (double-click on the edge gives back the default).
     readonly property int defaultWidth: 280
@@ -98,7 +106,8 @@ Rectangle {
     }
 
     // Enter in the field: the best match is assigned; when nothing matches (or with `forceCreate`), what was
-    // typed becomes a keyword, under the one that was clicked if any, and is assigned.
+    // typed becomes a keyword, under the one that was clicked if any, and is assigned: making it and giving it
+    // to the selection is one step of the history.
     function commit(forceCreate) {
         const typed = field.text.trim()
         if (typed === "")
@@ -109,16 +118,37 @@ Rectangle {
             if (row >= 0)
                 id = keywords.idAt(row)
         }
-        if (id === "") {
-            id = keywords.create(typed, createUnder)
-            if (id.indexOf("error:") === 0) {
-                note = id.substring(6)
+        if (id === "")
+            id = keywords.findSibling(typed, createUnder)
+        if (id !== "") {
+            note = ""
+            assign(id, true)
+        } else {
+            const made = photoGrid.selectedCount > 0 ? photoGrid.createKeywordSelection(typed, createUnder)
+                                                      : keywords.create(typed, createUnder)
+            if (made.indexOf("error:") === 0) {
+                note = made.substring(6)
                 return
             }
+            note = ""
+            keywords.refresh()
         }
-        note = ""
-        assign(id, true)
         field.text = ""
+    }
+
+    // The pointer was released: the ghost drops (on the row or the strip under it) and goes.
+    function endDrag() {
+        ghost.Drag.drop()
+        ghost.Drag.active = false
+        ghost.visible = false
+        dragging = false
+    }
+
+    // A keyword was dropped on `parent` (an identifier; empty for the top level).
+    function dropOn(id, parent) {
+        if (id === parent)
+            return
+        note = keywords.moveKeyword(id, parent)
     }
 
     property string note: ""
@@ -219,6 +249,24 @@ Rectangle {
                 width: ListView.view.width
                 height: 28
 
+                // Dropping a keyword here makes it a child of this one (when that is possible).
+                Rectangle {
+                    anchors.fill: parent
+                    visible: rowDrop.containsDrag && rowDrop.allowed
+                    color: palette.highlight
+                    opacity: 0.35
+                    border.color: palette.highlight
+                }
+                DropArea {
+                    id: rowDrop
+                    property bool allowed: false
+                    anchors.fill: parent
+                    keys: ["keyword"]
+                    onEntered: drag => allowed = drag.source.keywordId !== row.keywordId
+                                              && panel.keywords.canMove(drag.source.keywordId, row.keywordId)
+                    onDropped: drop => panel.dropOn(drop.source.keywordId, row.keywordId)
+                }
+
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: row.depth * 14
@@ -251,8 +299,31 @@ Rectangle {
                         text: row.name
                         elide: Text.ElideRight
                         MouseArea {
+                            id: nameArea
                             anchors.fill: parent
                             acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            drag.target: ghost
+                            drag.threshold: 8
+                            onPressed: mouse => {
+                                if (mouse.button !== Qt.LeftButton)
+                                    return
+                                const at = mapToItem(panel, mouse.x, mouse.y)
+                                ghost.x = at.x - ghost.Drag.hotSpot.x
+                                ghost.y = at.y - ghost.Drag.hotSpot.y
+                                ghost.keywordId = row.keywordId
+                                ghost.label = row.name
+                            }
+                            drag.onActiveChanged: {
+                                if (drag.active) {
+                                    ghost.visible = true
+                                    ghost.Drag.active = true
+                                    panel.dragging = true
+                                } else {
+                                    // (Not here: the drop can move the keyword and the list then rebuilds its rows,
+                                    // this one included.)
+                                    panel.endDrag()
+                                }
+                            }
                             onClicked: mouse => {
                                 panel.createUnder = row.keywordId
                                 panel.createUnderName = row.name
@@ -272,6 +343,54 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        // While a keyword is dragged: where to drop it to make it a top-level keyword.
+        Rectangle {
+            id: topLevelStrip
+            Layout.fillWidth: true
+            Layout.preferredHeight: panel.dragging ? 30 : 0
+            visible: panel.dragging
+            color: topLevelDrop.containsDrag ? palette.highlight : palette.base
+            border.color: palette.mid
+            Label {
+                anchors.centerIn: parent
+                text: qsTr("Drop here for the top level")
+                color: topLevelDrop.containsDrag ? palette.highlightedText : Theme.quiet
+            }
+            DropArea {
+                id: topLevelDrop
+                property alias strip: topLevelStrip
+                anchors.fill: parent
+                keys: ["keyword"]
+                onDropped: drop => panel.dropOn(drop.source.keywordId, "")
+            }
+        }
+    }
+
+    // What follows the pointer while a keyword is dragged (it lives here, not in a row, which the list clips).
+    Rectangle {
+        id: ghost
+        property string keywordId: ""
+        property alias label: ghostLabel.text
+        visible: false
+        z: 100
+        width: 180
+        height: 26
+        radius: 3
+        color: palette.highlight
+        opacity: 0.85
+        Drag.keys: ["keyword"]
+        Drag.source: ghost
+        Drag.hotSpot.x: 12
+        Drag.hotSpot.y: height / 2
+        Label {
+            id: ghostLabel
+            anchors.fill: parent
+            anchors.leftMargin: 8
+            verticalAlignment: Text.AlignVCenter
+            color: palette.highlightedText
+            elide: Text.ElideRight
         }
     }
 
@@ -298,6 +417,21 @@ Rectangle {
         AppMenuItem {
             text: qsTr("Rename…")
             onTriggered: renameDialog.openFor(menu.row, menu.keywordName)
+        }
+        MenuSeparator {}
+        AppMenuItem {
+            text: qsTr("Move to…")
+            onTriggered: moveDialog.openFor(menu.keywordId, menu.keywordName)
+        }
+        AppMenuItem {
+            text: qsTr("Move to the top level")
+            enabled: panel.keywords.canMove(menu.keywordId, "")
+            onTriggered: panel.dropOn(menu.keywordId, "")
+        }
+        MenuSeparator {}
+        AppMenuItem {
+            text: qsTr("Delete…")
+            onTriggered: deleteDialog.openFor(menu.keywordId)
         }
     }
 
@@ -354,6 +488,122 @@ Rectangle {
                 text: qsTr("Cancel")
                 DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
                 onClicked: renameDialog.close()
+            }
+        }
+    }
+
+    AppDialog {
+        id: moveDialog
+        property string keywordId: ""
+        property string keywordName: ""
+        property var targets: []
+        property alias targetBox: targetBox
+        preferredWidth: 460
+        title: qsTr("Move the keyword")
+
+        function openFor(id, name) {
+            keywordId = id
+            keywordName = name
+            targets = JSON.parse(panel.keywords.moveTargets(id))
+            targetBox.currentIndex = targets.length > 0 ? 0 : -1
+            open()
+        }
+
+        function tryMove() {
+            if (targetBox.currentIndex < 0)
+                return
+            panel.note = panel.keywords.moveKeyword(keywordId, targets[targetBox.currentIndex].id)
+            close()
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 8
+            Label {
+                Layout.fillWidth: true
+                text: moveDialog.targets.length > 0 ? qsTr("Move “%1” under:").arg(moveDialog.keywordName)
+                                                    : qsTr("There is nowhere to move “%1”.").arg(moveDialog.keywordName)
+                wrapMode: Text.Wrap
+            }
+            ComboBox {
+                id: targetBox
+                Layout.fillWidth: true
+                model: moveDialog.targets
+                textRole: "path"
+                enabled: moveDialog.targets.length > 0
+                Accessible.name: qsTr("New parent")
+            }
+        }
+
+        footer: DialogButtonBox {
+            AppButton {
+                text: qsTr("Move")
+                highlighted: true
+                enabled: targetBox.currentIndex >= 0
+                DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+                onClicked: moveDialog.tryMove()
+            }
+            AppButton {
+                text: qsTr("Cancel")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+                onClicked: moveDialog.close()
+            }
+        }
+    }
+
+    // Deleting takes the keyword and its branch off every photo: the numbers are said, and it can be undone.
+    AppDialog {
+        id: deleteDialog
+        property string keywordId: ""
+        property string keywordName: ""
+        property int branchKeywords: 1
+        property int branchPhotos: 0
+        preferredWidth: 480
+        title: qsTr("Delete the keyword")
+
+        function openFor(id) {
+            const info = JSON.parse(panel.keywords.branch(id))
+            keywordId = id
+            keywordName = info.name
+            branchKeywords = info.keywords
+            branchPhotos = info.photos
+            open()
+        }
+
+        function confirm() {
+            panel.note = panel.keywords.remove(keywordId)
+            close()
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 8
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: deleteDialog.branchKeywords > 1
+                      ? qsTr("Delete “%1” and the %n keyword(s) under it?", "", deleteDialog.branchKeywords - 1).arg(deleteDialog.keywordName)
+                      : qsTr("Delete “%1”?").arg(deleteDialog.keywordName)
+            }
+            Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: deleteDialog.branchPhotos > 0
+                      ? qsTr("%n photo(s) will lose it. You can undo this.", "", deleteDialog.branchPhotos)
+                      : qsTr("No photo has it. You can undo this.")
+                color: Theme.quiet
+            }
+        }
+
+        footer: DialogButtonBox {
+            AppButton {
+                text: qsTr("Delete")
+                highlighted: true
+                DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+                onClicked: deleteDialog.confirm()
+            }
+            AppButton {
+                text: qsTr("Cancel")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+                onClicked: deleteDialog.close()
             }
         }
     }

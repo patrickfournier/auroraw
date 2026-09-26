@@ -34,7 +34,7 @@ pub enum Command {
         /// The new flag, or `None` to clear it.
         flag: Option<Flag>,
     },
-    /// Applies several edits (`SetRating`, `SetFlag`, `AddKeyword`, `RemoveKeyword`) as **one action**:
+    /// Applies several edits (`SetRating`, `SetFlag`, `AddKeyword`, `RemoveKeyword`, `CreateKeyword`) as **one action**:
     /// one step of the history, and all or nothing (a failing edit takes back the ones before it). How a
     /// batch of ratings, a series resolved, or a paste of metadata onto many photos is undone in one go.
     Batch {
@@ -60,22 +60,43 @@ pub enum Command {
         /// The keyword.
         keyword_id: KeywordId,
     },
-    /// Adds a keyword to the vocabulary.
+    /// Adds a keyword to the vocabulary. An action of the person's (D-099): it is a step of the history,
+    /// and it can be part of a [`Command::Batch`] with the keyword's first assignments (which name it by
+    /// `id`, chosen by the caller for that reason). Refused when a sibling already has the name.
     CreateKeyword {
         /// Its name.
         name: String,
         /// Its parent, or `None` for a top-level keyword.
         parent: Option<KeywordId>,
+        /// Its identifier, or `None` to draw one (reported by [`crate::Outcome::KeywordCreated`]).
+        id: Option<KeywordId>,
     },
-    /// Renames a keyword. Changes the vocabulary and every catalogue row it (or a descendant of
-    /// it) affects immediately; the sidecars that carry a now-stale name snapshot are refreshed
-    /// afterwards, in the background (note 003 §6), reported through
+    /// Renames a keyword (a step of the history). Changes the vocabulary and every catalogue row it (or a
+    /// descendant of it) affects immediately; the sidecars that carry a now-stale name snapshot are
+    /// refreshed afterwards, in the background (note 003 §6), reported through
     /// [`crate::Event::KeywordRenamed`] and the `Job*` events that follow it.
     RenameKeyword {
         /// The keyword.
         keyword_id: KeywordId,
         /// Its new name.
         new_name: String,
+    },
+    /// Moves a keyword, with its branch, under another keyword or to the top level (a step of the
+    /// history). Refused under itself or a descendant, and when a sibling has its name there. The paths
+    /// the sidecars carry are refreshed in the background, as for a rename.
+    MoveKeyword {
+        /// The keyword.
+        keyword_id: KeywordId,
+        /// Its new parent, or `None` for the top level.
+        new_parent: Option<KeywordId>,
+    },
+    /// Deletes a keyword and its whole branch (a step of the history, and an undo brings all of it back):
+    /// the keywords leave the vocabulary, the catalogue and every photo that carried one. Done on the
+    /// coordinator, like a batch of ratings; [`crate::Outcome::KeywordsChanged`] says how many keywords
+    /// and photos it touched.
+    DeleteKeyword {
+        /// The keyword at the top of the branch.
+        keyword_id: KeywordId,
     },
     /// Cancels a background job (a keyword rename's sidecar refresh) started earlier.
     CancelJob {

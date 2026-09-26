@@ -32,7 +32,8 @@ FocusScope {
     property alias keywords: keywordList
     property alias keywordPanel: keywordPanel
     // A dialog of the panel is open (the window's commands wait, as for every dialog).
-    readonly property bool dialogOpen: keywordPanel.renameDialog.visible
+    readonly property bool dialogOpen: keywordPanel.renameDialog.visible || keywordPanel.moveDialog.visible
+                                       || keywordPanel.deleteDialog.visible
     // The name of the keyword the list is filtered by, for its chip.
     property string keywordFilterName: ""
 
@@ -47,7 +48,13 @@ FocusScope {
     Connections {
         target: Bus
         // Every keyword added or removed, undone or redone, changes what the selection carries.
-        function onHistoryChanged() { keywordList.refresh(); usageTimer.restart() }
+        function onHistoryChanged() {
+            keywordList.refresh()
+            usageTimer.restart()
+            // The keyword the list is filtered by was deleted (or its creation undone): back to the whole list.
+            if (photoGrid.keywordFilter !== "" && !keywordList.hasKeyword(photoGrid.keywordFilter))
+                root.filterKeyword("", "")
+        }
     }
 
     function flagName(index) {
@@ -170,6 +177,11 @@ FocusScope {
     // An action was undone or redone (Edit menu, Ctrl+Z): the photos it touched are shown as they are now,
     // selected, and the first is brought into view, as a person expects to see what was undone.
     function historyApplied(photoIds) {
+        // A step about the vocabulary touches no photo the person should be sent to: the selection stays.
+        if (photoIds.length === 0) {
+            updateSummary()
+            return
+        }
         for (const id of photoIds)
             photoGrid.syncPhoto(id)
         // A filter may now list a photo it did not, or not list one it did.

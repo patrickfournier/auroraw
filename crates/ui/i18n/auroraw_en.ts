@@ -138,8 +138,31 @@
             <numerusform>Undo keywords of %n photos</numerusform>
         </translation>
     </message>
-    <message numerus="yes">
+    <message>
         <location filename="../qml/AppActions.qml" line="60"/>
+        <source>Undo creating the keyword</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AppActions.qml" line="61"/>
+        <source>Undo renaming the keyword</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AppActions.qml" line="62"/>
+        <source>Undo moving the keyword</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="63"/>
+        <source>Undo deleting %n keyword(s)</source>
+        <translation>
+            <numerusform>Undo deleting %n keyword</numerusform>
+            <numerusform>Undo deleting %n keywords</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="64"/>
         <source>Undo the change to %n photo(s)</source>
         <translation>
             <numerusform>Undo the change</numerusform>
@@ -147,13 +170,13 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="62"/>
-        <location filename="../qml/AppActions.qml" line="77"/>
+        <location filename="../qml/AppActions.qml" line="66"/>
+        <location filename="../qml/AppActions.qml" line="85"/>
         <source>Undo</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/AppActions.qml" line="67"/>
+        <location filename="../qml/AppActions.qml" line="71"/>
         <source>Redo %n rating(s)</source>
         <translation>
             <numerusform>Redo rating</numerusform>
@@ -161,7 +184,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/AppActions.qml" line="68"/>
+        <location filename="../qml/AppActions.qml" line="72"/>
         <source>Redo %n flag(s)</source>
         <translation>
             <numerusform>Redo flag</numerusform>
@@ -169,15 +192,38 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/AppActions.qml" line="69"/>
+        <location filename="../qml/AppActions.qml" line="73"/>
         <source>Redo keywords of %n photo(s)</source>
         <translation>
             <numerusform>Redo keywords</numerusform>
             <numerusform>Redo keywords of %n photos</numerusform>
         </translation>
     </message>
+    <message>
+        <location filename="../qml/AppActions.qml" line="74"/>
+        <source>Redo creating the keyword</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AppActions.qml" line="75"/>
+        <source>Redo renaming the keyword</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/AppActions.qml" line="76"/>
+        <source>Redo moving the keyword</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message numerus="yes">
-        <location filename="../qml/AppActions.qml" line="70"/>
+        <location filename="../qml/AppActions.qml" line="77"/>
+        <source>Redo deleting %n keyword(s)</source>
+        <translation>
+            <numerusform>Redo deleting %n keyword</numerusform>
+            <numerusform>Redo deleting %n keywords</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/AppActions.qml" line="78"/>
         <source>Redo the change to %n photo(s)</source>
         <translation>
             <numerusform>Redo the change</numerusform>
@@ -185,53 +231,53 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="72"/>
-        <location filename="../qml/AppActions.qml" line="84"/>
+        <location filename="../qml/AppActions.qml" line="80"/>
+        <location filename="../qml/AppActions.qml" line="92"/>
         <source>Redo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="91"/>
+        <location filename="../qml/AppActions.qml" line="99"/>
         <source>Cut</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="98"/>
+        <location filename="../qml/AppActions.qml" line="106"/>
         <source>Copy</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="105"/>
+        <location filename="../qml/AppActions.qml" line="113"/>
         <source>Paste</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="112"/>
+        <location filename="../qml/AppActions.qml" line="120"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="130"/>
+        <location filename="../qml/AppActions.qml" line="138"/>
         <source>Select all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="137"/>
+        <location filename="../qml/AppActions.qml" line="145"/>
         <source>Select none</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="144"/>
+        <location filename="../qml/AppActions.qml" line="152"/>
         <source>Keywords</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="151"/>
+        <location filename="../qml/AppActions.qml" line="159"/>
         <source>Invert selection</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppActions.qml" line="159"/>
+        <location filename="../qml/AppActions.qml" line="167"/>
         <source>About Auroraw</source>
         <translation type="unfinished"></translation>
     </message>
@@ -585,80 +631,163 @@
 <context>
     <name>KeywordPanel</name>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="92"/>
+        <location filename="../qml/KeywordPanel.qml" line="159"/>
         <source>Keywords</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="100"/>
+        <location filename="../qml/KeywordPanel.qml" line="167"/>
         <source>Hide the keyword panel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="108"/>
+        <location filename="../qml/KeywordPanel.qml" line="175"/>
         <source>Find or add a keyword…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="109"/>
+        <location filename="../qml/KeywordPanel.qml" line="176"/>
         <source>Find or add a keyword</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="128"/>
+        <location filename="../qml/KeywordPanel.qml" line="195"/>
         <source>New keywords go under %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="135"/>
+        <location filename="../qml/KeywordPanel.qml" line="202"/>
         <source>New keywords go at the top level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="143"/>
+        <location filename="../qml/KeywordPanel.qml" line="210"/>
         <source>Select photos to give them keywords.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="239"/>
+        <location filename="../qml/KeywordPanel.qml" line="350"/>
+        <source>Drop here for the top level</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="396"/>
         <source>Show the keyword panel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="249"/>
+        <location filename="../qml/KeywordPanel.qml" line="406"/>
         <source>Show the photos with this keyword</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="253"/>
+        <location filename="../qml/KeywordPanel.qml" line="410"/>
         <source>Rename…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="264"/>
+        <location filename="../qml/KeywordPanel.qml" line="415"/>
+        <source>Move to…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="419"/>
+        <source>Move to the top level</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="425"/>
+        <source>Delete…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="436"/>
         <source>Rename the keyword</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="288"/>
+        <location filename="../qml/KeywordPanel.qml" line="460"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="302"/>
+        <location filename="../qml/KeywordPanel.qml" line="474"/>
         <source>Rename</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="308"/>
+        <location filename="../qml/KeywordPanel.qml" line="480"/>
+        <location filename="../qml/KeywordPanel.qml" line="538"/>
+        <location filename="../qml/KeywordPanel.qml" line="596"/>
         <source>Cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="494"/>
+        <source>Move the keyword</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="515"/>
+        <source>Move “%1” under:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="516"/>
+        <source>There is nowhere to move “%1”.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="525"/>
+        <source>New parent</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="531"/>
+        <source>Move</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="553"/>
+        <source>Delete the keyword</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/KeywordPanel.qml" line="575"/>
+        <source>Delete “%1” and the %n keyword(s) under it?</source>
+        <translation>
+            <numerusform>Delete “%1” and the %n keyword under it?</numerusform>
+            <numerusform>Delete “%1” and the %n keywords under it?</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="576"/>
+        <source>Delete “%1”?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/KeywordPanel.qml" line="582"/>
+        <source>%n photo(s) will lose it. You can undo this.</source>
+        <translation>
+            <numerusform>%n photo will lose it. You can undo this.</numerusform>
+            <numerusform>%n photos will lose it. You can undo this.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="583"/>
+        <source>No photo has it. You can undo this.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="590"/>
+        <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>Library</name>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="29"/>
+        <location filename="../qml/Library.qml" line="30"/>
         <source>%n photo(s)</source>
         <translation>
             <numerusform>%n photo</numerusform>
@@ -666,27 +795,27 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="53"/>
+        <location filename="../qml/Library.qml" line="61"/>
         <source>Not rejected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="53"/>
+        <location filename="../qml/Library.qml" line="61"/>
         <source>All photos</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="54"/>
+        <location filename="../qml/Library.qml" line="62"/>
         <source>Picked</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="54"/>
+        <location filename="../qml/Library.qml" line="62"/>
         <source>Rejected</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="28"/>
+        <location filename="../qml/Library.qml" line="29"/>
         <source>%n photo(s) selected</source>
         <translation>
             <numerusform>%n photo selected</numerusform>
@@ -694,52 +823,52 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="215"/>
+        <location filename="../qml/Library.qml" line="228"/>
         <source>All</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="215"/>
+        <location filename="../qml/Library.qml" line="228"/>
         <source>1+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="215"/>
+        <location filename="../qml/Library.qml" line="228"/>
         <source>2+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="216"/>
+        <location filename="../qml/Library.qml" line="229"/>
         <source>3+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="216"/>
+        <location filename="../qml/Library.qml" line="229"/>
         <source>4+</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="216"/>
+        <location filename="../qml/Library.qml" line="229"/>
         <source>5</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="233"/>
+        <location filename="../qml/Library.qml" line="246"/>
         <source>Show photos by flag</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="247"/>
+        <location filename="../qml/Library.qml" line="260"/>
         <source>Keyword: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="262"/>
+        <location filename="../qml/Library.qml" line="275"/>
         <source>Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Library.qml" line="468"/>
+        <location filename="../qml/Library.qml" line="481"/>
         <source>Photo, %n star(s)</source>
         <translation>
             <numerusform>Photo, %n star</numerusform>
@@ -747,12 +876,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="468"/>
+        <location filename="../qml/Library.qml" line="481"/>
         <source>Photo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Library.qml" line="489"/>
+        <location filename="../qml/Library.qml" line="502"/>
         <source>No preview</source>
         <translation type="unfinished"></translation>
     </message>
@@ -790,12 +919,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="341"/>
+        <location filename="../qml/Main.qml" line="342"/>
         <source>Choose a folder in the folder dialog…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="352"/>
+        <location filename="../qml/Main.qml" line="353"/>
         <source>Open a workspace</source>
         <translation type="unfinished"></translation>
     </message>
