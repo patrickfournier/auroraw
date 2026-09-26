@@ -21,8 +21,10 @@ AppTestCase {
 
         // The catalogue task is on screen throughout: nothing but the scan asks for the thumbnails.
         app.currentTask = "catalogue"
+        // The grid asked for the first photos' thumbnails as the window opened: let those be made, so
+        // that only the new source's are counted below.
+        tryVerify(() => files.previewsCount(home + "/cache") === 20, 30000, "the 20 photos' thumbnails")
         const before = files.previewsCount(home + "/cache")
-        verify(before >= 0, "the workspace has a previews database")
         addSource(app.launcher.env("AURORAW_TEST_EXTRA"))
         waitForTheScan()
         verify(app.flow.status.indexOf("Done: 5 added") === 0, app.flow.status)
