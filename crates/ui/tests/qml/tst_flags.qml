@@ -12,10 +12,7 @@ AppTestCase {
     property var grid: null
 
     function init() {
-        launch("")
-        app.width = 1680
-        wait(300)
-        tryCompare(app.photos, "count", 40, 20000)
+        launchWithPhotos(40)
         grid = app.library.grid
     }
 

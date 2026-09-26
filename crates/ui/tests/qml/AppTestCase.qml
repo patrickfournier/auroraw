@@ -33,6 +33,24 @@ TestCase {
         return app
     }
 
+    // The application on the shared machine, with the window widened for the keyword panel, once its grid lists
+    // `photos` photos. A slow runner (Windows) sometimes has not let go of the workspace of the window before, and
+    // the new one opens nothing: it is then closed and made again.
+    function launchWithPhotos(photos) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            launch("")
+            app.width = 1680
+            const deadline = Date.now() + 12000
+            while (app.photos.count !== photos && Date.now() < deadline)
+                wait(100)
+            if (app.photos.count === photos)
+                return
+            quit()
+            wait(1000)
+        }
+        compare(app.photos.count, photos, "the machine's photos were listed")
+    }
+
     function quit() {
         if (app) {
             app.close()
