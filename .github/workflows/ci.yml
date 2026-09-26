@@ -5,8 +5,7 @@ name: CI
 
 on:
   push:
-    # (feature/qt-ui: the Qt UI port's branch, D-094; removed when it is merged.)
-    branches: [dev, main, feature/qt-ui]
+    branches: [dev, main]
   pull_request:
 
 permissions:
