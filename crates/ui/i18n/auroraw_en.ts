@@ -631,119 +631,149 @@
 <context>
     <name>KeywordPanel</name>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="188"/>
+        <location filename="../qml/KeywordPanel.qml" line="167"/>
+        <source>A keyword needs a name, without |.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="169"/>
+        <source>A keyword cannot be moved under itself or under one of its own keywords.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="171"/>
+        <source>There is already a keyword named “%1” there.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="210"/>
         <source>Keywords</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="196"/>
+        <location filename="../qml/KeywordPanel.qml" line="218"/>
         <source>Hide the keyword panel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="204"/>
+        <location filename="../qml/KeywordPanel.qml" line="226"/>
         <source>Find or add a keyword…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="205"/>
+        <location filename="../qml/KeywordPanel.qml" line="227"/>
         <source>Find or add a keyword</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="227"/>
+        <location filename="../qml/KeywordPanel.qml" line="252"/>
+        <source>Add “%1” at the top level</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="253"/>
+        <source>Add “%1” under %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="261"/>
+        <source>Shift+Enter</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/KeywordPanel.qml" line="270"/>
         <source>New keywords go under %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="235"/>
+        <location filename="../qml/KeywordPanel.qml" line="278"/>
         <source>New keywords go at the top level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="414"/>
+        <location filename="../qml/KeywordPanel.qml" line="456"/>
         <source>Show the keyword panel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="424"/>
+        <location filename="../qml/KeywordPanel.qml" line="466"/>
         <source>Show the photos with this keyword</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="428"/>
+        <location filename="../qml/KeywordPanel.qml" line="470"/>
         <source>Rename…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="433"/>
+        <location filename="../qml/KeywordPanel.qml" line="475"/>
         <source>Move to…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="437"/>
+        <location filename="../qml/KeywordPanel.qml" line="479"/>
         <source>Move to the top level</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="443"/>
+        <location filename="../qml/KeywordPanel.qml" line="485"/>
         <source>Delete…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="454"/>
+        <location filename="../qml/KeywordPanel.qml" line="496"/>
         <source>Rename the keyword</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="478"/>
+        <location filename="../qml/KeywordPanel.qml" line="520"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="492"/>
+        <location filename="../qml/KeywordPanel.qml" line="534"/>
         <source>Rename</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="498"/>
-        <location filename="../qml/KeywordPanel.qml" line="556"/>
-        <location filename="../qml/KeywordPanel.qml" line="614"/>
+        <location filename="../qml/KeywordPanel.qml" line="540"/>
+        <location filename="../qml/KeywordPanel.qml" line="598"/>
+        <location filename="../qml/KeywordPanel.qml" line="656"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="512"/>
+        <location filename="../qml/KeywordPanel.qml" line="554"/>
         <source>Move the keyword</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="533"/>
+        <location filename="../qml/KeywordPanel.qml" line="575"/>
         <source>Move “%1” under:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="534"/>
+        <location filename="../qml/KeywordPanel.qml" line="576"/>
         <source>There is nowhere to move “%1”.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="543"/>
+        <location filename="../qml/KeywordPanel.qml" line="585"/>
         <source>New parent</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="549"/>
+        <location filename="../qml/KeywordPanel.qml" line="591"/>
         <source>Move</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="571"/>
+        <location filename="../qml/KeywordPanel.qml" line="613"/>
         <source>Delete the keyword</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/KeywordPanel.qml" line="593"/>
+        <location filename="../qml/KeywordPanel.qml" line="635"/>
         <source>Delete “%1” and the %n keyword(s) under it?</source>
         <translation>
             <numerusform>Delete “%1” and the %n keyword under it?</numerusform>
@@ -751,12 +781,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="594"/>
+        <location filename="../qml/KeywordPanel.qml" line="636"/>
         <source>Delete “%1”?</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/KeywordPanel.qml" line="600"/>
+        <location filename="../qml/KeywordPanel.qml" line="642"/>
         <source>%n photo(s) will lose it. You can undo this.</source>
         <translation>
             <numerusform>%n photo will lose it. You can undo this.</numerusform>
@@ -764,12 +794,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="601"/>
+        <location filename="../qml/KeywordPanel.qml" line="643"/>
         <source>No photo has it. You can undo this.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/KeywordPanel.qml" line="608"/>
+        <location filename="../qml/KeywordPanel.qml" line="650"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>

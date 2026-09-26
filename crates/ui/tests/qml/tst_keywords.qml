@@ -213,6 +213,35 @@ AppTestCase {
         verify(rowOf("Rome") >= 0)
     }
 
+    function test_a_name_that_exists_deeper_in_the_tree_can_be_added_at_the_top_level() {
+        selectFirst(2)
+        typeKeyword("Animal")
+        const animal = item("Animal")
+        mouseClick(animal, animal.depth * 14 + 60, animal.height / 2)
+        tryVerify(() => app.keywordPanel.createUnderName === "Animal")
+        typeKeyword("Renard")
+        tryItem("Renard", "depth", 1)
+        app.keywordPanel.createUnder = ""
+        click(6)
+        // Enter would give the Renard that exists; the button (and Shift+Enter) make another at the top level.
+        app.library.focusKeywords()
+        tryVerify(() => app.keywordPanel.filterField.activeFocus)
+        app.keywordPanel.filterField.text = "Renard"
+        const panel = app.keywordPanel
+        tryVerify(() => panel.canAdd && panel.addButton.visible)
+        compare(panel.addButton.text, "Add “Renard” at the top level")
+        snapshot("keywords-add-en")
+        mouseClick(panel.addButton)
+        tryVerify(() => {
+            let n = 0
+            for (let i = 0; i < app.library.keywords.count; i++)
+                n += app.library.keywords.nameAt(i) === "Renard" ? 1 : 0
+            return n === 2
+        }, 5000, "two keywords named Renard")
+        verify(!panel.canAdd, "there is one at the top level now")
+        compare(panel.filterField.text, "", "the field is emptied")
+    }
+
     function test_shift_enter_makes_the_keyword_even_when_another_matches() {
         selectFirst(2)
         typeKeyword("Sea")
@@ -304,6 +333,9 @@ AppTestCase {
         typeKeyword("Vue")
         app.launcher.chooseLanguage("fr")
         wait(250)
+        compare(app.keywordPanel.explain("taken:Vue"), "Il y a déjà un mot-clé nommé «\u00a0Vue\u00a0» à cet endroit.")
+        compare(app.keywordPanel.explain("cycle"), "Un mot-clé ne peut pas être déplacé sous lui-même ni sous l’un de ses propres mots-clés.")
+        compare(app.keywordPanel.explain("name"), "Un mot-clé doit avoir un nom, sans |.")
         compare(app.keywordPanel.filterField.placeholderText, "Chercher ou ajouter un mot-clé…")
         tryVerify(() => app.actions.undo.text === "Annuler la création du mot-clé", 5000, app.actions.undo.text)
         compare(app.library.summary, "3 photos sélectionnées", "what is already on screen changes language")

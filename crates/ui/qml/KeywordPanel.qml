@@ -32,6 +32,7 @@ Rectangle {
     property alias deleteDialog: deleteDialog
     property alias topLevelDrop: topLevelDrop
     property alias contextMenu: menu
+    property alias addButton: addButton
     property alias ghost: ghost
     // A keyword is being dragged (the top-level strip shows).
     property bool dragging: false
@@ -148,7 +149,7 @@ Rectangle {
             const made = photoGrid.selectedCount > 0 ? photoGrid.createKeywordSelection(typed, createUnder)
                                                       : keywords.create(typed, createUnder)
             if (made.indexOf("error:") === 0) {
-                note = made.substring(6)
+                note = explain(made.substring(6))
                 return
             }
             note = ""
@@ -156,6 +157,26 @@ Rectangle {
         }
         field.text = ""
     }
+
+    // A refusal, in words: the models answer with a code (`name`, `taken:<name>`, `cycle`, or `other:` and the
+    // engine's own English), the sentence is the interface's, so that it is translated. Empty for no refusal.
+    function explain(code) {
+        if (code === "")
+            return ""
+        if (code === "name")
+            return qsTr("A keyword needs a name, without |.")
+        if (code === "cycle")
+            return qsTr("A keyword cannot be moved under itself or under one of its own keywords.")
+        if (code.indexOf("taken:") === 0)
+            return qsTr("There is already a keyword named “%1” there.").arg(code.substring(6))
+        return code.indexOf("other:") === 0 ? code.substring(6) : code
+    }
+
+    // What was typed can be added as a keyword where new keywords go (nothing of that name is there yet). Enter
+    // gives the best match instead, which may be a keyword of the same name elsewhere in the tree: this is
+    // how to make a second one (Shift+Enter does the same from the keyboard).
+    readonly property string typed: field.text.trim()
+    readonly property bool canAdd: (keywords.count, typed !== "" && keywords.findSibling(typed, createUnder) === "")
 
     // The pointer was released: the ghost drops (on the row or the strip under it) and goes.
     function endDrag() {
@@ -169,7 +190,7 @@ Rectangle {
     function dropOn(id, parent) {
         if (id === parent)
             return
-        note = keywords.moveKeyword(id, parent)
+        note = explain(keywords.moveKeyword(id, parent))
     }
 
     property string note: ""
@@ -217,28 +238,48 @@ Rectangle {
         }
 
         // Where a new keyword will go, once a keyword was clicked.
-        // (The row keeps its place when there is nothing to say, so that the list below does not move.)
+        // One line that always has its place, so that the list below does not move: the button that adds what was
+        // typed, else where new keywords go (once a keyword was clicked).
         RowLayout {
             Layout.fillWidth: true
             Layout.preferredHeight: 30
             Layout.maximumHeight: 30
+            AppButton {
+                id: addButton
+                visible: panel.canAdd
+                Layout.fillWidth: true
+                focusPolicy: Qt.NoFocus
+                text: panel.createUnder === "" ? qsTr("Add “%1” at the top level").arg(panel.typed)
+                                               : qsTr("Add “%1” under %2").arg(panel.typed).arg(panel.createUnderName)
+                contentItem: Label {
+                    text: addButton.text
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Shift+Enter")
+                onClicked: {
+                    panel.commit(true)
+                    field.forceActiveFocus()
+                }
+            }
             Label {
-                visible: panel.createUnder !== ""
+                visible: !panel.canAdd && panel.createUnder !== ""
                 Layout.fillWidth: true
                 text: qsTr("New keywords go under %1").arg(panel.createUnderName)
                 color: Theme.quiet
                 elide: Text.ElideRight
             }
             ToolButton {
-                visible: panel.createUnder !== ""
+                visible: !panel.canAdd && panel.createUnder !== ""
                 text: "×"
                 focusPolicy: Qt.NoFocus
                 Accessible.name: qsTr("New keywords go at the top level")
                 onClicked: panel.createUnder = ""
             }
-            Item { Layout.fillWidth: panel.createUnder === "" }
+            Item { Layout.fillWidth: !panel.canAdd && panel.createUnder === "" }
         }
-
 
         ListView {
             id: tree
@@ -468,7 +509,7 @@ Rectangle {
             if (reason === "")
                 close()
             else
-                error = reason
+                error = panel.explain(reason)
         }
 
         contentItem: ColumnLayout {
@@ -523,7 +564,7 @@ Rectangle {
         function tryMove() {
             if (targetBox.currentIndex < 0)
                 return
-            panel.note = panel.keywords.moveKeyword(keywordId, targets[targetBox.currentIndex].id)
+            panel.note = panel.explain(panel.keywords.moveKeyword(keywordId, targets[targetBox.currentIndex].id))
             close()
         }
 
@@ -581,7 +622,7 @@ Rectangle {
         }
 
         function confirm() {
-            panel.note = panel.keywords.remove(keywordId)
+            panel.note = panel.explain(panel.keywords.remove(keywordId))
             close()
         }
 

@@ -8,7 +8,7 @@ use core::pin::Pin;
 use std::collections::{HashMap, HashSet};
 
 use auroraw_catalogue::KeywordRow;
-use auroraw_engine::{Command, KeywordId, Outcome};
+use auroraw_engine::{Command, EngineError, KeywordId, Outcome};
 use cxx_qt::CxxQtType;
 use cxx_qt_lib::{
     QByteArray, QHash, QHashPair_i32_QByteArray, QModelIndex, QString, QVariant, QVector,
@@ -42,6 +42,18 @@ pub struct KeywordListRust {
 
 fn text(value: &str) -> QString {
     QString::from(value)
+}
+
+/// What the panel is told when the engine refuses a keyword edit: a code that the interface turns into a
+/// sentence in the person's language (`name`, `taken:<name>`, `cycle`), or `other:` and the engine's own
+/// (English) words for what has no sentence of its own.
+pub(crate) fn reason(error: &EngineError) -> String {
+    match error {
+        EngineError::KeywordName => "name".into(),
+        EngineError::KeywordNameTaken(name) => format!("taken:{name}"),
+        EngineError::KeywordCycle => "cycle".into(),
+        other => format!("other:{other}"),
+    }
 }
 
 impl KeywordListRust {
@@ -205,11 +217,11 @@ impl KeywordList {
 
     pub fn create(mut self: Pin<&mut Self>, name: &QString, parent: &QString) -> QString {
         let Some(session) = session::current() else {
-            return text("error:no workspace is open");
+            return text("error:other:No workspace is open.");
         };
         let name = name.to_string().trim().to_string();
         if name.is_empty() || name.contains('|') {
-            return text("error:a keyword needs a name without |");
+            return text("error:name");
         }
         let parent: Option<KeywordId> = parent.to_string().parse().ok();
         // The name is there already under that parent: that keyword is the one.
@@ -229,18 +241,18 @@ impl KeywordList {
                 self.as_mut().refresh();
                 text(&id.to_string())
             }
-            Ok(other) => text(&format!("error:unexpected answer {other:?}")),
-            Err(e) => text(&format!("error:{e}")),
+            Ok(other) => text(&format!("error:other:Unexpected answer {other:?}")),
+            Err(e) => text(&format!("error:{}", reason(&e))),
         }
     }
 
     pub fn rename(mut self: Pin<&mut Self>, row: i32, name: &QString) -> QString {
         let (Some(session), Some(id)) = (session::current(), self.row(row).map(|k| k.id)) else {
-            return text("no such keyword");
+            return text("other:No such keyword.");
         };
         let new_name = name.to_string().trim().to_string();
         if new_name.is_empty() || new_name.contains('|') {
-            return text("a keyword needs a name without |");
+            return text("name");
         }
         match session.engine.submit_and_wait(Command::RenameKeyword {
             keyword_id: id,
@@ -250,7 +262,7 @@ impl KeywordList {
                 self.as_mut().refresh();
                 QString::default()
             }
-            Err(e) => text(&e.to_string()),
+            Err(e) => text(&reason(&e)),
         }
     }
 
@@ -377,10 +389,10 @@ impl KeywordList {
     /// Puts the keyword under `parent` (an identifier; empty for the top level); empty, or why not.
     pub fn move_keyword(mut self: Pin<&mut Self>, id: &QString, parent: &QString) -> QString {
         let Some(session) = session::current() else {
-            return text("no workspace is open");
+            return text("other:No workspace is open.");
         };
         let Ok(keyword_id) = id.to_string().parse::<KeywordId>() else {
-            return text("no such keyword");
+            return text("other:No such keyword.");
         };
         let new_parent: Option<KeywordId> = parent.to_string().parse().ok();
         // What was moved is to be seen where it went.
@@ -395,17 +407,17 @@ impl KeywordList {
                 self.as_mut().refresh();
                 QString::default()
             }
-            Err(e) => text(&e.to_string()),
+            Err(e) => text(&reason(&e)),
         }
     }
 
     /// Deletes the keyword and its branch (one step of the history); empty, or why not.
     pub fn remove(mut self: Pin<&mut Self>, id: &QString) -> QString {
         let Some(session) = session::current() else {
-            return text("no workspace is open");
+            return text("other:No workspace is open.");
         };
         let Ok(keyword_id) = id.to_string().parse::<KeywordId>() else {
-            return text("no such keyword");
+            return text("other:No such keyword.");
         };
         match session
             .engine
@@ -415,7 +427,7 @@ impl KeywordList {
                 self.as_mut().refresh();
                 QString::default()
             }
-            Err(e) => text(&e.to_string()),
+            Err(e) => text(&reason(&e)),
         }
     }
 

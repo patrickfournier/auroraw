@@ -180,7 +180,7 @@ AppTestCase {
         drag(item("Alpha"), target, 100, target.height / 2)
         compare(item("Alpha").depth, 0, "a keyword does not go under its own")
         compare(item("Beta").depth, 1)
-        verify(app.keywordPanel.note !== "", "the panel says why")
+        compare(app.keywordPanel.note, "A keyword cannot be moved under itself or under one of its own keywords.")
         // A name that is already there is refused too.
         app.keywordPanel.note = ""
         make("Gamma")
@@ -190,7 +190,7 @@ AppTestCase {
         drag(itemAtRow(lastRowOf("Gamma")), gamma, 100, gamma.height / 2) // the top-level Gamma onto Delta, which has a Gamma
         compare(item("Delta").depth, 0)
         compare(itemAtRow(lastRowOf("Gamma")).depth, 0, "the top-level Gamma did not move")
-        verify(app.keywordPanel.note !== "", "the panel says why")
+        compare(app.keywordPanel.note, "There is already a keyword named “Gamma” there.")
     }
 
     function test_the_move_dialog_lists_where_a_keyword_can_go() {

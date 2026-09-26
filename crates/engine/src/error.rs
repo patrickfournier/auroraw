@@ -26,6 +26,15 @@ pub enum EngineError {
     /// A command that cannot be done the way it was asked (an edit that is not one, in a batch).
     #[error("{0}")]
     InvalidCommand(String),
+    /// A keyword needs a name, and the name cannot contain `|` (it separates the parts of a path).
+    #[error("A keyword needs a name, without |.")]
+    KeywordName,
+    /// A sibling has the name already (whatever the case).
+    #[error("There is already a keyword named “{0}” there.")]
+    KeywordNameTaken(String),
+    /// A keyword cannot be moved under itself or one of its own keywords.
+    #[error("A keyword cannot be moved under itself or under one of its own keywords.")]
+    KeywordCycle,
     /// The coordinator thread has already stopped (a command was sent after `shutdown`, or it
     /// panicked: the latter is always a bug, since every command is caught, never propagated).
     #[error("the engine is no longer running")]

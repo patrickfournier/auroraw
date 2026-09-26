@@ -197,7 +197,7 @@ fn a_keyword_made_alone_can_be_undone_and_a_name_that_is_taken_is_refused() {
         id: None,
     });
     assert!(
-        matches!(again, Err(EngineError::InvalidCommand(_))),
+        matches!(again, Err(EngineError::KeywordNameTaken(_))),
         "a sibling has that name, whatever the case: {again:?}"
     );
     // Under another parent the same name is fine.
@@ -209,7 +209,7 @@ fn a_keyword_made_alone_can_be_undone_and_a_name_that_is_taken_is_refused() {
                 parent: None,
                 id: None
             }),
-            Err(EngineError::InvalidCommand(_))
+            Err(EngineError::KeywordName)
         ));
     }
     f.engine.undo().unwrap(); // the child
@@ -297,16 +297,24 @@ fn a_move_that_makes_a_cycle_or_a_name_clash_is_refused_and_changes_nothing() {
     let c = f.create("C", Some(b));
     let other_b = f.create("b", None);
     let before = f.vocabulary().len();
-    for (id, parent) in [(a, Some(a)), (a, Some(c)), (b, Some(c)), (other_b, Some(a))] {
+    for (id, parent) in [(a, Some(a)), (a, Some(c)), (b, Some(c))] {
         let refused = f.engine.submit_and_wait(Command::MoveKeyword {
             keyword_id: id,
             new_parent: parent,
         });
         assert!(
-            matches!(refused, Err(EngineError::InvalidCommand(_))),
+            matches!(refused, Err(EngineError::KeywordCycle)),
             "{id} under {parent:?}: {refused:?}"
         );
     }
+    let clash = f.engine.submit_and_wait(Command::MoveKeyword {
+        keyword_id: other_b,
+        new_parent: Some(a),
+    });
+    assert!(
+        matches!(clash, Err(EngineError::KeywordNameTaken(_))),
+        "{clash:?}"
+    );
     assert_eq!(f.vocabulary().len(), before);
     let rows: Vec<String> = f.rows().into_iter().map(|r| r.0).collect();
     assert_eq!(rows, ["A", "A|B", "A|B|C", "b"]);

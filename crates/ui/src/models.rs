@@ -897,7 +897,7 @@ impl qobject::PhotoGrid {
         parent: &QString,
     ) -> QString {
         let Some(session) = session::current() else {
-            return QString::from("error:no workspace is open");
+            return QString::from("error:other:No workspace is open.");
         };
         let rows = self.selected_rows();
         let keyword_id = auroraw_types::KeywordId::random();
@@ -918,7 +918,7 @@ impl qobject::PhotoGrid {
         };
         match session.engine.submit_and_wait(command) {
             Ok(_) => QString::from(keyword_id.to_string().as_str()),
-            Err(e) => QString::from(format!("error:{e}").as_str()),
+            Err(e) => QString::from(format!("error:{}", crate::keyword_list::reason(&e)).as_str()),
         }
     }
 

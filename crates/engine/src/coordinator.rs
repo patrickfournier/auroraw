@@ -793,10 +793,7 @@ impl Coordinator {
         if let Some(parent) = new_parent {
             find_keyword(&vocabulary.keywords, parent)?;
             if descendants_of(&vocabulary.keywords, keyword_id).contains(&parent) {
-                return Err(EngineError::InvalidCommand(
-                    "a keyword cannot be moved under itself or under one of its own keywords"
-                        .into(),
-                ));
+                return Err(EngineError::KeywordCycle);
             }
         }
         ensure_name_is_free(
@@ -1508,9 +1505,7 @@ fn descendants_of(vocabulary: &[KeywordEntry], id: KeywordId) -> Vec<KeywordId> 
 fn checked_name(name: &str) -> Result<String> {
     let name = name.trim();
     if name.is_empty() || name.contains('|') {
-        return Err(EngineError::InvalidCommand(
-            "a keyword needs a name, without |".into(),
-        ));
+        return Err(EngineError::KeywordName);
     }
     Ok(name.to_string())
 }
@@ -1537,9 +1532,7 @@ fn ensure_name_is_free(
         .iter()
         .any(|k| k.parent == parent && Some(k.id) != except && k.name.to_lowercase() == wanted)
     {
-        return Err(EngineError::InvalidCommand(format!(
-            "there is already a keyword named {name} there"
-        )));
+        return Err(EngineError::KeywordNameTaken(name.to_string()));
     }
     Ok(())
 }
