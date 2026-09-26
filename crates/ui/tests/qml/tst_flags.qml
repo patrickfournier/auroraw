@@ -72,8 +72,9 @@ AppTestCase {
         key(Qt.Key_X)
         for (let i = 2; i <= 5; i++)
             compare(cell(i).flag, 2, "one of them was rejected already: X sets it on all")
-        tryVerify(() => app.actions.undo.enabled, 5000)
-        compare(app.actions.undo.text, "Undo 3 flags", "the photo that had the flag is not part of the step")
+        // (The step before it, "Undo flag", is still the label until the engine has recorded this one.)
+        tryVerify(() => app.actions.undo.text === "Undo 3 flags", 5000,
+                  "the photo that had the flag is not part of the step: " + app.actions.undo.text)
         key(Qt.Key_X)
         for (let i = 2; i <= 5; i++)
             compare(cell(i).flag, 0, "every photo had it: X takes it off all")
