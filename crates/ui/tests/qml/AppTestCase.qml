@@ -62,8 +62,7 @@ TestCase {
         const root = files.env("AUR_SNAPSHOT_DIR")
         if (root === "")
             return
-        // (Its own folder: the Slint shell's tests, until they go, write theirs beside.)
-        const dir = root + "/qt"
+        const dir = root + "/views"
         files.mkdir(dir)
         grabImage(app.contentItem).save(dir + "/" + name + ".png")
         // Dialogs and menus live in the overlay, above the content.

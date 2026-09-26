@@ -112,7 +112,7 @@ FocusScope {
             cellHeight: 124
             currentIndex: -1
             // The arrows are ours, so that a step down from above a short last row lands on its
-            // last photo (the Slint shell's rule, `gridmath::step`).
+            // last photo (`gridmath::step`).
             keyNavigationEnabled: false
             readonly property int columns: Math.max(1, Math.floor(width / cellWidth))
             readonly property int visibleRows: Math.max(1, Math.floor(height / cellHeight))

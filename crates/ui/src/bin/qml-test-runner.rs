@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 
 use auroraw_engine::LocalDirs;
-use auroraw_ui_qt::Launch;
+use auroraw_ui::Launch;
 
 fn main() {
     if std::env::args().nth(1).as_deref() == Some("--app") {
@@ -19,7 +19,7 @@ fn main() {
             pictures: PathBuf::from("Pictures"),
             open: None,
         };
-        std::process::exit(i32::from(auroraw_ui_qt::run(launch).is_err()));
+        std::process::exit(i32::from(auroraw_ui::run(launch).is_err()));
     }
-    std::process::exit(auroraw_ui_qt::quick_test());
+    std::process::exit(auroraw_ui::quick_test());
 }

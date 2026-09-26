@@ -11,14 +11,9 @@ description = "The Auroraw application"
 [lints]
 workspace = true
 
-[features]
-# The Qt Quick interface (D-094) instead of the Slint one, until the cutover makes it the only one:
-# `cargo run -p auroraw-app --features qt`.
-qt = ["dep:auroraw-ui-qt"]
-
 [dependencies]
-auroraw-ui = { path = "../ui" }
-auroraw-ui-qt = { path = "../ui-qt", default-features = false, optional = true }
+# Without its test runner (QtQuickTest), which the application does not carry.
+auroraw-ui = { path = "../ui", default-features = false }
 auroraw-engine = { path = "../engine" }
 auroraw-types = { path = "../types" }
 # The platform's own data, cache and Pictures folders (design note 001 §5.7).

@@ -7,7 +7,8 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-/// The languages the interface is translated into (`i18n/<code>/`).
+/// The languages the interface is translated into: English (the source text of every string) and the
+/// `.ts` files of `i18n/`.
 pub const LANGUAGES: &[&str] = &["en", "fr"];
 
 /// The application's settings.
@@ -45,7 +46,7 @@ impl AppSettings {
     }
 }
 
-/// The bundled language for a setting: itself when it is one of ours, else the machine's own when
+/// The language to use for a setting: itself when it is one of ours, else the machine's own when
 /// that is one of ours, else English.
 pub fn resolve_language(setting: &str) -> &'static str {
     let wanted = if LANGUAGES.contains(&setting) {

@@ -6,33 +6,37 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
-description = "The Slint user interface"
+description = "The Qt Quick user interface (D-094)"
 
 [lints]
 workspace = true
+
+[features]
+default = ["quicktest"]
+# QtQuickTest's runner (the QML test suites): links two more Qt libraries, so the application itself is
+# built without it (`default-features = false`).
+quicktest = []
 
 [dependencies]
 auroraw-catalogue = { path = "../catalogue" }
 auroraw-engine = { path = "../engine" }
 auroraw-imaging = { path = "../imaging" }
 auroraw-types = { path = "../types" }
+cxx = "1"
+cxx-qt = "0.10"
+cxx-qt-lib = { version = "0.10", features = ["full"] }
 serde.workspace = true
 serde_json.workspace = true
-image = { version = "0.25", default-features = false, features = ["jpeg"] }
-# Native folder picker: the Windows and macOS system dialogs, the desktop portal on Linux (`wayland`
-# lets it name the application's window as its parent there, `raw-window-handle-06` on Slint gives
-# it that window).
-rfd = { version = "0.17", default-features = false, features = ["xdg-portal", "wayland"] }
-slint = { version = "1.18", features = ["raw-window-handle-06"] }
 sys-locale = "0.3"
 
 [build-dependencies]
-slint-build = "1.18"
+cxx-qt-build = "0.10"
 
 [dev-dependencies]
-# Runs the interface without a window or a display (testing strategy §6). Its API is preliminary
-# and its version must equal Slint's exactly: bump the two together.
-image = { version = "0.25", default-features = false, features = ["png"] }
-i-slint-backend-testing = { version = "=1.18.1", features = ["renderer-software"] }
 auroraw-testkit = { path = "../testkit" }
-auroraw-workspace = { path = "../workspace" }
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+
+[[bin]]
+name = "qml-test-runner"
+path = "src/bin/qml-test-runner.rs"
+required-features = ["quicktest"]

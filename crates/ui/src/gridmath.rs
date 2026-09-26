@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! Where a keyboard move in the grid goes: a step to a neighbour, a page, the first or last photo.
-//! Pure, so it is unit-tested without Qt. The same rules as the Slint shell's `grid::step` and
-//! `grid::jump`.
+//! Pure, so it is unit-tested without Qt.
 
 /// The index a step of `(dx, dy)` cells from `current` lands on, in a grid `cols` wide with `len`
 /// photos: always a photo, never outside the list (a step down from above a short last row lands on

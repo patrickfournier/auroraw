@@ -4,7 +4,7 @@ import QtQuick.Controls
 import org.auroraw.ui
 import QtQuick.Layouts
 
-// The Qt twin of the Slint NewWorkspaceDialog: a real modal Dialog, and the system's folder dialog.
+// New workspace: a real modal Dialog, and the system's folder dialog.
 AppDialog {
     id: dialog
     required property var launcher

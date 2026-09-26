@@ -1,39 +1,59 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! The Slint user interface. It talks only to the engine (architecture §3.2): the types this
-//! crate uses beyond `auroraw_engine` itself are plain data (`PhotoId`, `Thumbnail`) the engine's
-//! own public API already hands back, the same way `cli` uses `auroraw_format`'s and
-//! `auroraw_types`'s data types directly without depending on how the engine computes them.
-//! Work package WP8: the shell, the welcome list, the library grid. Grows with later work packages
-//! (cull mode, develop, publish, WP9 onward).
+//! The Qt Quick user interface (D-094). It talks only to the
+//! engine (architecture §3.2): the Rust objects here are thin, the screens are QML (`qml/`), and the
+//! only C++ is `glue.cpp` (an image provider, the translation loader, the QtQuickTest entry).
+//!
+//! `unsafe` is confined to the modules that talk to C++ (`glue`, and the cxx-qt bridges): everything
+//! else keeps the workspace's `deny` (D-094).
 
-mod app;
 mod app_settings;
-pub mod commands;
-mod grid;
-// Without a display, elements are found through the compiler's debug info, which a release build
-// leaves out (`build.rs`): these tests run in debug builds only.
-#[cfg(all(test, debug_assertions))]
-mod headless_tests;
+#[allow(unsafe_code)]
+mod bus;
+// The table is read by its own checks only, until a command palette reads it too.
 #[cfg(test)]
-mod i18n_check;
-mod settings;
-mod workspace_shell;
-
-// Slint's own generated code carries no doc comments; this crate's `missing_docs` lint (workspace
-// wide) would otherwise warn on every item the macro below produces.
-#[allow(missing_docs)]
-mod generated {
-    slint::include_modules!();
-}
+mod commands;
+#[allow(unsafe_code)]
+mod files;
+#[allow(unsafe_code)]
+mod folders;
+#[allow(unsafe_code)]
+mod glue;
+mod gridmath;
+#[allow(unsafe_code)]
+mod import_form;
+mod import_settings;
+#[allow(unsafe_code)]
+mod launcher;
+#[allow(unsafe_code)]
+mod models;
+mod session;
+#[allow(unsafe_code)]
+mod shortcuts;
+#[allow(unsafe_code)]
+mod source_list;
 
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Mutex;
 
-use auroraw_engine::{Engine, LocalDirs, VolumeInfo};
+use auroraw_engine::LocalDirs;
+use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QQuickStyle, QString, QUrl};
 
-/// What a launch needs from the application: where this machine keeps its data (this crate
-/// resolves no directory itself, like every crate under `engine`), the Pictures folder new
-/// workspaces are offered in, and optionally a workspace to open instead of the last one.
+mod translations {
+    include!(concat!(env!("OUT_DIR"), "/translations.rs"));
+}
+
+/// The compiled translation for a language code (`None` when there is none: the source texts).
+pub(crate) fn translation_for(code: &str) -> Option<&'static [u8]> {
+    translations::TRANSLATIONS
+        .iter()
+        .find(|(language, _)| *language == code)
+        .map(|(_, bytes)| *bytes)
+}
+
+/// What a launch needs from the application: where this machine keeps its data (this crate resolves no
+/// directory itself, like every crate under `engine`), the Pictures folder new workspaces are offered
+/// in, and optionally a workspace to open instead of the last one.
+#[derive(Debug, Clone)]
 pub struct Launch {
     /// The data and cache folders.
     pub dirs: LocalDirs,
@@ -43,80 +63,109 @@ pub struct Launch {
     pub open: Option<PathBuf>,
 }
 
-/// Asks a person for a folder: called with the window the dialog belongs to (it opens over that
-/// window and, where the system allows, keeps it from being used meanwhile), a dialog title, the
-/// folder to open the dialog at, and what to do with the answer (`None` when the dialog was
-/// cancelled). Returns whether a dialog was started. The answer is delivered on the interface
-/// thread. Tests without a display pass a picker of their own: a native dialog cannot be opened
-/// without one.
-pub type FolderPicker =
-    Rc<dyn Fn(&slint::Window, &str, Option<PathBuf>, Box<dyn FnOnce(Option<PathBuf>)>) -> bool>;
+static LAUNCH: Mutex<Option<Launch>> = Mutex::new(None);
 
-/// The removable volumes mounted right now.
-pub type VolumeLister = Rc<dyn Fn() -> Vec<VolumeInfo>>;
+/// A sub-folder of `AURORAW_TEST_HOME` a test chose as its machine (`Launcher.useMachine`).
+static MACHINE: Mutex<Option<String>> = Mutex::new(None);
 
-/// What the interface asks of the machine it runs on, so the tests without a display can stand in
-/// for it: the system's folder dialog and the list of mounted cards.
-#[derive(Clone)]
-pub struct Platform {
-    /// The folder dialog.
-    pub pick_folder: FolderPicker,
-    /// The mounted removable volumes.
-    pub volumes: VolumeLister,
+/// Chooses the machine the tests run on: a folder named `name` under `AURORAW_TEST_HOME` (the folder
+/// itself for an empty name).
+pub(crate) fn use_machine(name: &str) {
+    *MACHINE.lock().unwrap() = Some(name.to_string());
 }
 
-impl Platform {
-    /// This machine's own.
-    pub fn native() -> Self {
-        Self {
-            pick_folder: native_folder_picker(),
-            volumes: Rc::new(Engine::removable_volumes),
+/// The launch in force. `AURORAW_TEST_HOME`, when set, moves the data, cache and Pictures folders
+/// under it (a hook for the tests, which each get a machine of their own).
+pub(crate) fn launch() -> Launch {
+    let mut launch = LAUNCH
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("run() or quick_test() stored the launch");
+    if let Some(home) = std::env::var_os("AURORAW_TEST_HOME") {
+        let mut home = PathBuf::from(home);
+        if let Some(name) = MACHINE.lock().unwrap().as_deref() {
+            home = home.join(name);
         }
+        launch.dirs = LocalDirs {
+            data: home.join("data"),
+            cache: home.join("cache"),
+        };
+        launch.pictures = home.join("Pictures");
+    }
+    launch
+}
+
+/// Why the interface stopped with an error.
+#[derive(Debug)]
+pub struct UiError(pub String);
+
+impl std::fmt::Display for UiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
     }
 }
 
-/// Opens the window (the last workspace, or the welcome list) and runs until the application is
-/// quit or its window closed.
-pub fn run(launch: Launch) -> Result<(), slint::PlatformError> {
-    let _launcher = app::Launcher::start(launch, Platform::native())?;
-    slint::run_event_loop_until_quit()
+impl std::error::Error for UiError {}
+
+/// Forces the linker to keep what cxx-qt registers at start-up (the QML module and this crate's
+/// objects), which a library crate would otherwise lose.
+fn keep_registrations() {
+    cxx_qt::init_crate!(auroraw_ui);
+    cxx_qt::init_qml_module!("org.auroraw.ui");
 }
 
-/// The system's own folder dialog (Windows and macOS: the native ones; Linux: the desktop portal),
-/// run as a task of the event loop so the window stays alive and the dialog cannot freeze it.
-fn native_folder_picker() -> FolderPicker {
-    Rc::new(|window, title, start, done| {
-        let title = title.to_string();
-        // The dialog is made a child of the application's window, so that it stays over it and the
-        // window cannot be used (or closed) while it is open.
-        let parent = window.window_handle();
-        slint::spawn_local(async move {
-            let mut dialog = rfd::AsyncFileDialog::new()
-                .set_title(title)
-                .set_parent(&parent);
-            if let Some(start) = start {
-                dialog = dialog.set_directory(start);
-            }
-            done(
-                dialog
-                    .pick_folder()
-                    .await
-                    .map(|folder| folder.path().to_path_buf()),
-            );
-        })
-        .is_ok()
-    })
+/// The application's look and language, before any screen exists: Fusion on every platform (D-094,
+/// no native styles), and the language the settings (or the machine) ask for.
+fn prepare_style() {
+    QQuickStyle::set_style(&QString::from("Fusion"));
 }
 
-/// Where a folder dialog should open for what is typed in a field: the folder itself when it
-/// exists, else the closest folder above it that does, else the system's default (`None`).
-fn start_directory(typed: &str) -> Option<PathBuf> {
-    let typed = typed.trim();
-    if typed.is_empty() {
-        return None;
+/// Opens the window (the last workspace, or the welcome list) and runs until the application is quit
+/// or its window closed.
+pub fn run(launch: Launch) -> Result<(), UiError> {
+    keep_registrations();
+    *LAUNCH.lock().unwrap() = Some(launch);
+    prepare_style();
+    let mut app = QGuiApplication::new();
+    // A test that starts the application asks it to stop by itself.
+    if let Some(ms) = std::env::var("AURORAW_TEST_QUIT_MS")
+        .ok()
+        .and_then(|ms| ms.parse().ok())
+    {
+        glue::quit_after(ms);
     }
-    std::path::Path::new(typed)
-        .ancestors()
-        .find(|candidate| !candidate.as_os_str().is_empty() && candidate.is_dir())
-        .map(std::path::Path::to_path_buf)
+    let mut engine = QQmlApplicationEngine::new();
+    let Some(mut engine) = engine.as_mut() else {
+        return Err(UiError("the QML engine could not be created".into()));
+    };
+    glue::add_import_path(engine.as_mut(), "qrc:/qt/qml");
+    engine.load(&QUrl::from("qrc:/qt/qml/org/auroraw/ui/qml/Main.qml"));
+    match app.as_mut() {
+        Some(app) => {
+            app.exec();
+            Ok(())
+        }
+        None => Err(UiError(
+            "the application object could not be created".into(),
+        )),
+    }
+}
+
+/// Runs the QtQuickTest suites named on the command line against the QML module (the test runner
+/// binary calls this); returns the number of failures. Each suite gets a machine of its own through
+/// `AURORAW_TEST_HOME`.
+#[cfg(feature = "quicktest")]
+pub fn quick_test() -> i32 {
+    keep_registrations();
+    *LAUNCH.lock().unwrap() = Some(Launch {
+        dirs: LocalDirs {
+            data: PathBuf::from("unused"),
+            cache: PathBuf::from("unused"),
+        },
+        pictures: PathBuf::from("unused"),
+        open: None,
+    });
+    prepare_style();
+    glue::quick_test(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/qml"))
 }

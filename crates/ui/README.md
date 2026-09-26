@@ -1,7 +1,7 @@
-# auroraw-ui-qt
+# auroraw-ui
 
-The Qt Quick user interface (decision D-094). It replaces the Slint `crates/ui` at cutover (milestones
-Q1 to Q7 of the port, `docs/m1-plan.md`), and until then `cargo run -p auroraw-app --features qt` runs it.
+The Qt Quick user interface (decision D-094; it replaced a first one in Slint, D-072), which
+`cargo run -p auroraw-app` runs.
 
 - `src/`: thin Rust objects over the engine (`launcher`, the list models in `models`, the event `bus`),
   the C++ glue (`glue.cpp`: the asynchronous thumbnail image provider, the translation loader and the
@@ -20,4 +20,4 @@ Q1 to Q7 of the port, `docs/m1-plan.md`), and until then `cargo run -p auroraw-a
   `grabImage(...).save(...)` to a test.
 
 Trying a typeface without a rebuild: `AURORAW_FONT="Inter" AURORAW_FONT_SIZE=13 cargo run -p auroraw-app
---features qt`.
+`.

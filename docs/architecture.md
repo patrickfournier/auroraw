@@ -35,7 +35,7 @@ Budgets and what the spikes measured against them:
 | Photo from the cache under 100 ms | thumbnails 0.25 ms to decode; a page of 200 in 6 ms cold |
 | Opening a catalogue of 100,000 photos: a few seconds | 6 ms to open, 0.6 s to list 87,715 photos cold |
 | Search under 200 ms | 1 ms (full text), 21 ms for the slowest filter |
-| 60 frames per second | held by Slint on Linux and Windows with a new image on every frame |
+| 60 frames per second | held by Slint on Linux and Windows with a new image on every frame (spike 2; the Qt Quick provider path of spike 5 is the base for the image view) |
 
 ## 2. Technology [decided]
 
@@ -67,7 +67,7 @@ and the packaging of each platform.
 
 ```mermaid
 flowchart TD
-  app["app (binary)"] --> ui["ui (Slint views and models)"]
+  app["app (binary)"] --> ui["ui (Qt Quick views and models)"]
   cli["cli (headless)"] --> engine
   cli --> catalogue
   cli --> format
@@ -146,7 +146,7 @@ runs in a separate helper process, so that its crash or corruption stays out of 
 
 | Thread or pool | Role |
 | --- | --- |
-| **Interface thread** | Slint. Displays, takes input. **No work that can take more than a frame**: spike 2 showed that Slint renders on it. |
+| **Interface thread** | Qt Quick (QML), on Qt's GUI thread. Displays, takes input. **No work that can take more than a frame**: the objects in `ui` are thin, thumbnails are made and decoded off it, and the engine's events reach it through a queue. |
 | **Engine coordinator** | Owns the state of the open catalogue, sequences commands, is the **single writer** of the workspace and of the database. |
 | **Worker pool** | Sized to the physical cores. Runs decoding, thumbnails, verified copies, sidecar parsing. Each worker holds its own plugin instances and its own database connections (SQLite in WAL mode: many readers, one writer). |
 | **GPU thread** | Owns the wgpu device and queue, the stage caches and the memory budget (§6). |
@@ -334,7 +334,7 @@ Black levels are per channel (the spike averaged them), and highlight reconstruc
   provides the display profile or applies it** (spike 2): the profile comes from the operating
   system (colord, the Windows colour system, ColorSync), which is a task per platform [open].
 - The toolkit's job is to display the bytes it is given, unaltered; Slint and Qt were checked to
-  do so exactly.
+  do so exactly (spikes 2 and 5).
 
 ### 6.6 Fallbacks [open in part]
 
@@ -533,8 +533,9 @@ The shell is organised by **task** (Import, Cull, Develop, Publish) around a lib
 
 ### 10.3 Rendering back end [open]
 
-Slint's default is femtovg (OpenGL). It ran at 60 frames per second on Linux and Windows. macOS
-deprecates OpenGL; Slint's Skia or Metal renderer may be needed there. To check in M1.
+Qt Quick 6.8 draws through Qt's RHI (Metal on macOS, Direct3D on Windows, OpenGL or Vulkan on Linux), so
+OpenGL's deprecation on macOS does not bind it (D-094). The interface's suites run offscreen on the software
+renderer on every platform; the image view's own rendering path is designed with the develop module.
 
 ## 11. Across the modules
 
@@ -576,7 +577,7 @@ deprecates OpenGL; Slint's Skia or Metal renderer may be needed there. To check 
 
 | # | Item | Why it matters | To settle |
 | --- | --- | --- | --- |
-| 1 | Slint on macOS | OpenGL is deprecated there | M1: run on a Mac; evaluate Skia or Metal |
+| 1 | ~~Slint on macOS~~ | Closed by D-094: the interface is Qt Quick, which draws through Metal there; macOS runs the interface's suites in CI | Done |
 | 2 | ~~DirectX 12 on a real GPU, and the Intel iGPU~~ | Closed (issue #1, 2026-09-22): both pass the smoke test on Patrick's machine | Done |
 | 3 | NTFS and antivirus with 243,000 sidecars, **including a real spinning disk** | Sidecars measured in WP1 (design note 001 §4.2): correct, but slow on a hard disk (25 minutes to write 225,000 files). D-075 (the thumbnail database) is still provisional. | The thumbnail database on NTFS |
 | 4 | Identity of a file edited elsewhere | The fingerprint changes with the content | Design in M1 (spec §10, 6) |

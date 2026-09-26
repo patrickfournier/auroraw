@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! Import as a person uses it (spec §5.2, M1 plan WP7 and D-090, D-093): copying the photos of a card or
-//! folder to another folder, verified, with an optional second destination. The Qt-side twin of the
-//! import handlers of `crates/ui/src/workspace_shell.rs`, on the same engine calls. The sentences it
-//! leads to (progress, results, what the destination is to the catalogue) are QML's, so that they are
+//! folder to another folder, verified, with an optional second destination, on the engine's own calls.
+//! The sentences it leads to (progress, results, what the destination is to the catalogue) are QML's, so that they are
 //! translated; this object answers with codes and JSON.
 
 #[cxx_qt::bridge]

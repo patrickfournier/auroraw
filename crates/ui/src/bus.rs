@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! The event bus: what the engine reports, as QML signals on one singleton. A thread blocks on the
 //! engine's event receiver and queues each event onto the GUI thread, where the `Bus` emits it; QML
-//! and the other objects connect to what they care about. (The Slint shell polled the receiver from
-//! two timers.) Each milestone adds the events its screens need.
+//! and the other objects connect to what they care about. Each milestone adds the events its screens need.
 
 #[cxx_qt::bridge]
 pub mod qobject {

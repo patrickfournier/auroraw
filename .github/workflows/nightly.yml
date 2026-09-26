@@ -36,8 +36,8 @@ jobs:
         with:
           version: 6.8.3
           cache: true
-      # The Slint interface's headless test backend needs fontconfig's headers (as in ci.yml).
-      - name: Install Slint's Linux build dependencies
+      # The Qt libraries need the platform's display, font and GL libraries (as in ci.yml).
+      - name: Install the system libraries Qt Quick needs on Linux (display, fonts, GL)
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libxcb1-dev \

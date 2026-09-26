@@ -87,7 +87,7 @@ and named for screen readers. The reasons are in [docs/testing-strategy.md](docs
 
 ## Translations
 
-Translations are Qt Linguist `.ts` files (`crates/ui-qt/i18n/auroraw_<code>.ts`, editable with Qt
+Translations are Qt Linguist `.ts` files (`crates/ui/i18n/auroraw_<code>.ts`, editable with Qt
 Linguist or any text editor), **sent as pull requests**. Say in an issue which language
 you take, so that nobody works on the same one twice. A language ships when it is at least 90 %
 translated for the main views, passes the automatic checks, and has a named person who reviews

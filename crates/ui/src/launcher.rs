@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! The launcher: which workspaces this machine knows, creating and opening one, and the interface's
-//! own settings (the language). The Qt-side twin of `crates/ui/src/app.rs` (the Slint launcher), on
-//! the same engine calls.
+//! own settings (the language), on the engine's own calls.
 
 #[cxx_qt::bridge]
 pub mod qobject {

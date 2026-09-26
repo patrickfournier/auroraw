@@ -1,9 +1,10 @@
 # Interface port: parity checklist (Slint to Qt Quick, milestone Q6)
 
 Every one of the 54 headless scenarios of the Slint shell (`crates/ui/src/headless_tests.rs`) has a
-counterpart in the Qt Quick interface's own suites (`crates/ui-qt/tests/qml/tst_*.qml`, run by
-`crates/ui-qt/tests/qml.rs`, offscreen, with real key and mouse events), or in a Rust unit test where the
-rule is pure. This page is the checklist of the port (D-094); it goes with the Slint crate at cutover (Q7).
+counterpart in the Qt Quick interface's own suites (`crates/ui/tests/qml/tst_*.qml`, run by
+`crates/ui/tests/qml.rs`, offscreen, with real key and mouse events), or in a Rust unit test where the
+rule is pure. This page is the checklist of the port (D-094), kept as its record: the Slint scenarios can be read at the
+tag `slint-shell-final` (`crates/ui/src/headless_tests.rs`).
 "same name" means the Qt test carries the Slint scenario's name.
 
 Beyond the 54: the modal guard against keyboard shortcuts, the Alt mnemonics that follow the language,
@@ -81,4 +82,4 @@ Not automated, and never driven by an automated session on a person's desktop: t
 dialogs (stay over the window, modal), typing with an input method (`é`, dead keys, Compose), the grey theme
 and fonts on the real display, HiDPI, scrolling a large grid on the real GPU, the menu keys, the window
 resize. Patrick's pass on Linux and Windows is Q0's checklist again, on the real application:
-`cargo run -p auroraw-app --features qt` (see CONTRIBUTING.md).
+`cargo run -p auroraw-app` (see CONTRIBUTING.md).

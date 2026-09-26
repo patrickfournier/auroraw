@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-//! The list models: the library grid's (`PhotoGrid`, over the open workspace's photos; the Qt-side twin
-//! of `crates/ui/src/grid.rs`, whose selection is the `GridView`'s here and whose moves are `gridmath`) and the
+//! The list models: the library grid's (`PhotoGrid`, over the open workspace's photos; the selection is the
+//! `GridView`'s and the moves are `gridmath`) and the
 //! welcome list's (`KnownWorkspaces`, over the registry). Both are `QAbstractListModel`s, and the base
 //! class can only be declared once per link, so they share this bridge.
 

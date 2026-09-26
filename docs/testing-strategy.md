@@ -182,7 +182,7 @@ translation can fail unnoticed. What is checked:
   (spike 2: nothing heavy on the interface thread).
 - **The interface is tested without a display first, on a real machine second.** Qt Quick Test
   (D-094) runs the whole interface offscreen with the software renderer, in a process of its own per
-  suite (`crates/ui-qt/tests/qml/tst_*.qml`, started by `tests/qml.rs`, so `cargo nextest run` runs
+  suite (`crates/ui/tests/qml/tst_*.qml`, started by `tests/qml.rs`, so `cargo nextest run` runs
   them): each test makes the real window on a machine of its own (a folder standing for a person's
   computer, made by the harness), clicks and keys are real events sent to the window, and the
   engine's events arrive through the real event bus. The suites cover the welcome list and workspace

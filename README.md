@@ -28,7 +28,7 @@ Quick (D-094), so building also needs **Qt 6.4 or later**, **cmake 3.24 or later
 cargo build --workspace
 cargo test --workspace
 cargo xtask check      # licence headers and the allowed dependencies between crates
-cargo run -p auroraw-app --features qt   # the Qt Quick interface (until it replaces the Slint one)
+cargo run -p auroraw-app                 # the application
 ```
 
 The crates are described in the [architecture](docs/architecture.md) (§3). The code of the four

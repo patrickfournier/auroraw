@@ -5,7 +5,7 @@ name: CI
 
 on:
   push:
-    # (feature/qt-ui: the Qt UI port's long-lived branch, D-094; removed when it is merged.)
+    # (feature/qt-ui: the Qt UI port's branch, D-094; removed when it is merged.)
     branches: [dev, main, feature/qt-ui]
   pull_request:
 
@@ -37,7 +37,7 @@ jobs:
         with:
           version: 6.8.3
           cache: true
-      - name: Install Slint's Linux build dependencies (WP8, ui and app)
+      - name: Install the system libraries Qt Quick needs on Linux (display, fonts, GL)
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libwayland-dev libxcb1-dev \
@@ -88,7 +88,7 @@ jobs:
           version: 6.8.3
           arch: ${{ matrix.arch }}
           cache: true
-      - name: Install Slint's Linux build dependencies (WP8, ui and app)
+      - name: Install the system libraries Qt Quick needs on Linux (display, fonts, GL)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update

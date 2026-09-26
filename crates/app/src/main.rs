@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! The Auroraw application: `--version` and `--self-test` for CI's launch test, and otherwise the
-//! real Slint shell, which opens the last workspace, or the welcome list (WP8).
+//! Qt Quick interface, which opens the last workspace, or the welcome list (WP8).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -52,10 +52,7 @@ fn main() -> ExitCode {
                 eprintln!("cannot find this machine's data folders");
                 return ExitCode::FAILURE;
             };
-            #[cfg(not(feature = "qt"))]
             use auroraw_ui as ui;
-            #[cfg(feature = "qt")]
-            use auroraw_ui_qt as ui;
             let launch = ui::Launch {
                 dirs,
                 pictures,
