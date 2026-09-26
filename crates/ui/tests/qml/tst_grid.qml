@@ -171,6 +171,7 @@ AppTestCase {
         rateSelected(3)
         rateSelected(3)
         tryVerify(() => app.actions.undo.enabled)
+        wait(300)
         undo()
         tryCompare(grid.itemAtIndex(0), "rating", 0)
         tryVerify(() => !app.actions.undo.enabled, 5000, "the second press was not a step")
@@ -178,8 +179,10 @@ AppTestCase {
         rateSelected(1)
         rateSelected(2)
         tryCompare(grid.itemAtIndex(0), "rating", 2)
+        wait(300) // the engine's word that both steps are in the history reaches the menu
         undo()
         tryCompare(grid.itemAtIndex(0), "rating", 1)
+        wait(300)
         undo()
         tryCompare(grid.itemAtIndex(0), "rating", 0)
     }
