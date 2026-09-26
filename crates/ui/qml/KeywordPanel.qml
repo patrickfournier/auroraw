@@ -25,7 +25,14 @@ Rectangle {
     property alias tree: tree
     property alias collapseButton: collapseButton
 
-    Layout.preferredWidth: expanded ? 280 : 30
+    // The width the person dragged the panel to (double-click on the edge gives back the default).
+    readonly property int defaultWidth: 280
+    readonly property int minimumWidth: 200
+    readonly property int maximumWidth: 640
+    property int panelWidth: defaultWidth
+    property alias edge: edge
+
+    Layout.preferredWidth: expanded ? panelWidth : 30
     color: palette.window
 
     Rectangle {
@@ -33,7 +40,32 @@ Rectangle {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         width: 1
-        color: palette.dark
+        color: edge.containsMouse || edge.pressed ? palette.highlight : palette.dark
+    }
+
+    // The edge beside the grid: drag it to widen or narrow the panel.
+    MouseArea {
+        id: edge
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: 6
+        visible: panel.expanded
+        hoverEnabled: true
+        cursorShape: Qt.SizeHorCursor
+        property real startX: 0
+        property int startWidth: 0
+        onPressed: mouse => {
+            startX = mapToItem(null, mouse.x, 0).x
+            startWidth = panel.panelWidth
+        }
+        onPositionChanged: mouse => {
+            if (pressed) {
+                const dx = startX - mapToItem(null, mouse.x, 0).x
+                panel.panelWidth = Math.max(panel.minimumWidth, Math.min(panel.maximumWidth, Math.round(startWidth + dx)))
+            }
+        }
+        onDoubleClicked: panel.panelWidth = panel.defaultWidth
     }
 
     // Shows the panel and puts the keyboard in its field.

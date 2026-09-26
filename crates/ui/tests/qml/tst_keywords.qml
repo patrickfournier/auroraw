@@ -239,6 +239,22 @@ AppTestCase {
         tryCompare(panel, "width", 280)
     }
 
+    function test_the_panel_is_widened_and_narrowed_by_its_edge() {
+        const panel = app.keywordPanel
+        compare(panel.width, 280)
+        const edge = panel.edge
+        mousePress(edge, 2, 100)
+        mouseMove(edge, -78, 100)
+        mouseRelease(edge, -78, 100)
+        tryCompare(panel, "width", 360)
+        mousePress(edge, 2, 100)
+        mouseMove(edge, 402, 100)
+        mouseRelease(edge, 402, 100)
+        tryCompare(panel, "width", panel.minimumWidth, 5000, "it does not get narrower than its minimum")
+        mouseDoubleClickSequence(edge, 2, 100)
+        tryCompare(panel, "width", 280)
+    }
+
     function test_the_panel_speaks_french() {
         selectFirst(3)
         typeKeyword("Vue")
