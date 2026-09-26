@@ -237,7 +237,13 @@ AppTestCase {
         rateSelected(5)
         clickCell(2)
         rateSelected(1)
-        wait(300)
+        // The ratings reach the catalogue on the engine's own time (slower on a busy runner): wait until it lists them.
+        tryVerify(() => {
+            app.library.filterBy(3)
+            return app.photos.count === 2
+        }, 15000)
+        app.library.filterBy(0)
+        tryCompare(app.photos, "count", 80)
         const buttons = app.library.filterButtons
         compare(buttons.count, 6)
         compare(buttons.itemAt(0).text, "All")
